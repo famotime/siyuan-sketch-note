@@ -2,6 +2,7 @@ import {
   Plugin,
   fetchSyncPost,
   getFrontend,
+  getActiveEditor,
 } from "siyuan";
 import "@/index.scss";
 import { init, destroy } from "./main";
@@ -67,18 +68,8 @@ export default class SketchNotePlugin extends Plugin {
   };
 
   private getCurrentDocId(): string | null {
-    // 方案 1: 从编辑器 DOM 获取当前文档根块 ID
-    const docElement = document.querySelector('.protyle.wysiwyg [data-node-id]');
-    if (docElement) {
-      return docElement.getAttribute('data-node-id');
-    }
-    // 方案 2: 从 URL hash 获取（格式: #notebookId/docId）
-    const hash = location.hash;
-    const match = hash.match(/#([a-z0-9]+)\/([a-z0-9]+)/);
-    if (match) {
-      return match[2];
-    }
-    return null;
+    const editor = getActiveEditor();
+    return editor?.protyle?.block?.rootID || null;
   }
 
   private async insertSketchBlock() {
@@ -92,11 +83,9 @@ export default class SketchNotePlugin extends Plugin {
     const data = "```sketch-note\n" + blockId + "\n```";
 
     try {
-      const result = await fetchSyncPost("/api/block/insertBlock", {
+      const result = await fetchSyncPost("/api/block/appendBlock", {
         dataType: "markdown",
         data,
-        nextID: "",
-        previousID: "",
         parentID: docId,
       });
       if (result.code === 0) {
