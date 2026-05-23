@@ -1,65 +1,95 @@
 import {
   Plugin,
+  fetchSyncPost,
   getFrontend,
 } from "siyuan";
 import "@/index.scss";
-import PluginInfoString from '@/../plugin.json'
-import { destroy, init } from '@/main'
+import { init, destroy } from "./main";
+import { renderSketchBlocks } from "./widget/sketchRenderer";
+import { openSketchEditor, setI18n } from "./App.vue";
+import { storageKey } from "./storage";
 
-let PluginInfo = {
-  version: '',
-}
-try {
-  PluginInfo = PluginInfoString
-} catch (err) {
-  console.log('Plugin info parse error: ', err)
-}
-const {
-  version,
-} = PluginInfo
-
-export default class PluginSample extends Plugin {
-  // Run as mobile
-  public isMobile: boolean
-  // Run in browser
-  public isBrowser: boolean
-  // Run as local
-  public isLocal: boolean
-  // Run in Electron
-  public isElectron: boolean
-  // Run in window
-  public isInWindow: boolean
-  public platform: SyFrontendTypes
-  public readonly version = version
+export default class SketchNotePlugin extends Plugin {
+  public isMobile = false;
+  public isBrowser = false;
+  public isElectron = false;
 
   async onload() {
     const frontEnd = getFrontend();
-    this.platform = frontEnd as SyFrontendTypes
-    this.isMobile = frontEnd === "mobile" || frontEnd === "browser-mobile"
-    this.isBrowser = frontEnd.includes('browser')
-    this.isLocal =
-      location.href.includes('127.0.0.1')
-      || location.href.includes('localhost')
-    this.isInWindow = location.href.includes('window.html')
+    this.isMobile = frontEnd === "mobile" || frontEnd === "browser-mobile";
+    this.isBrowser = frontEnd === "browser-desktop" || frontEnd === "browser-mobile";
+    this.isElectron = frontEnd === "desktop";
 
-    try {
-      require("@electron/remote")
-        .require("@electron/remote/main")
-      this.isElectron = true
-    } catch (err) {
-      this.isElectron = false
-    }
+    // Initialize i18n
+    setI18n(this.i18n ?? {});
 
-    console.log('Plugin loaded, the plugin is ', this)
+    // Initialize Vue app
+    init(this);
 
-    init(this)
+    // Register event listeners for block rendering
+    this.eventBus.on("loaded-protyle-static", this.onProtyleLoaded);
+    this.eventBus.on("loaded-protyle-dynamic", this.onProtyleLoaded);
+
+    // Add top bar button
+    this.addTopBar({
+      icon: "iconPencil",
+      title: this.i18n?.insertSketch ?? "Insert Sketch Block",
+      callback: () => this.insertSketchBlock(),
+    });
+
+    // Register command
+    this.addCommand({
+      langKey: "insertSketch",
+      hotkey: "Ctrl+Shift+S",
+      callback: () => this.insertSketchBlock(),
+    });
+
+    // Expose openEditor for renderer callbacks
+    window.sySketchNote = {
+      openEditor: (blockId: string) => openSketchEditor(blockId),
+    };
   }
 
   onunload() {
-    destroy()
+    this.eventBus.off("loaded-protyle-static", this.onProtyleLoaded);
+    this.eventBus.off("loaded-protyle-dynamic", this.onProtyleLoaded);
+    destroy();
+    delete window.sySketchNote;
   }
 
-  openSetting() {
-    window._sy_plugin_sample.openSetting()
+  private onProtyleLoaded = (event: CustomEvent) => {
+    const { protyle } = event.detail;
+    if (!protyle?.wysiwyg?.element) return;
+    const container = protyle.wysiwyg.element;
+    renderSketchBlocks(container, (key) => this.loadData(key), (blockId) => {
+      openSketchEditor(blockId);
+    });
+  };
+
+  private async insertSketchBlock() {
+    const blockId = Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+    const data = "```sketch-note\n" + blockId + "\n```";
+    try {
+      const result = await fetchSyncPost("/api/block/insertBlock", {
+        dataType: "markdown",
+        data,
+        nextID: "",
+        previousID: "",
+        parentID: "",
+      });
+      if (result.code === 0) {
+        await this.saveData(storageKey(blockId), {
+          version: 1,
+          template: "blank",
+          canvasWidth: 800,
+          canvasHeight: 1200,
+          strokes: [],
+          thumbnail: null,
+        });
+        await openSketchEditor(blockId);
+      }
+    } catch (e) {
+      console.error("[Sketch Note] Failed to insert block:", e);
+    }
   }
 }

@@ -1,37 +1,38 @@
-import {
-  Plugin,
-} from "siyuan";
-import { createApp } from 'vue'
-import App from './App.vue'
+import { createApp } from "vue";
+import App from "./App.vue";
+import { setI18n, setSaveDataFn, setLoadDataFn } from "./App.vue";
+import type { Plugin } from "siyuan";
 
-let plugin = null
-export function usePlugin(pluginProps?: Plugin): Plugin {
-  console.log('usePlugin', pluginProps, plugin)
+let app: ReturnType<typeof createApp> | null = null;
+let container: HTMLDivElement | null = null;
+
+export function usePlugin(pluginProps?: Plugin): Plugin | undefined {
   if (pluginProps) {
-    plugin = pluginProps
+    (window as any)._sketchNotePlugin = pluginProps;
   }
-  if (!plugin && !pluginProps) {
-    console.error('need bind plugin')
-  }
-  return plugin;
+  return (window as any)._sketchNotePlugin;
 }
 
-
-let app = null
 export function init(plugin: Plugin) {
-  // bind plugin hook
-  usePlugin(plugin);
+  container = document.createElement("div");
+  container.className = "sketch-note-app";
+  document.body.appendChild(container);
 
-  const div = document.createElement('div')
-  div.classList.toggle('plugin-sample-vite-vue-app')
-  div.id = this.name
-  app = createApp(App)
-  app.mount(div)
-  document.body.appendChild(div)
+  app = createApp(App);
+  app.mount(container);
+
+  // Wire up plugin APIs to Vue app
+  setSaveDataFn((key, data) => plugin.saveData(key, data));
+  setLoadDataFn((key) => plugin.loadData(key));
 }
 
 export function destroy() {
-  app.unmount()
-  const div = document.getElementById(this.name)
-  document.body.removeChild(div)
+  if (app) {
+    app.unmount();
+    app = null;
+  }
+  if (container) {
+    container.remove();
+    container = null;
+  }
 }

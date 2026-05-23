@@ -1,0 +1,60 @@
+.sketch-note-app {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100dvh;
+  pointer-events: none;
+  z-index: 998;
+}
+
+// Sketch block rendering styles
+.sketch-note-render {
+  cursor: pointer;
+  border-radius: 8px;
+  overflow: hidden;
+  transition: box-shadow 0.2s;
+  position: relative;
+
+  &:hover {
+    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.12);
+  }
+}
+
+.sketch-note-render--has-content {
+  .sketch-note-thumbnail {
+    display: block;
+    max-width: 100%;
+    border-radius: 4px;
+  }
+
+  .sketch-note-label {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    font-size: 14px;
+    opacity: 0;
+    transition: opacity 0.2s;
+  }
+
+  &:hover .sketch-note-label {
+    opacity: 1;
+  }
+}
+
+.sketch-note-render--empty {
+  padding: 24px;
+  border: 2px dashed var(--b3-border-color);
+  text-align: center;
+  color: var(--b3-theme-on-surface-light);
+  background: var(--b3-theme-surface);
+}
+
+.sketch-note-placeholder {
+  font-size: 14px;
+}
+
+// Editor styles
+.sketch-editor {
+  pointer-events: all;
+}
