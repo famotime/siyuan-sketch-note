@@ -6,6 +6,8 @@ type OpenEditorFn = (blockId: string) => void;
 const SKETCH_SUBTYPE = "sketch-note";
 const STORAGE_PREFIX = "sketch:";
 
+const renderedHandlers = new WeakSet<HTMLElement>();
+
 /**
  * Render all sketch-note code blocks in the given container.
  * Follows the same pattern as SiYuan's chartRender/mindmapRender:
@@ -27,6 +29,33 @@ export function renderSketchBlocks(
     blockElement.setAttribute("data-render", "true");
     renderSingleBlock(blockElement, loadData, openEditor);
   });
+}
+
+/**
+ * Re-render a single sketch block by its ID (e.g. after save).
+ * Removes the data-render flag so it can be picked up again,
+ * or directly updates the thumbnail if the block is already rendered.
+ */
+export function rerenderSketchBlock(
+  blockId: string,
+  container: HTMLElement,
+  loadData: LoadDataFn,
+  openEditor: OpenEditorFn
+): void {
+  const blockElement = container.querySelector(
+    `[data-subtype="${SKETCH_SUBTYPE}"][data-node-id="${blockId}"]`
+  ) as HTMLElement | null;
+  if (!blockElement) return;
+
+  // Remove render flag so renderSketchBlocks will process it
+  blockElement.removeAttribute("data-render");
+  renderedHandlers.delete(blockElement);
+
+  // Remove old render target to avoid stale DOM
+  const oldTarget = blockElement.querySelector(".sketch-note-render");
+  if (oldTarget) oldTarget.remove();
+
+  renderSketchBlocks(container, loadData, openEditor);
 }
 
 async function renderSingleBlock(
@@ -86,10 +115,13 @@ async function renderSingleBlock(
     renderTarget.appendChild(placeholder);
   }
 
-  // Click handler to open fullscreen editor
-  renderTarget.addEventListener("click", (e) => {
-    e.stopPropagation();
-    e.preventDefault();
-    openEditor(blockId);
-  });
+  // Click handler to open fullscreen editor (register only once per element)
+  if (!renderedHandlers.has(blockElement)) {
+    renderedHandlers.add(blockElement);
+    renderTarget.addEventListener("click", (e) => {
+      e.stopPropagation();
+      e.preventDefault();
+      openEditor(blockId);
+    });
+  }
 }

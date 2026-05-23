@@ -6,7 +6,7 @@ import {
 } from "siyuan";
 import "@/index.scss";
 import { init, destroy } from "./main";
-import { renderSketchBlocks } from "./widget/sketchRenderer";
+import { renderSketchBlocks, rerenderSketchBlock } from "./widget/sketchRenderer";
 import { openSketchEditor, setI18n } from "./App.vue";
 import { storageKey } from "./storage";
 
@@ -14,6 +14,8 @@ export default class SketchNotePlugin extends Plugin {
   public isMobile = false;
   public isBrowser = false;
   public isElectron = false;
+  private lastProtyleContainer: HTMLElement | null = null;
+  private onSketchSaved: ((e: CustomEvent) => void) | null = null;
 
   async onload() {
     const frontEnd = getFrontend();
@@ -30,6 +32,19 @@ export default class SketchNotePlugin extends Plugin {
     // Register event listeners for block rendering
     this.eventBus.on("loaded-protyle-static", this.onProtyleLoaded);
     this.eventBus.on("loaded-protyle-dynamic", this.onProtyleLoaded);
+
+    // Re-render sketch block thumbnail after saving
+    this.onSketchSaved = (e: CustomEvent) => {
+      const { blockId } = e.detail;
+      if (!blockId || !this.lastProtyleContainer) return;
+      rerenderSketchBlock(
+        blockId,
+        this.lastProtyleContainer,
+        (key) => this.loadData(key),
+        (id) => openSketchEditor(id)
+      );
+    };
+    window.addEventListener("sketch-note-saved", this.onSketchSaved as EventListener);
 
     // Add top bar button
     this.addTopBar({
@@ -54,6 +69,11 @@ export default class SketchNotePlugin extends Plugin {
   onunload() {
     this.eventBus.off("loaded-protyle-static", this.onProtyleLoaded);
     this.eventBus.off("loaded-protyle-dynamic", this.onProtyleLoaded);
+    if (this.onSketchSaved) {
+      window.removeEventListener("sketch-note-saved", this.onSketchSaved as EventListener);
+      this.onSketchSaved = null;
+    }
+    this.lastProtyleContainer = null;
     destroy();
     delete window.sySketchNote;
   }
@@ -62,6 +82,7 @@ export default class SketchNotePlugin extends Plugin {
     const { protyle } = event.detail;
     if (!protyle?.wysiwyg?.element) return;
     const container = protyle.wysiwyg.element;
+    this.lastProtyleContainer = container;
     renderSketchBlocks(container, (key) => this.loadData(key), (blockId) => {
       openSketchEditor(blockId);
     });
