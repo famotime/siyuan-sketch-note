@@ -1,3 +1,16 @@
 {
-  "addTopBarIcon": "PluginSampleViteVue"
+  "addTopBarIcon": "Sketch Note",
+  "insertSketch": "Insert Sketch Block",
+  "sketchNote": "Sketch Note",
+  "clickToEdit": "Click to edit sketch",
+  "templateBlank": "Blank",
+  "templateGrid": "Grid",
+  "pen": "Pen",
+  "eraser": "Eraser",
+  "undo": "Undo",
+  "redo": "Redo",
+  "clear": "Clear",
+  "save": "Save",
+  "back": "Back",
+  "unsavedConfirm": "You have unsaved changes. Are you sure you want to leave?"
 }

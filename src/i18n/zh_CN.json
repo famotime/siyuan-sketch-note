@@ -1,3 +1,16 @@
 {
-  "addTopBarIcon": "PluginSampleViteVue"
+  "addTopBarIcon": "手写笔记",
+  "insertSketch": "插入手写块",
+  "sketchNote": "手写笔记",
+  "clickToEdit": "点击编辑手写笔记",
+  "templateBlank": "白纸",
+  "templateGrid": "方格纸",
+  "pen": "画笔",
+  "eraser": "橡皮",
+  "undo": "撤销",
+  "redo": "重做",
+  "clear": "清除",
+  "save": "保存",
+  "back": "返回",
+  "unsavedConfirm": "有未保存的更改，确定要离开吗？"
 }
