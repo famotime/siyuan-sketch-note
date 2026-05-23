@@ -125,6 +125,9 @@ interface Window {
   _sy_plugin_sample: {
     [key: string]: any;
   };
+  sySketchNote?: {
+    openEditor: (blockId: string) => void;
+  };
 }
 
 
