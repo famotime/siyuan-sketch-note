@@ -12,6 +12,7 @@
 <script lang="ts">
 import { ref } from "vue";
 import { loadSketchData } from "@/storage";
+import SketchEditor from "@/editor/SketchEditor.vue";
 
 const editorVisible = ref(false);
 const editorBlockId = ref("");
@@ -48,7 +49,7 @@ function closeEditor() {
 }
 
 export default {
-  components: { SketchEditor: () => import("@/editor/SketchEditor.vue") },
+  components: { SketchEditor },
   setup() {
     return {
       editorVisible,

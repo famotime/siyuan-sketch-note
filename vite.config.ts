@@ -143,6 +143,7 @@ export default defineConfig(({
 
         output: {
           entryFileNames: "[name].js",
+          inlineDynamicImports: true,
           assetFileNames: (assetInfo) => {
             if (assetInfo.name === "style.css") {
               return "index.css"
