@@ -66,16 +66,38 @@ export default class SketchNotePlugin extends Plugin {
     });
   };
 
+  private getCurrentDocId(): string | null {
+    // 方案 1: 从编辑器 DOM 获取当前文档根块 ID
+    const docElement = document.querySelector('.protyle.wysiwyg [data-node-id]');
+    if (docElement) {
+      return docElement.getAttribute('data-node-id');
+    }
+    // 方案 2: 从 URL hash 获取（格式: #notebookId/docId）
+    const hash = location.hash;
+    const match = hash.match(/#([a-z0-9]+)\/([a-z0-9]+)/);
+    if (match) {
+      return match[2];
+    }
+    return null;
+  }
+
   private async insertSketchBlock() {
+    const docId = this.getCurrentDocId();
+    if (!docId) {
+      console.error("[Sketch Note] 无法获取当前文档 ID，请先打开一个文档");
+      return;
+    }
+
     const blockId = Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
     const data = "```sketch-note\n" + blockId + "\n```";
+
     try {
       const result = await fetchSyncPost("/api/block/insertBlock", {
         dataType: "markdown",
         data,
         nextID: "",
         previousID: "",
-        parentID: "",
+        parentID: docId,
       });
       if (result.code === 0) {
         await this.saveData(storageKey(blockId), {
@@ -87,6 +109,8 @@ export default class SketchNotePlugin extends Plugin {
           thumbnail: null,
         });
         await openSketchEditor(blockId);
+      } else {
+        console.error("[Sketch Note] 插入块失败:", result.msg);
       }
     } catch (e) {
       console.error("[Sketch Note] Failed to insert block:", e);
