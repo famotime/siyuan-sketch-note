@@ -16,6 +16,7 @@ import {
 
 let idCounter = 0;
 const MIN_POINT_DISTANCE = 1.5;
+const ERASER_HIT_PADDING = 2;
 const imageCache = new Map<string, HTMLImageElement>();
 function newId(): string {
   return `s${Date.now()}-${++idCounter}`;
@@ -204,6 +205,15 @@ export function handlePointerMove(
 export function handlePointerUp(state: EngineState): boolean {
   if (!state.currentStroke) return false;
   state.currentStroke.points = filterStrokePointsByDistance(state.currentStroke.points, MIN_POINT_DISTANCE);
+  if (state.currentStroke.tool === "eraser" && state.toolPresets.eraser.mode === "stroke") {
+    const hitIds = findStrokeEraseHits(state.strokes, state.currentStroke);
+    state.currentStroke = null;
+    if (hitIds.size === 0) return false;
+    pushHistorySnapshot(state);
+    state.strokes = state.strokes.filter((stroke) => !hitIds.has(stroke.id));
+    state.isDirty = true;
+    return true;
+  }
   pushHistorySnapshot(state);
   state.strokes.push(state.currentStroke);
   state.currentStroke = null;
@@ -366,4 +376,49 @@ function renderStrokeSegment(
   ctx.lineTo(curr.x, curr.y);
   ctx.stroke();
   ctx.restore();
+}
+
+function findStrokeEraseHits(strokes: Stroke[], eraserStroke: Stroke): Set<string> {
+  const hitIds = new Set<string>();
+  const threshold = eraserStroke.width / 2 + ERASER_HIT_PADDING;
+
+  for (const stroke of strokes) {
+    if (stroke.tool === "eraser") continue;
+    if (doesEraserHitStroke(eraserStroke.points, stroke, threshold + stroke.width / 2)) {
+      hitIds.add(stroke.id);
+    }
+  }
+
+  return hitIds;
+}
+
+function doesEraserHitStroke(eraserPoints: StrokePoint[], stroke: Stroke, threshold: number): boolean {
+  for (const eraserPoint of eraserPoints) {
+    if (stroke.points.length === 1) {
+      if (distance(eraserPoint, stroke.points[0]) <= threshold) return true;
+      continue;
+    }
+
+    for (let index = 1; index < stroke.points.length; index += 1) {
+      if (distanceToSegment(eraserPoint, stroke.points[index - 1], stroke.points[index]) <= threshold) {
+        return true;
+      }
+    }
+  }
+
+  return false;
+}
+
+function distance(a: StrokePoint, b: StrokePoint): number {
+  return Math.hypot(a.x - b.x, a.y - b.y);
+}
+
+function distanceToSegment(point: StrokePoint, start: StrokePoint, end: StrokePoint): number {
+  const dx = end.x - start.x;
+  const dy = end.y - start.y;
+  const lengthSquared = dx * dx + dy * dy;
+  if (lengthSquared === 0) return distance(point, start);
+
+  const t = Math.max(0, Math.min(1, ((point.x - start.x) * dx + (point.y - start.y) * dy) / lengthSquared));
+  return Math.hypot(point.x - (start.x + t * dx), point.y - (start.y + t * dy));
 }

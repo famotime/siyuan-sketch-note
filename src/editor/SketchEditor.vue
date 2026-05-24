@@ -153,6 +153,16 @@
             >
             <output>{{ Math.round(activePreset.opacity * 100) }}%</output>
           </label>
+          <label v-if="activeTool === 'eraser'" class="sketch-mode">
+            <span>{{ t("eraserMode") }}</span>
+            <select
+              :value="activePreset.mode"
+              @change="updateActivePreset({ mode: ($event.target as HTMLSelectElement).value as ToolPreset['mode'] })"
+            >
+              <option value="pixel">{{ t("eraserModePixel") }}</option>
+              <option value="stroke">{{ t("eraserModeStroke") }}</option>
+            </select>
+          </label>
         </div>
         <span class="sketch-sep" />
         <button
@@ -570,6 +580,22 @@ function onHeightChanged(_h: number) {}
   min-width: 32px;
   text-align: right;
   color: var(--b3-theme-on-surface-light);
+}
+.sketch-mode {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--b3-theme-on-surface);
+  font-size: 12px;
+  white-space: nowrap;
+}
+.sketch-mode select {
+  min-height: 26px;
+  border: 1px solid var(--b3-border-color);
+  border-radius: 4px;
+  background: var(--b3-theme-surface);
+  color: var(--b3-theme-on-surface);
+  font-size: 12px;
 }
 
 /* ── Select ── */
