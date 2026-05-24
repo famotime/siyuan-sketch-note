@@ -75,7 +75,7 @@ async function doSave() {
   data.template = currentTemplate.value;
 
   // Generate PNG and upload to assets
-  const pngDataUrl = thumbnailCanvas(data.strokes, data.template, data.canvasHeight);
+  const pngDataUrl = thumbnailCanvas(data.strokes, data.template);
   const fileName = sketchAssetFileName(props.blockId);
   await uploadDataUrlToAssets(pngDataUrl, fileName);
 

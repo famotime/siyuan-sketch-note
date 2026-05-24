@@ -4,65 +4,138 @@ import type { Stroke } from "@/types/sketch";
 const PADDING = 40;
 const MIN_WIDTH = 200;
 const MIN_HEIGHT = 150;
+const SAFE_MARGIN = 60;
 
 /**
- * Calculate the bounding box of all strokes, with padding.
- * Returns null if there are no strokes.
+ * Calculate a safe canvas size that covers all stroke coordinates + margin.
+ * This is the data-level bounds, NOT the visible bounds (which accounts for erasing).
  */
-function strokesBounds(strokes: Stroke[]): { x: number; y: number; w: number; h: number } | null {
-  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
-
+function safeCanvasSize(strokes: Stroke[]): { w: number; h: number } | null {
+  let maxX = 0, maxY = 0;
   for (const stroke of strokes) {
     const halfW = stroke.width / 2;
     for (const pt of stroke.points) {
-      minX = Math.min(minX, pt.x - halfW);
-      minY = Math.min(minY, pt.y - halfW);
       maxX = Math.max(maxX, pt.x + halfW);
       maxY = Math.max(maxY, pt.y + halfW);
     }
   }
+  if (maxX === 0 && maxY === 0) return null;
+  return { w: maxX + SAFE_MARGIN, h: maxY + SAFE_MARGIN };
+}
 
-  if (minX === Infinity) return null;
+/**
+ * Render all strokes onto a canvas in order, with correct compositing.
+ * Eraser strokes use destination-out to truly erase pixels from earlier strokes.
+ */
+function compositeStrokes(ctx: CanvasRenderingContext2D, strokes: Stroke[]): void {
+  for (const stroke of strokes) {
+    renderStrokeToCtx(ctx, stroke);
+  }
+}
+
+/**
+ * Scan pixel data to find the bounding box of non-transparent content.
+ * Returns null if the canvas is fully transparent.
+ */
+function scanVisibleBounds(
+  imageData: ImageData,
+  width: number,
+  height: number
+): { x: number; y: number; w: number; h: number } | null {
+  const data = imageData.data;
+  let minX = width, minY = height, maxX = 0, maxY = 0;
+  let found = false;
+
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x++) {
+      if (data[(y * width + x) * 4 + 3] > 0) {
+        if (x < minX) minX = x;
+        if (y < minY) minY = y;
+        if (x > maxX) maxX = x;
+        if (y > maxY) maxY = y;
+        found = true;
+      }
+    }
+  }
+
+  if (!found) return null;
 
   return {
-    x: minX - PADDING,
-    y: minY - PADDING,
-    w: maxX - minX + PADDING * 2,
-    h: maxY - minY + PADDING * 2,
+    x: minX,
+    y: minY,
+    w: maxX - minX + 1,
+    h: maxY - minY + 1,
   };
 }
 
 /**
- * Render strokes to a PNG data URL.
- * Canvas size is determined by the actual stroke bounding box + padding,
- * rather than the full editing canvas size.
+ * Render strokes to a PNG data URL with correct eraser compositing and auto-cropping.
+ *
+ * 1. Render all strokes on a transparent scan canvas (same order as the editor)
+ *    so that eraser's destination-out correctly removes earlier stroke pixels.
+ * 2. Scan pixels to find the actual visible bounding box after erasing.
+ * 3. Crop to the visible bounds + padding, render the final PNG.
  */
-export function thumbnailCanvas(
-  strokes: Stroke[],
+export function thumbnailCanvas(strokes: Stroke[], templateId: string): string {
+  if (strokes.length === 0) {
+    return renderToDataUrl(MIN_WIDTH, MIN_HEIGHT, templateId, []);
+  }
+
+  const size = safeCanvasSize(strokes);
+  if (!size) {
+    return renderToDataUrl(MIN_WIDTH, MIN_HEIGHT, templateId, []);
+  }
+
+  // Step 1: Composite render on transparent scan canvas
+  const scanCanvas = document.createElement("canvas");
+  scanCanvas.width = Math.ceil(size.w);
+  scanCanvas.height = Math.ceil(size.h);
+  const scanCtx = scanCanvas.getContext("2d")!;
+  compositeStrokes(scanCtx, strokes);
+
+  // Step 2: Scan pixels for true visible bounds (accounts for erasing)
+  const imageData = scanCtx.getImageData(0, 0, scanCanvas.width, scanCanvas.height);
+  const visible = scanVisibleBounds(imageData, scanCanvas.width, scanCanvas.height);
+
+  if (!visible) {
+    // All content erased — return placeholder
+    return renderToDataUrl(MIN_WIDTH, MIN_HEIGHT, templateId, []);
+  }
+
+  // Step 3: Calculate final cropped size with padding
+  const cropX = Math.max(0, visible.x - PADDING);
+  const cropY = Math.max(0, visible.y - PADDING);
+  const cropW = Math.min(Math.ceil(visible.w + PADDING * 2), scanCanvas.width - cropX);
+  const cropH = Math.min(Math.ceil(visible.h + PADDING * 2), scanCanvas.height - cropY);
+  const outW = Math.max(cropW, MIN_WIDTH);
+  const outH = Math.max(cropH, MIN_HEIGHT);
+
+  return renderToDataUrl(outW, outH, templateId, strokes, -cropX, -cropY);
+}
+
+/**
+ * Render the final PNG: template background + translated strokes.
+ */
+function renderToDataUrl(
+  width: number,
+  height: number,
   templateId: string,
-  _canvasHeight: number
+  strokes: Stroke[],
+  tx = 0,
+  ty = 0
 ): string {
-  const bounds = strokesBounds(strokes);
-
-  const width = bounds ? Math.max(Math.ceil(bounds.w), MIN_WIDTH) : MIN_WIDTH;
-  const height = bounds ? Math.max(Math.ceil(bounds.h), MIN_HEIGHT) : MIN_HEIGHT;
-
   const canvas = document.createElement("canvas");
   canvas.width = width;
   canvas.height = height;
   const ctx = canvas.getContext("2d")!;
 
-  // Render template background at the output size
   const template = getTemplate(templateId);
   template.render(ctx, width, height);
 
-  // Translate so that the stroke bounding box origin maps to (0, 0)
-  if (bounds) {
+  if (strokes.length > 0) {
     ctx.save();
-    ctx.translate(-bounds.x, -bounds.y);
-    for (const stroke of strokes) {
-      renderStrokeToCtx(ctx, stroke);
-    }
+    ctx.translate(tx, ty);
+    compositeStrokes(ctx, strokes);
     ctx.restore();
   }
 

@@ -5,7 +5,7 @@ import { thumbnailCanvas } from "@/storage/thumbnail";
  * Uses the template renderer to generate a blank canvas image.
  */
 export function createPlaceholderPng(templateId: string): Blob {
-  const dataUrl = thumbnailCanvas([], templateId, 0);
+  const dataUrl = thumbnailCanvas([], templateId);
   const byteString = atob(dataUrl.split(",")[1]);
   const mimeString = dataUrl.split(",")[0].split(":")[1].split(";")[0];
   const ab = new ArrayBuffer(byteString.length);
