@@ -36,6 +36,17 @@
           class="sketch-btn sketch-btn--action"
           @click="exportJson"
         >⇩ {{ t("exportJson") }}</button>
+        <button
+          class="sketch-btn sketch-btn--action"
+          @click="triggerJsonImport"
+        >⇧ {{ t("importJson") }}</button>
+        <input
+          ref="jsonInputRef"
+          class="sketch-file-input"
+          type="file"
+          accept="application/json,.json"
+          @change="onJsonSelected"
+        >
       </div>
 
       <!-- Row 2: drawing tools -->
@@ -188,7 +199,7 @@ import { sketchAssetFileName, uploadDataUrlToAssets } from "@/utils/uploadPng";
 import { normalizeToolPresets, updateToolPreset } from "@/tools/presets";
 import { createExportPngFileName, dataUrlToBlob, downloadBlob } from "@/export/png";
 import { createExportPdfFileName, createPdfExportPlanFromSketch, exportPdf as exportPdfBlob } from "@/export/pdf";
-import { createExportJsonFileName, exportSketchJson } from "@/export/json";
+import { createExportJsonFileName, exportSketchJson, importSketchJson } from "@/export/json";
 import { SaveQueue } from "@/storage/saveQueue";
 import { getFirstImageFileFromClipboard } from "./clipboard";
 import { getDrawingToolForEditorTool } from "./tools";
@@ -212,6 +223,7 @@ const colors = PRESET_COLORS;
 const visible = ref(false);
 const canvasRef = ref<InstanceType<typeof SketchCanvas>>();
 const imageInputRef = ref<HTMLInputElement>();
+const jsonInputRef = ref<HTMLInputElement>();
 const activeTool = ref<EditorTool>("pen");
 const activeColor = ref(PRESET_COLORS[0]);
 const toolPresets = ref(normalizeToolPresets(props.initialData?.toolPresets));
@@ -359,6 +371,31 @@ function exportJson() {
   data.toolPresets = toolPresets.value;
   const blob = exportSketchJson(data);
   downloadBlob(blob, createExportJsonFileName(props.blockId));
+}
+
+function triggerJsonImport() {
+  jsonInputRef.value?.click();
+}
+
+async function onJsonSelected(event: Event) {
+  const input = event.target as HTMLInputElement;
+  const file = input.files?.[0];
+  input.value = "";
+  if (!file || !canvasRef.value) return;
+
+  try {
+    const imported = importSketchJson(await file.text());
+    const importedPresets = normalizeToolPresets(imported.toolPresets);
+    imported.toolPresets = importedPresets;
+    currentTemplate.value = imported.template;
+    toolPresets.value = importedPresets;
+    loadedData.value = imported;
+    await canvasRef.value.restoreData(imported);
+    onStroke();
+  } catch (error) {
+    console.error("[Sketch Note] JSON restore failed:", error);
+    showMessage(t("importJsonFailed"), 5000, "error");
+  }
 }
 
 function insertTextElement() {

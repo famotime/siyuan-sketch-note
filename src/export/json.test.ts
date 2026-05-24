@@ -51,6 +51,48 @@ describe("json export helpers", () => {
     });
   });
 
+  it("restores legacy sketch json with migrated elements and normalized tool presets", () => {
+    const data = importSketchJson(JSON.stringify({
+      version: 1,
+      template: "blank",
+      canvasWidth: 800,
+      canvasHeight: 1200,
+      strokes: [
+        {
+          id: "stroke-1",
+          points: [
+            { x: 10, y: 20, pressure: 0.5, timestamp: 1 },
+            { x: 30, y: 40, pressure: 0.5, timestamp: 2 },
+          ],
+          color: "#111111",
+          width: 4,
+          tool: "pen",
+        },
+      ],
+      toolPresets: {
+        pen: {
+          tool: "pen",
+          color: "#111111",
+          width: 80,
+          opacity: 2,
+          mode: "ink",
+        },
+      },
+    }));
+
+    expect(data.elements).toHaveLength(1);
+    expect(data.toolPresets?.pen).toMatchObject({
+      tool: "pen",
+      color: "#111111",
+      width: 30,
+      opacity: 1,
+    });
+    expect(data.toolPresets?.highlighter).toMatchObject({
+      tool: "highlighter",
+      mode: "marker",
+    });
+  });
+
   it("rejects invalid sketch json text", () => {
     expect(() => importSketchJson("{")).toThrow("Invalid sketch JSON");
     expect(() => importSketchJson(JSON.stringify({

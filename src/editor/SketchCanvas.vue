@@ -467,6 +467,17 @@ function getSelectableElements() {
   ];
 }
 
+function clearInteractionState() {
+  shapeStart = null;
+  imageTransform = null;
+  elementTransform = null;
+  selectedElementId = null;
+  lassoPath = [];
+  selectedLassoIds = [];
+  lassoMove = null;
+  rulerMove = null;
+}
+
 function onCanvasDoubleClick(e: MouseEvent) {
   if (props.tool !== "text") return;
   const point = eventPoint(e as PointerEvent);
@@ -497,6 +508,17 @@ function doRedo() { selectedLassoIds = []; engineRedo(state); fullRedrawStrokeCa
 function doClear() { selectedLassoIds = []; engineClear(state); fullRedrawStrokeCanvas(getCanvas(), state); updateUndoRedoState(); emit("stroke"); }
 function getData(): SketchData { return serializeState(state); }
 function getState(): EngineState { return state; }
+async function restoreData(data: SketchData) {
+  if (!bgCanvasRef.value || !strokeCanvasRef.value) return;
+  clearInteractionState();
+  state = restoreEngineState(data);
+  state.tool = props.tool === "eraser" ? "eraser" : "pen";
+  state.toolPresets = data.toolPresets ?? props.toolPresets;
+  await preloadElementImages(state.elements);
+  setupBackgroundCanvas(bgCanvasRef.value, state);
+  setupStrokeCanvas(strokeCanvasRef.value, state);
+  updateUndoRedoState();
+}
 function deleteLassoSelection() {
   if (selectedLassoIds.length === 0) return;
   pushHistorySnapshot(state);
@@ -555,6 +577,7 @@ defineExpose({
   getState,
   insertText,
   insertImage,
+  restoreData,
   deleteLassoSelection,
   recolorLasso,
   rotateRulerBy,

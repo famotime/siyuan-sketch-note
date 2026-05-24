@@ -1,5 +1,6 @@
 import type { SketchData } from "@/types/sketch";
 import { migrateSketchData } from "@/storage/migrations";
+import { normalizeToolPresets } from "@/tools/presets";
 
 function pad(value: number): string {
   return String(value).padStart(2, "0");
@@ -30,7 +31,11 @@ export function importSketchJson(text: string): SketchData {
   }
 
   try {
-    return migrateSketchData(raw);
+    const data = migrateSketchData(raw);
+    return {
+      ...data,
+      toolPresets: normalizeToolPresets(data.toolPresets),
+    };
   } catch {
     throw new Error("Unsupported sketch JSON");
   }

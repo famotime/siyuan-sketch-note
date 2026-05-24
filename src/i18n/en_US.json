@@ -31,6 +31,8 @@
   "exportPng": "Export PNG",
   "exportPdf": "Export PDF",
   "exportJson": "Backup JSON",
+  "importJson": "Restore JSON",
+  "importJsonFailed": "Failed to restore JSON backup",
   "back": "Back",
   "autoSave": "Auto Save",
   "unsavedConfirm": "You have unsaved changes. Discard and exit?",
