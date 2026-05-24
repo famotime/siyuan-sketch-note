@@ -2,27 +2,47 @@
 
 ## Project Structure & Module Organization
 
-This repository is a SiYuan Note plugin built with Vite, Vue 3, and TypeScript. Core plugin code lives in `src/`: `main.ts` and `index.ts` handle entry points, `editor/` contains Vue editor components, `engine/` contains canvas rendering, `storage/` handles sketch data and thumbnails, `template/` defines page backgrounds, `types/` stores shared types, and `i18n/` contains locale JSON files. Root files such as `plugin.json`, `icon.png`, and `preview.png` provide plugin metadata and marketplace assets. `developer_docs/` stores SiYuan API references, and `plugin-sample-vite-vue/` is an upstream sample for comparison. Do not edit generated `dist/` or `package.zip` by hand.
+This repository is a SiYuan Note plugin (闲笔) built with Vite, Vue 3, and TypeScript. It provides a vector handwriting editor using HTML5 Canvas.
+
+Core plugin code lives in `src/`: `index.ts` exports the `SketchNotePlugin` class (SiYuan Plugin SDK lifecycle), `main.ts` handles Vue app mount/unmount and API bridge, `App.vue` manages editor visibility. Key modules:
+
+- `editor/` — Vue editor components: `SketchEditor.vue` (orchestrator), `SketchCanvas.vue` (canvas surface), `EditorTopBar.vue`, `ToolBar.vue`, `ToolOptionsPopover.vue`, plus `shortcuts.ts`, `clipboard.ts`, `inputMode.ts`
+- `elements/` — Element model system: `SketchElement` discriminated union (StrokeElement | ShapeElement | TextElement | ImageElement), lasso hit-testing and edit operations, transform, render ordering
+- `engine/` — Canvas rendering engine: `canvasEngine.ts` (state machine, pointer events, undo/redo), `strokeSmoothing.ts` (point filtering, Bézier curves)
+- `storage/` — Data persistence via SiYuan plugin storage API, migration/recovery, thumbnail generation, save queue
+- `template/` — 9 built-in page templates + custom background support
+- `export/` — PNG/PDF/JSON export
+- `pages/` — Multi-page model
+- `search/` — OCR provider interface (pluggable) and text indexing
+- `tools/` — Tool presets and recent colors palette
+- `types/` — Shared TypeScript types (`SketchData`, `Stroke`, `SketchTool`, etc.)
+- `i18n/` — Locale JSON files (en_US, zh_CN)
+
+Root files: `plugin.json` (metadata), `icon.png`, `preview.png` (marketplace assets), `release.js` (version bump + tag script). `developer_docs/` stores SiYuan API references, `plugin-sample-vite-vue/` is an upstream sample. Do not edit generated `dist/` or `package.zip` by hand.
 
 ## Build, Test, and Development Commands
 
 Use `pnpm install` to install dependencies from `pnpm-lock.yaml`.
 
-- `pnpm dev`: runs `vite build --watch` for plugin development.
-- `pnpm build`: creates a production build in `dist/`.
-- `pnpm release`: runs `release.js` using the default release mode.
-- `pnpm release:patch|minor|major`: bumps the corresponding version and packages the plugin.
-- `pnpm release:manual`: packages without automatic version bumping.
+- `pnpm dev`: runs `vite build --watch` for plugin development (outputs to SiYuan workspace via `.env` config)
+- `pnpm build`: creates a production build in `dist/` + `package.zip`
+- `pnpm test`: runs Vitest unit tests
+- `npx vitest run src/path/to/file.test.ts`: run a single test file
+- `npx eslint src/`: check code conventions
+- `pnpm release`: interactive version bump, git tag, and push
+- `pnpm release:patch|minor|major`: auto-bump the corresponding version
 
-There is currently no dedicated test script. Before submitting changes, at minimum run `pnpm build`.
+Before submitting changes, run `pnpm test` and `pnpm build`.
 
 ## Coding Style & Naming Conventions
 
-Follow `.editorconfig`: UTF-8, spaces, 2-space indentation, final newline, and trimmed trailing whitespace except Markdown and declaration files. TypeScript and Vue style is governed by `eslint.config.mjs`, based on `@antfu/eslint-config`. Prefer single quotes, multiline object properties, trailing commas in multiline structures, and Vue SFC block order of `template`, `script`, then `style`. Name Vue components in PascalCase, modules in camelCase, and keep locale keys aligned across `src/i18n/en_US.json` and `src/i18n/zh_CN.json`.
+Follow `.editorconfig`: UTF-8, spaces, 2-space indentation, final newline, and trimmed trailing whitespace except Markdown and declaration files. TypeScript and Vue style is governed by `eslint.config.mjs`, based on `@antfu/eslint-config`. Prefer single quotes, multiline object properties, trailing commas in multiline structures, and Vue SFC block order of `template`, `script`, then `style`. Each Vue attribute on its own line (`vue/max-attributes-per-line: 1`). Name Vue components in PascalCase, modules in camelCase, and keep locale keys aligned across `src/i18n/en_US.json` and `src/i18n/zh_CN.json`.
 
 ## Testing Guidelines
 
-No automated test framework is configured yet. For behavior changes, verify manually in SiYuan: insert a sketch block, draw, erase, undo/redo, save, reopen, and confirm thumbnail rendering. For rendering or storage changes, include focused manual verification notes in the PR. If tests are added later, place them near the affected module and name files with `.spec.ts`.
+Vitest is the test framework. Test files are colocated with source using the `.test.ts` suffix (not `.spec.ts`). Run `pnpm test` for the full suite or `npx vitest run src/path/to/file.test.ts` for a single file.
+
+For UI/editor changes that cannot be unit-tested, verify manually in SiYuan: insert a sketch block, draw, erase, undo/redo, save, reopen, and confirm thumbnail rendering. Include manual verification notes in the PR.
 
 ## Commit & Pull Request Guidelines
 
