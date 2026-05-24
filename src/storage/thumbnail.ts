@@ -14,23 +14,6 @@ const MIN_HEIGHT = 150;
 const SAFE_MARGIN = 60;
 
 /**
- * Calculate a safe canvas size that covers all stroke coordinates + margin.
- * This is the data-level bounds, NOT the visible bounds (which accounts for erasing).
- */
-function safeCanvasSize(strokes: Stroke[]): { w: number; h: number } | null {
-  let maxX = 0, maxY = 0;
-  for (const stroke of strokes) {
-    const halfW = stroke.width / 2;
-    for (const pt of stroke.points) {
-      maxX = Math.max(maxX, pt.x + halfW);
-      maxY = Math.max(maxY, pt.y + halfW);
-    }
-  }
-  if (maxX === 0 && maxY === 0) return null;
-  return { w: maxX + SAFE_MARGIN, h: maxY + SAFE_MARGIN };
-}
-
-/**
  * Render all strokes onto a canvas in order, with correct compositing.
  * Eraser strokes use destination-out to truly erase pixels from earlier strokes.
  */
@@ -77,21 +60,33 @@ function scanVisibleBounds(
 
 /**
  * Composite strokes onto a transparent canvas and scan for visible pixel bounds.
+ * Automatically sizes the scan canvas from all stroke coordinates + width + margin.
  * Accounts for eraser destination-out compositing.
  * Returns null if no visible content.
  */
-function findStrokeVisibleBounds(
-  strokes: Stroke[],
-  width: number,
-  height: number,
-): { x: number; y: number; w: number; h: number } | null {
+function findStrokeVisibleBounds(strokes: Stroke[]): { x: number; y: number; w: number; h: number } | null {
+  if (strokes.length === 0) return null;
+
+  let maxX = 0, maxY = 0;
+  for (const stroke of strokes) {
+    const halfW = stroke.width / 2;
+    for (const pt of stroke.points) {
+      if (pt.x + halfW > maxX) maxX = pt.x + halfW;
+      if (pt.y + halfW > maxY) maxY = pt.y + halfW;
+    }
+  }
+  if (maxX === 0 && maxY === 0) return null;
+
+  const w = Math.ceil(maxX) + SAFE_MARGIN;
+  const h = Math.ceil(maxY) + SAFE_MARGIN;
+
   const scanCanvas = document.createElement("canvas");
-  scanCanvas.width = width;
-  scanCanvas.height = height;
+  scanCanvas.width = w;
+  scanCanvas.height = h;
   const scanCtx = scanCanvas.getContext("2d")!;
   compositeStrokes(scanCtx, strokes);
-  const imageData = scanCtx.getImageData(0, 0, width, height);
-  return scanVisibleBounds(imageData, width, height);
+  const imageData = scanCtx.getImageData(0, 0, w, h);
+  return scanVisibleBounds(imageData, w, h);
 }
 
 /**
@@ -153,20 +148,15 @@ export function thumbnailCanvas(strokes: Stroke[], templateId: string): string {
     return renderToDataUrl(MIN_WIDTH, MIN_HEIGHT, templateId, []);
   }
 
-  const size = safeCanvasSize(strokes);
-  if (!size) {
-    return renderToDataUrl(MIN_WIDTH, MIN_HEIGHT, templateId, []);
-  }
-
-  const visible = findStrokeVisibleBounds(strokes, Math.ceil(size.w), Math.ceil(size.h));
+  const visible = findStrokeVisibleBounds(strokes);
   if (!visible) {
     return renderToDataUrl(MIN_WIDTH, MIN_HEIGHT, templateId, []);
   }
 
   const crop = computeCropRegion(
     { minX: visible.x, minY: visible.y, maxX: visible.x + visible.w, maxY: visible.y + visible.h },
-    Math.ceil(size.w),
-    Math.ceil(size.h),
+    visible.x + visible.w + SAFE_MARGIN,
+    visible.y + visible.h + SAFE_MARGIN,
   );
 
   return renderToDataUrl(crop.w, crop.h, templateId, strokes, -crop.x, -crop.y);
@@ -188,10 +178,7 @@ function thumbnailCanvasWithElements(
   // Scan visible stroke bounds on transparent canvas (correctly handles eraser)
   let strokeBounds = null;
   if (strokes.length > 0) {
-    const safeSize = safeCanvasSize(strokes);
-    if (safeSize) {
-      strokeBounds = findStrokeVisibleBounds(strokes, Math.ceil(safeSize.w), Math.ceil(safeSize.h));
-    }
+    strokeBounds = findStrokeVisibleBounds(strokes);
   }
 
   // Compute element bounds (text, images)
@@ -242,10 +229,7 @@ export async function thumbnailSketchDataAsync(data: SketchData): Promise<string
   // Auto-crop to visible content bounds + padding
   let strokeBounds = null;
   if (strokes.length > 0) {
-    const safeSize = safeCanvasSize(strokes);
-    if (safeSize) {
-      strokeBounds = findStrokeVisibleBounds(strokes, Math.max(Math.ceil(safeSize.w), canvasW), Math.max(Math.ceil(safeSize.h), canvasH));
-    }
+    strokeBounds = findStrokeVisibleBounds(strokes);
   }
 
   const elBounds = computeElementBounds(elements);
