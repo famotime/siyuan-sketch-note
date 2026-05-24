@@ -181,8 +181,8 @@ function thumbnailCanvasWithElements(
     strokeBounds = findStrokeVisibleBounds(strokes);
   }
 
-  // Compute element bounds (text, images)
-  const elBounds = computeElementBounds(elements);
+  // Compute element bounds (text, images, excluding stroke elements since their bounds are already handled by strokeBounds with pixel eraser consideration)
+  const elBounds = computeElementBounds(elements.filter((el) => el.type !== "stroke"));
 
   // Union stroke visible bounds + element bounds
   let contentBounds = null;
@@ -232,7 +232,8 @@ export async function thumbnailSketchDataAsync(data: SketchData): Promise<string
     strokeBounds = findStrokeVisibleBounds(strokes);
   }
 
-  const elBounds = computeElementBounds(elements);
+  // Compute element bounds (text, images, excluding stroke elements since their bounds are already handled by strokeBounds with pixel eraser consideration)
+  const elBounds = computeElementBounds(elements.filter((el) => el.type !== "stroke"));
 
   let contentBounds = null;
   if (strokeBounds && elBounds) {
