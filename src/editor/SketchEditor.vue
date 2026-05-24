@@ -60,6 +60,14 @@
             :style="{ backgroundColor: c }"
             @click="selectColor(c)"
           />
+          <label class="sketch-color-picker" :title="t('addColor')">
+            +
+            <input
+              type="color"
+              :value="activePreset.color"
+              @input="selectCustomColor(($event.target as HTMLInputElement).value)"
+            >
+          </label>
         </div>
         <span class="sketch-sep" />
         <button
@@ -223,6 +231,10 @@ import { createExportJsonFileName, exportSketchJson, importSketchJson } from "@/
 import { SaveQueue } from "@/storage/saveQueue";
 import { createSaveStatusLabel } from "@/storage/saveStatus";
 import type { SaveStatus } from "@/storage/saveStatus";
+import {
+  addRecentColor,
+  normalizeRecentColors,
+} from "@/tools/palette";
 import { getFirstImageFileFromClipboard } from "./clipboard";
 import { resolveEditorShortcut } from "./shortcuts";
 import { getDrawingToolForEditorTool } from "./tools";
@@ -240,7 +252,6 @@ const emit = defineEmits<{ (e: "close"): void }>();
 
 function t(key: string): string { return props.i18n[key] ?? key; }
 
-const colors = PRESET_COLORS;
 const visible = ref(false);
 const canvasRef = ref<InstanceType<typeof SketchCanvas>>();
 const imageInputRef = ref<HTMLInputElement>();
@@ -248,6 +259,7 @@ const jsonInputRef = ref<HTMLInputElement>();
 const activeTool = ref<EditorTool>("pen");
 const activeColor = ref(PRESET_COLORS[0]);
 const toolPresets = ref(normalizeToolPresets(props.initialData?.toolPresets));
+const recentColors = ref(normalizeRecentColors(props.initialData?.recentColors));
 const canUndo = ref(false);
 const canRedo = ref(false);
 const currentTemplate = ref(props.initialData?.template ?? "blank");
@@ -263,6 +275,7 @@ const saveQueue = new SaveQueue();
 const statusLabel = computed(() => createSaveStatusLabel(saveStatus.value, t, lastSavedAt.value));
 
 const activePreset = computed(() => toolPresets.value[getDrawingToolForEditorTool(activeTool.value)]);
+const colors = computed(() => recentColors.value);
 
 onMounted(() => {
   visible.value = true;
@@ -286,6 +299,11 @@ function selectColor(c: string) {
     activeTool.value = "pen";
   }
   updateActivePreset({ color: c });
+  recentColors.value = addRecentColor(recentColors.value, c);
+}
+
+function selectCustomColor(c: string) {
+  selectColor(c);
 }
 
 function updateActivePreset(patch: Partial<Omit<ToolPreset, "tool">>) {
@@ -331,6 +349,7 @@ async function runSave(): Promise<boolean> {
   const data = canvasRef.value.getData();
   data.template = currentTemplate.value;
   data.toolPresets = toolPresets.value;
+  data.recentColors = recentColors.value;
   delete data.recovery;
 
   let pngDataUrl: string;
@@ -366,6 +385,7 @@ async function exportPng() {
   if (!canvasRef.value) return;
   const data = canvasRef.value.getData();
   data.template = currentTemplate.value;
+  data.recentColors = recentColors.value;
   const pngDataUrl = await thumbnailSketchDataAsync(data);
   const blob = dataUrlToBlob(pngDataUrl);
   downloadBlob(blob, createExportPngFileName(props.blockId));
@@ -375,6 +395,7 @@ async function exportPdf() {
   if (!canvasRef.value) return;
   const data = canvasRef.value.getData();
   data.template = currentTemplate.value;
+  data.recentColors = recentColors.value;
   const plan = createPdfExportPlanFromSketch(props.blockId, data);
   const pageImages = await renderSketchPdfPageImages(data, plan);
   const blob = await exportPdfBlob(plan, { pageImages });
@@ -386,6 +407,7 @@ function exportJson() {
   const data = canvasRef.value.getData();
   data.template = currentTemplate.value;
   data.toolPresets = toolPresets.value;
+  data.recentColors = recentColors.value;
   const blob = exportSketchJson(data);
   downloadBlob(blob, createExportJsonFileName(props.blockId));
 }
@@ -406,6 +428,7 @@ async function onJsonSelected(event: Event) {
     imported.toolPresets = importedPresets;
     currentTemplate.value = imported.template;
     toolPresets.value = importedPresets;
+    recentColors.value = normalizeRecentColors(imported.recentColors);
     loadedData.value = imported;
     await canvasRef.value.restoreData(imported);
     onStroke();
@@ -625,6 +648,30 @@ function onHeightChanged(_h: number) {}
   border: 2px solid transparent; cursor: pointer;
   box-sizing: border-box;
   -webkit-tap-highlight-color: transparent;
+}
+.sketch-color-picker {
+  pointer-events: auto !important;
+  position: relative;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  border: 1px dashed var(--b3-border-color);
+  color: var(--b3-theme-on-surface-light);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+  line-height: 1;
+  box-sizing: border-box;
+  overflow: hidden;
+  -webkit-tap-highlight-color: transparent;
+}
+.sketch-color-picker input {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  cursor: pointer;
 }
 .sketch-color--active {
   border-color: var(--b3-theme-primary);

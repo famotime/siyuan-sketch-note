@@ -47,6 +47,27 @@ describe("sketch data migrations", () => {
         },
       },
     });
+    expect(data.recentColors).toEqual(["#000000", "#e74c3c", "#3498db", "#2ecc71", "#f39c12"]);
+  });
+
+  it("normalizes persisted recent color slots", () => {
+    const data = migrateSketchData({
+      version: 1,
+      template: "grid",
+      canvasWidth: 800,
+      canvasHeight: 1200,
+      recentColors: ["#ABCDEF", "not-color", "#abcdef", "#123456"],
+      strokes: [],
+    });
+
+    expect(data.recentColors).toEqual([
+      "#abcdef",
+      "#123456",
+      "#000000",
+      "#e74c3c",
+      "#3498db",
+      "#2ecc71",
+    ]);
   });
 
   it("recovers corrupted data to an empty sketch and preserves the raw payload", () => {

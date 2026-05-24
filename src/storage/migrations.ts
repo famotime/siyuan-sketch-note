@@ -1,4 +1,5 @@
 import { migrateStrokesToElements, withStrokeBounds } from "@/elements/model";
+import { normalizeRecentColors } from "@/tools/palette";
 import type { SketchData } from "@/types/sketch";
 import {
   CANVAS_INITIAL_HEIGHT,
@@ -23,6 +24,7 @@ export function migrateSketchData(raw: unknown): SketchData {
     canvasWidth: data.canvasWidth || CANVAS_LOGICAL_WIDTH,
     canvasHeight: data.canvasHeight || CANVAS_INITIAL_HEIGHT,
     elements: data.elements ?? migrateStrokesToElements(strokes),
+    recentColors: normalizeRecentColors(data.recentColors),
     strokes,
     template: data.template || DEFAULT_SKETCH_DATA.template,
     version: 1,

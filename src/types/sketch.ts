@@ -26,6 +26,7 @@ export interface SketchData {
   recovery?: SketchDataRecoveryInfo;
   ocrIndex?: OcrIndex;
   toolPresets?: ToolPresetCollection;
+  recentColors?: string[];
   elements?: SketchElement[];
   strokes: Stroke[];
 }
