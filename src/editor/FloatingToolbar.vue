@@ -165,12 +165,12 @@
 
       <div v-if="showWidthSlider" class="sketch-float-slider-popover">
         <div class="sketch-float-slider-header">
-          <span>{{ t('width') }}: {{ preset.width }}px</span>
+          <span>{{ activeTool === 'text' ? '字号' : t('width') }}: {{ preset.width }}px</span>
         </div>
         <input
           type="range"
-          min="1"
-          max="30"
+          :min="activeTool === 'text' ? 12 : 1"
+          :max="activeTool === 'text' ? 48 : 30"
           :value="preset.width"
           @input="emitWidth(($event.target as HTMLInputElement).value)"
         >
@@ -350,11 +350,33 @@ function onColorClick(c: string) {
 const showWidthSlider = ref(false);
 const showOpacitySlider = ref(false);
 
-const widthPresets = [
-  { val: 2, dotSize: 3, label: "细" },
-  { val: 6, dotSize: 7, label: "中" },
-  { val: 12, dotSize: 12, label: "粗" },
-];
+const widthPresets = computed(() => {
+  if (props.activeTool === "highlighter") {
+    return [
+      { val: 8, dotSize: 4, label: "细" },
+      { val: 18, dotSize: 9, label: "中" },
+      { val: 28, dotSize: 14, label: "粗" },
+    ];
+  } else if (props.activeTool === "eraser") {
+    return [
+      { val: 10, dotSize: 5, label: "细" },
+      { val: 20, dotSize: 10, label: "中" },
+      { val: 30, dotSize: 15, label: "粗" },
+    ];
+  } else if (props.activeTool === "text") {
+    return [
+      { val: 14, dotSize: 4, label: "小" },
+      { val: 20, dotSize: 7, label: "中" },
+      { val: 28, dotSize: 11, label: "大" },
+    ];
+  } else {
+    return [
+      { val: 2, dotSize: 3, label: "细" },
+      { val: 6, dotSize: 7, label: "中" },
+      { val: 12, dotSize: 12, label: "粗" },
+    ];
+  }
+});
 
 function emitWidth(value: string) {
   emit("updatePreset", { width: Number(value) });
@@ -365,14 +387,14 @@ function emitOpacity(value: string) {
 }
 
 const isVisible = computed(() => {
-  const toolsToShow: EditorTool[] = ["pen", "highlighter", "eraser", "lasso"];
+  const toolsToShow: EditorTool[] = ["pen", "highlighter", "eraser", "lasso", "text"];
   return toolsToShow.includes(props.activeTool) || isShapeEditorTool(props.activeTool);
 });
 
 const isShapeMode = computed(() => isShapeEditorTool(props.activeTool));
 
 const hasColorPalette = computed(() => {
-  return props.activeTool === "pen" || props.activeTool === "highlighter" || isShapeMode.value;
+  return props.activeTool === "pen" || props.activeTool === "highlighter" || props.activeTool === "text" || isShapeMode.value;
 });
 
 const hasStrokeControls = computed(() => {

@@ -374,7 +374,7 @@ function renderImageElement(ctx: CanvasRenderingContext2D, element: Extract<Sket
 }
 
 function renderStroke(ctx: CanvasRenderingContext2D, stroke: Stroke): void {
-  const { points, color, width, tool } = stroke;
+  const { points, color, width, tool, isShape } = stroke;
   if (points.length < 2) return;
   ctx.save();
   if (tool === "eraser") {
@@ -390,13 +390,19 @@ function renderStroke(ctx: CanvasRenderingContext2D, stroke: Stroke): void {
   ctx.lineCap = "round";
   ctx.beginPath();
   ctx.moveTo(points[0].x, points[0].y);
-  for (const segment of getSmoothedSegments(points)) {
-    ctx.quadraticCurveTo(
-      segment.control.x,
-      segment.control.y,
-      segment.end.x,
-      segment.end.y,
-    );
+  if (isShape) {
+    for (let i = 1; i < points.length; i++) {
+      ctx.lineTo(points[i].x, points[i].y);
+    }
+  } else {
+    for (const segment of getSmoothedSegments(points)) {
+      ctx.quadraticCurveTo(
+        segment.control.x,
+        segment.control.y,
+        segment.end.x,
+        segment.end.y,
+      );
+    }
   }
   ctx.stroke();
   ctx.restore();

@@ -10,12 +10,33 @@
       @pointerup="onPointerUp"
       @pointerleave="onPointerUp"
     />
+
+    <!-- 动态原位精致文本编辑器 -->
+    <div
+      v-if="textEditor.show"
+      class="sketch-text-editor-overlay"
+      :style="{ left: `${textEditor.x}px`, top: `${textEditor.y}px` }"
+    >
+      <input
+        ref="textEditorInputRef"
+        v-model="textEditor.val"
+        class="sketch-text-editor-input"
+        type="text"
+        :style="{
+          fontSize: `${props.toolPresets.text?.width ?? 20}px`,
+          color: props.toolPresets.text?.color ?? '#000000',
+        }"
+        @keydown.enter="finishTextEditing"
+        @keydown.esc="cancelTextEditing"
+        @blur="finishTextEditing"
+      >
+    </div>
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref, onMounted, watch } from "vue";
-import type { SketchData, Stroke, StrokePoint, ToolPresetCollection } from "@/types/sketch";
+import type { SketchData, Stroke, StrokePoint, ToolPresetCollection, SketchTool } from "@/types/sketch";
 import {
   createEngineState,
   restoreEngineState,
@@ -104,6 +125,15 @@ const emit = defineEmits<{
   (e: "stroke"): void;
 }>();
 
+const textEditor = ref({
+  show: false,
+  x: 0,
+  y: 0,
+  val: "",
+  elementId: null as string | null,
+});
+const textEditorInputRef = ref<HTMLInputElement>();
+
 const containerRef = ref<HTMLDivElement>();
 const bgCanvasRef = ref<HTMLCanvasElement>();
 const strokeCanvasRef = ref<HTMLCanvasElement>();
@@ -151,7 +181,46 @@ onMounted(async () => {
   emitPageState();
 });
 
-watch(() => props.tool, (t) => { if (state) state.tool = t === "eraser" ? "eraser" : "pen"; });
+watch(
+  [() => props.tool, () => props.toolPresets.eraser.width],
+  ([newTool, newWidth]) => {
+    updateCanvasCursor(newTool, newWidth);
+  },
+  { immediate: true }
+);
+
+function updateCanvasCursor(tool: string, eraserWidth: number) {
+  const canvas = strokeCanvasRef.value;
+  if (!canvas) return;
+
+  if (tool === "eraser") {
+    const w = Math.max(16, eraserWidth);
+    const r = eraserWidth / 2;
+    const center = w / 2;
+    const svg = `
+      <svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${w}" viewBox="0 0 ${w} ${w}">
+        <circle cx="${center}" cy="${center}" r="${r - 1}" stroke="rgba(255, 255, 255, 0.8)" stroke-width="1.5" fill="none"/>
+        <circle cx="${center}" cy="${center}" r="${r}" stroke="rgba(223, 76, 60, 0.9)" stroke-width="1" fill="rgba(223, 76, 60, 0.15)"/>
+      </svg>
+    `.trim().replace(/\s+/g, " ");
+
+    const encodedSvg = encodeURIComponent(svg);
+    const dataUrl = `data:image/svg+xml;utf8,${encodedSvg}`;
+    canvas.style.cursor = `url("${dataUrl}") ${center} ${center}, auto`;
+  } else {
+    canvas.style.cursor = "crosshair";
+  }
+}
+
+function getEngineTool(tool: EditorTool): SketchTool {
+  if (tool === "eraser") return "eraser";
+  if (tool === "highlighter") return "highlighter";
+  return "pen";
+}
+
+watch(() => props.tool, (t) => {
+  if (state) state.tool = getEngineTool(t);
+});
 watch(() => props.toolPresets, (presets) => {
   if (state) state.toolPresets = presets;
 }, { deep: true });
@@ -180,6 +249,24 @@ function onPointerDown(e: PointerEvent) {
   e.preventDefault();
   if (!shouldDrawFromPointer(e, props.inputSettings)) return;
   (e.target as HTMLElement).setPointerCapture(e.pointerId);
+
+  if (props.tool === "text") {
+    if (textEditor.value.show) {
+      finishTextEditing();
+    } else {
+      const point = eventPoint(e);
+      const hit = hitTestElement(
+        state.elements.filter((item) => item.type === "text"),
+        point.x,
+        point.y,
+      );
+      if (!hit) {
+        startNewTextEditing(point.x, point.y);
+      }
+    }
+    return;
+  }
+
   if (props.tool === "lasso") {
     const point = eventPoint(e);
     const selectionBounds = getLassoSelectionBounds();
@@ -354,6 +441,21 @@ function onPointerMove(e: PointerEvent) {
     drawSelectionOutline();
     return;
   }
+  if (shapeStart && isShapeEditorTool(props.tool)) {
+    const point = eventPoint(e);
+    fullRedrawStrokeCanvas(getCanvas(), state);
+    const ctx = getCanvas().getContext("2d")!;
+    ctx.save();
+    const preset = props.toolPresets.pen;
+    ctx.strokeStyle = preset.color;
+    ctx.lineWidth = preset.width;
+    ctx.globalAlpha = preset.opacity ?? 1;
+    ctx.lineCap = "round";
+    ctx.lineJoin = "round";
+    drawShapePreview(ctx, props.tool, shapeStart, point);
+    ctx.restore();
+    return;
+  }
   if (shapeStart) return;
   const prevHeight = state.canvasHeight;
   const heightChanged = enginePointerMove(state, e, getCanvas());
@@ -415,9 +517,12 @@ function onPointerUp(e: PointerEvent) {
   if (shapeStart && isShapeEditorTool(props.tool)) {
     const preset = props.toolPresets.pen;
     const end = eventPoint(e);
-    const stroke = createShapeStrokeForTool(`shape-${Date.now()}`, props.tool, shapeStart, end, preset);
-    pushHistorySnapshot(state);
-    state.strokes.push(stroke);
+    const dist = Math.hypot(end.x - shapeStart.x, end.y - shapeStart.y);
+    if (dist > 4) {
+      const stroke = createShapeStrokeForTool(`shape-${Date.now()}`, props.tool, shapeStart, end, preset);
+      pushHistorySnapshot(state);
+      state.strokes.push(stroke);
+    }
     shapeStart = null;
     fullRedrawStrokeCanvas(getCanvas(), state);
     updateUndoRedoState();
@@ -443,6 +548,60 @@ function createShapeStrokeForTool(
   if (tool === "rectangle") return createRectangleStroke(id, start, end, preset);
   if (tool === "triangle") return createTriangleStroke(id, start, end, preset);
   return createEllipseStroke(id, start, end, preset);
+}
+
+function drawShapePreview(
+  ctx: CanvasRenderingContext2D,
+  tool: EditorTool,
+  start: StrokePoint,
+  end: StrokePoint,
+): void {
+  ctx.beginPath();
+  if (tool === "line") {
+    ctx.moveTo(start.x, start.y);
+    ctx.lineTo(end.x, end.y);
+  } else if (tool === "arrow") {
+    const angle = Math.atan2(end.y - start.y, end.x - start.x);
+    const length = Math.hypot(end.x - start.x, end.y - start.y);
+    const headLength = Math.max(12, Math.min(28, length * 0.25));
+    const wingAngle = Math.PI / 7;
+    const left = {
+      x: end.x - Math.cos(angle - wingAngle) * headLength,
+      y: end.y - Math.sin(angle - wingAngle) * headLength,
+    };
+    const right = {
+      x: end.x - Math.cos(angle + wingAngle) * headLength,
+      y: end.y - Math.sin(angle + wingAngle) * headLength,
+    };
+    ctx.moveTo(start.x, start.y);
+    ctx.lineTo(end.x, end.y);
+    ctx.lineTo(left.x, left.y);
+    ctx.moveTo(end.x, end.y);
+    ctx.lineTo(right.x, right.y);
+  } else if (tool === "rectangle") {
+    ctx.rect(
+      Math.min(start.x, end.x),
+      Math.min(start.y, end.y),
+      Math.abs(end.x - start.x),
+      Math.abs(end.y - start.y),
+    );
+  } else if (tool === "ellipse") {
+    const centerX = (start.x + end.x) / 2;
+    const centerY = (start.y + end.y) / 2;
+    const radiusX = Math.abs(end.x - start.x) / 2;
+    const radiusY = Math.abs(end.y - start.y) / 2;
+    ctx.ellipse(centerX, centerY, radiusX, radiusY, 0, 0, Math.PI * 2);
+  } else if (tool === "triangle") {
+    const minX = Math.min(start.x, end.x);
+    const maxX = Math.max(start.x, end.x);
+    const minY = Math.min(start.y, end.y);
+    const maxY = Math.max(start.y, end.y);
+    ctx.moveTo((minX + maxX) / 2, minY);
+    ctx.lineTo(maxX, maxY);
+    ctx.lineTo(minX, maxY);
+    ctx.closePath();
+  }
+  ctx.stroke();
 }
 
 function updateUndoRedoState() {
@@ -610,19 +769,20 @@ function onCanvasDoubleClick(e: MouseEvent) {
   );
   if (!element || element.type !== "text") return;
 
-  const nextText = window.prompt("Text", element.text);
-  if (nextText == null) return;
+  textEditor.value = {
+    show: true,
+    x: element.bounds.x,
+    y: element.bounds.y,
+    val: element.text,
+    elementId: element.id,
+  };
 
-  pushHistorySnapshot(state);
-  selectedElementId = element.id;
-  state.elements = state.elements.map((item) =>
-    item.id === element.id ? updateTextElement(element, { text: nextText }) : item,
-  );
-  state.isDirty = true;
-  fullRedrawStrokeCanvas(getCanvas(), state);
-  drawSelectionOutline();
-  updateUndoRedoState();
-  emit("stroke");
+  setTimeout(() => {
+    if (textEditorInputRef.value) {
+      textEditorInputRef.value.focus();
+      textEditorInputRef.value.select();
+    }
+  }, 50);
 }
 
 function doUndo() { selectedLassoIds = []; engineUndo(state); fullRedrawStrokeCanvas(getCanvas(), state); updateUndoRedoState(); emit("stroke"); }
@@ -635,7 +795,7 @@ async function restoreData(data: SketchData) {
   if (!bgCanvasRef.value || !strokeCanvasRef.value) return;
   clearInteractionState();
   state = restoreEngineState(data);
-  state.tool = props.tool === "eraser" ? "eraser" : "pen";
+  state.tool = getEngineTool(props.tool);
   state.toolPresets = data.toolPresets ?? props.toolPresets;
   state.customBackgrounds = data.customBackgrounds ?? [];
   await preloadElementImages(state.elements);
@@ -770,7 +930,6 @@ function duplicateLassoSelection() {
   emit("stroke");
 }
 function insertText() {
-  const text = window.prompt("Text", "Text") ?? "Text";
   const position = createInsertElementPosition({
     canvasWidth: state.canvasWidth,
     pageMode: state.pageMode,
@@ -779,15 +938,95 @@ function insertText() {
     elementWidth: 220,
     topOffset: 120,
   });
-  const element = createTextElement(`text-${Date.now()}`, {
+
+  textEditor.value = {
+    show: true,
     x: position.x,
     y: position.y,
-    text,
-  });
+    val: "",
+    elementId: null,
+  };
+
+  setTimeout(() => {
+    if (textEditorInputRef.value) {
+      textEditorInputRef.value.focus();
+    }
+  }, 50);
+}
+
+function startNewTextEditing(x: number, y: number) {
+  const textStyle = props.toolPresets.text ?? { color: "#000000", width: 20 };
+  const fontSize = textStyle.width;
+
+  textEditor.value = {
+    show: true,
+    x: x,
+    y: y - fontSize / 2,
+    val: "",
+    elementId: null,
+  };
+
+  setTimeout(() => {
+    if (textEditorInputRef.value) {
+      textEditorInputRef.value.focus();
+    }
+  }, 50);
+}
+
+function finishTextEditing() {
+  if (!textEditor.value.show) return;
+  const { elementId, val, x, y } = textEditor.value;
+  textEditor.value.show = false;
+
+  if (!val.trim()) {
+    if (elementId) {
+      pushHistorySnapshot(state);
+      state.elements = state.elements.filter((item) => item.id !== elementId);
+      state.isDirty = true;
+      fullRedrawStrokeCanvas(getCanvas(), state);
+      updateUndoRedoState();
+      emit("stroke");
+    }
+    return;
+  }
+
   pushHistorySnapshot(state);
-  state.elements = [...state.elements, element];
+
+  if (elementId) {
+    state.elements = state.elements.map((item) =>
+      item.id === elementId ? updateTextElement(item as any, { text: val }) : item,
+    );
+  } else {
+    const textStyle = props.toolPresets.text ?? { color: "#000000", width: 20 };
+    const fontSize = textStyle.width;
+    const color = textStyle.color;
+
+    const calculatedWidth = Math.max(150, val.length * fontSize * 0.65);
+    const calculatedHeight = fontSize + 8;
+
+    const element = createTextElement(`text-${Date.now()}`, {
+      x,
+      y,
+      text: val,
+      width: calculatedWidth,
+      height: calculatedHeight,
+      style: {
+        fontSize,
+        color,
+        fontFamily: "Inter, system-ui, sans-serif",
+      },
+    });
+    state.elements = [...state.elements, element];
+  }
+
+  state.isDirty = true;
   fullRedrawStrokeCanvas(getCanvas(), state);
   updateUndoRedoState();
+  emit("stroke");
+}
+
+function cancelTextEditing() {
+  textEditor.value.show = false;
 }
 async function insertImage(src: string) {
   await preloadImage(src);
@@ -861,9 +1100,46 @@ defineExpose({
 
 <style scoped>
 .sketch-canvas-container {
-  position: relative; width: fit-content; margin: 0 auto; touch-action: none;
+  position: relative;
+  width: fit-content;
+  margin: 24px auto;
+  touch-action: none;
+  border-radius: 12px;
+  overflow: hidden;
+  border: 1px solid var(--b3-theme-border, rgba(0, 0, 0, 0.08));
+  box-shadow:
+    0 10px 30px rgba(0, 0, 0, 0.06),
+    0 1px 4px rgba(0, 0, 0, 0.03);
+  background: var(--b3-theme-background, #ffffff);
+  transition: box-shadow 0.3s ease, border-color 0.3s ease;
 }
 .sketch-canvas { display: block; }
 .sketch-canvas--bg { position: relative; }
 .sketch-canvas--stroke { position: absolute; top: 0; left: 0; cursor: crosshair; }
+
+/* 原位文本编辑器 */
+.sketch-text-editor-overlay {
+  position: absolute;
+  z-index: 2000;
+  background: transparent;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  align-items: center;
+}
+.sketch-text-editor-input {
+  box-sizing: border-box;
+  font-family: inherit;
+  font-size: 16px;
+  color: var(--b3-theme-text-main, #333);
+  background: var(--b3-theme-background, #fff);
+  border: 1px solid var(--b3-theme-primary, #2f80ed);
+  border-radius: 4px;
+  padding: 2px 6px;
+  min-width: 150px;
+  max-width: 300px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  outline: none;
+  font-weight: 500;
+}
 </style>

@@ -78,7 +78,7 @@
         ref="canvasRef"
         :initialData="loadedData"
         :tool="activeTool"
-        :toolPresets="toolPresets"
+        :toolPresets="{ ...toolPresets, text: textPreset }"
         :inputSettings="inputSettings"
         :templateId="currentTemplate"
         :lassoMode="lassoMode"
@@ -111,7 +111,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted } from "vue";
 import type { SketchData, ToolPreset } from "@/types/sketch";
-import { PRESET_COLORS } from "@/types/sketch";
+import { PRESET_COLORS, HIGHLIGHTER_PRESET_COLORS } from "@/types/sketch";
 import { getAllTemplates } from "@/template";
 import { renderSketchPdfPageImages, renderSketchPngPageImage, thumbnailSketchDataAsync } from "@/storage/thumbnail";
 import { showMessage } from "siyuan";
@@ -167,6 +167,31 @@ const lassoMode = ref<"freehand" | "box">("freehand");
 const lastShapeTool = ref<ShapeEditorTool>("line");
 const activeColor = ref(PRESET_COLORS[0]);
 const toolPresets = ref(normalizeToolPresets(props.initialData?.toolPresets));
+
+// 文本专属预设 (包含字号 width 及 颜色 color)，独立配置并跨文档记忆
+const textPreset = ref({
+  color: "#000000",
+  width: 20, // 默认字号 20px
+  opacity: 1,
+});
+
+onMounted(() => {
+  try {
+    const cachedText = localStorage.getItem("sketch-note-text-preset");
+    if (cachedText) {
+      const parsed = JSON.parse(cachedText);
+      if (parsed && typeof parsed.color === "string" && typeof parsed.width === "number") {
+        textPreset.value = {
+          color: parsed.color,
+          width: parsed.width,
+          opacity: parsed.opacity ?? 1,
+        };
+      }
+    }
+  } catch (e) {
+    console.error("加载文本预设失败:", e);
+  }
+});
 const inputSettings = ref(normalizeInputSettings(props.initialData?.inputSettings));
 const customBackgrounds = ref(props.initialData?.customBackgrounds ?? []);
 const recentColors = ref(normalizeRecentColors(props.initialData?.recentColors));
@@ -195,8 +220,22 @@ const saveQueue = new SaveQueue();
 
 const statusLabel = computed(() => createSaveStatusLabel(saveStatus.value, t, lastSavedAt.value));
 
-const activePreset = computed(() => toolPresets.value[getDrawingToolForEditorTool(activeTool.value)]);
-const colors = computed(() => recentColors.value);
+const activePreset = computed(() => {
+  if (activeTool.value === "text") {
+    return {
+      tool: "text",
+      mode: "ink",
+      ...textPreset.value,
+    } as any;
+  }
+  return toolPresets.value[getDrawingToolForEditorTool(activeTool.value)];
+});
+const colors = computed(() => {
+  if (activeTool.value === "highlighter") {
+    return HIGHLIGHTER_PRESET_COLORS;
+  }
+  return recentColors.value;
+});
 const activeCustomBackground = computed(() => getCustomBackgroundTemplate({
   template: currentTemplate.value,
   customBackgrounds: customBackgrounds.value,
@@ -259,10 +298,6 @@ function resetDefaultColors() {
 }
 
 function selectTool(tool: EditorTool) {
-  if (tool === "text") {
-    insertTextElement();
-    return;
-  }
   if (tool === "image") {
     triggerImageImport();
     return;
@@ -274,6 +309,18 @@ function selectTool(tool: EditorTool) {
 }
 
 function updateActivePreset(patch: Partial<Omit<ToolPreset, "tool">>) {
+  if (activeTool.value === "text") {
+    textPreset.value = {
+      ...textPreset.value,
+      ...patch,
+    };
+    try {
+      localStorage.setItem("sketch-note-text-preset", JSON.stringify(textPreset.value));
+    } catch (e) {
+      console.error("保存文本预设失败:", e);
+    }
+    return;
+  }
   toolPresets.value = updateToolPreset(toolPresets.value, getDrawingToolForEditorTool(activeTool.value), patch);
 }
 

@@ -139,6 +139,7 @@ function createShapeStroke(
     width: preset.width,
     opacity: preset.opacity,
     tool: "pen",
+    isShape: true,
   });
 }
 

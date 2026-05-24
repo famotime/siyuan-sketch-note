@@ -18,6 +18,7 @@ export interface Stroke {
   opacity?: number;    // 0~1, default 1 for old data
   tool: SketchTool;
   bounds?: Bounds;     // precomputed bounds for large documents
+  isShape?: boolean;   // 是否为几何形状（跳过贝塞尔平滑）
 }
 
 export interface SketchData {
@@ -80,6 +81,14 @@ export const PRESET_COLORS = [
   "#3498db",
   "#2ecc71",
   "#f39c12",
+] as const;
+
+export const HIGHLIGHTER_PRESET_COLORS = [
+  "#fff176", // 荧光黄 (默认)
+  "#81c784", // 荧光绿
+  "#ffb74d", // 荧光橙
+  "#64b5f6", // 荧光蓝
+  "#f06292", // 荧光粉
 ] as const;
 
 export const DEFAULT_PEN_WIDTH = 3;
