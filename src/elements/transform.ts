@@ -12,11 +12,18 @@ function updateElementBounds<T extends SketchElement>(element: T, bounds: Bounds
 }
 
 export function moveElement<T extends SketchElement>(element: T, dx: number, dy: number): T {
-  return updateElementBounds(element, {
-    ...element.bounds,
-    x: element.bounds.x + dx,
-    y: element.bounds.y + dy,
-  });
+  return {
+    ...updateElementBounds(element, {
+      ...element.bounds,
+      x: element.bounds.x + dx,
+      y: element.bounds.y + dy,
+    }),
+    transform: {
+      ...element.transform,
+      x: element.transform.x + dx,
+      y: element.transform.y + dy,
+    },
+  };
 }
 
 export function resizeElementFromCorner<T extends SketchElement>(

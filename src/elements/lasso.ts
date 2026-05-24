@@ -26,8 +26,8 @@ function isPointInPolygon(point: Point, polygon: Point[]): boolean {
 
 function getElementCenter(element: SketchElement): Point {
   return {
-    x: element.bounds.x + element.bounds.width / 2 + element.transform.x,
-    y: element.bounds.y + element.bounds.height / 2 + element.transform.y,
+    x: element.bounds.x + element.bounds.width / 2,
+    y: element.bounds.y + element.bounds.height / 2,
   };
 }
 

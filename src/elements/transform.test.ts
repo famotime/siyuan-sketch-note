@@ -25,6 +25,20 @@ describe("element transforms", () => {
     expect(element.bounds.y).toBe(30);
   });
 
+  it("keeps transform translation in sync when moving an element", () => {
+    const element = createImageElement("image-1", {
+      x: 20,
+      y: 30,
+      src: "data:image/png;base64,AAA",
+    });
+
+    const moved = moveElement(moveElement(element, 12, -8), -2, 18);
+
+    expect(moved.bounds).toMatchObject({ x: 30, y: 40 });
+    expect(moved.transform).toMatchObject({ x: 10, y: 10 });
+    expect(element.transform).toMatchObject({ x: 0, y: 0 });
+  });
+
   it("resizes from the bottom right corner with a minimum size", () => {
     const element = createImageElement("image-1", {
       x: 20,

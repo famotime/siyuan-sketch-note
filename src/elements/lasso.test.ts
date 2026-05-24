@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { SketchElement } from "./model";
+import { moveElement } from "./transform";
 import {
   findElementsInBoxSelection,
   findElementsInLasso,
@@ -67,6 +68,19 @@ describe("lasso selection", () => {
       y: 40,
       width: -40,
       height: -40,
+    });
+
+    expect(selected.map((element) => element.id)).toEqual(["inside"]);
+  });
+
+  it("selects moved elements by their rendered bounds without double-counting transform translation", () => {
+    const moved = moveElement(elements[0], 40, 0);
+
+    const selected = findElementsInBoxSelection([moved], {
+      x: 45,
+      y: 0,
+      width: 30,
+      height: 40,
     });
 
     expect(selected.map((element) => element.id)).toEqual(["inside"]);
