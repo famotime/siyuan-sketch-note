@@ -70,6 +70,23 @@ describe("sketch data migrations", () => {
     ]);
   });
 
+  it("reconstructs missing page metadata for paged sketches", () => {
+    const data = migrateSketchData({
+      version: 1,
+      template: "grid",
+      canvasWidth: 800,
+      canvasHeight: 2000,
+      pageMode: "paged",
+      strokes: [],
+    });
+
+    expect(data.pages).toEqual([
+      { id: "page-1", index: 0, x: 0, y: 0, width: 800, height: 1000 },
+      { id: "page-2", index: 1, x: 0, y: 1000, width: 800, height: 1000 },
+    ]);
+    expect(data.activePageId).toBe("page-1");
+  });
+
   it("recovers corrupted data to an empty sketch and preserves the raw payload", () => {
     const result = recoverSketchData({
       version: 1,

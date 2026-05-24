@@ -1,4 +1,5 @@
 import { migrateStrokesToElements, withStrokeBounds } from "@/elements/model";
+import { getSketchPages } from "@/pages/model";
 import { normalizeRecentColors } from "@/tools/palette";
 import type { SketchData } from "@/types/sketch";
 import {
@@ -18,12 +19,26 @@ export function migrateSketchData(raw: unknown): SketchData {
   assertSketchDataShape(raw);
   const data = raw as SketchData;
   const strokes = data.strokes.map(withStrokeBounds);
+  const canvasWidth = data.canvasWidth || CANVAS_LOGICAL_WIDTH;
+  const canvasHeight = data.canvasHeight || CANVAS_INITIAL_HEIGHT;
+  const pageMode = data.pageMode;
+  const pages = pageMode === "paged"
+    ? getSketchPages({
+        activePageId: data.activePageId,
+        canvasHeight,
+        canvasWidth,
+        pageMode,
+        pages: data.pages,
+      })
+    : data.pages;
 
   return {
     ...data,
-    canvasWidth: data.canvasWidth || CANVAS_LOGICAL_WIDTH,
-    canvasHeight: data.canvasHeight || CANVAS_INITIAL_HEIGHT,
+    activePageId: pageMode === "paged" ? data.activePageId ?? pages?.[0]?.id : data.activePageId,
+    canvasWidth,
+    canvasHeight,
     elements: data.elements ?? migrateStrokesToElements(strokes),
+    pages,
     recentColors: normalizeRecentColors(data.recentColors),
     strokes,
     template: data.template || DEFAULT_SKETCH_DATA.template,
