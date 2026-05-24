@@ -96,6 +96,7 @@ import {
 } from "@/pages/model";
 import { shouldDrawFromPointer } from "./inputMode";
 import type { SketchInputSettings } from "./inputMode";
+import { createInsertElementPosition } from "./insertPosition";
 import { isShapeEditorTool } from "./tools";
 import type { EditorTool } from "./tools";
 
@@ -850,9 +851,17 @@ function rotateRulerBy(delta: number) {
 }
 function insertText() {
   const text = window.prompt("Text", "Text") ?? "Text";
+  const position = createInsertElementPosition({
+    canvasWidth: state.canvasWidth,
+    pageMode: state.pageMode,
+    activePageId: state.activePageId,
+    pages: state.pages,
+    elementWidth: 220,
+    topOffset: 120,
+  });
   const element = createTextElement(`text-${Date.now()}`, {
-    x: state.canvasWidth / 2 - 110,
-    y: 120,
+    x: position.x,
+    y: position.y,
     text,
   });
   pushHistorySnapshot(state);
@@ -862,9 +871,17 @@ function insertText() {
 }
 async function insertImage(src: string) {
   await preloadImage(src);
+  const position = createInsertElementPosition({
+    canvasWidth: state.canvasWidth,
+    pageMode: state.pageMode,
+    activePageId: state.activePageId,
+    pages: state.pages,
+    elementWidth: 320,
+    topOffset: 140,
+  });
   const element = createImageElement(`image-${Date.now()}`, {
-    x: state.canvasWidth / 2 - 160,
-    y: 140,
+    x: position.x,
+    y: position.y,
     src,
   });
   pushHistorySnapshot(state);
