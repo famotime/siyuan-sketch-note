@@ -6,6 +6,7 @@ import type { SketchElement } from "@/elements/model";
 import { splitElementsForRender } from "@/elements/renderOrder";
 import { getPressureWidth, getSmoothedSegments } from "@/engine/strokeSmoothing";
 import { getCustomBackgroundDrawRect, getCustomBackgroundSource, getCustomBackgroundTemplate } from "@/template/customBackground";
+import { translateElementsForRender } from "./renderElements";
 
 const PADDING = 40;
 const MIN_WIDTH = 200;
@@ -221,7 +222,8 @@ function renderToDataUrl(
   const template = getTemplate(templateId);
   template.render(ctx, width, height);
 
-  const layers = splitElementsForRender(elements);
+  const translatedElements = translateElementsForRender(elements, tx, ty);
+  const layers = splitElementsForRender(translatedElements);
   renderNonStrokeElements(ctx, layers.background);
   if (strokes.length > 0) {
     ctx.save();
@@ -281,7 +283,8 @@ async function renderToDataUrlAsync(
     ctx.clearRect(0, 0, width, height);
   }
 
-  const layers = splitElementsForRender(elements);
+  const translatedElements = translateElementsForRender(elements, tx, ty);
+  const layers = splitElementsForRender(translatedElements);
   await renderNonStrokeElementsAsync(ctx, layers.background);
   if (strokes.length > 0) {
     ctx.save();
