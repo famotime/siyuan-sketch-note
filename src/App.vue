@@ -11,6 +11,7 @@
 
 <script lang="ts">
 import { ref } from "vue";
+import { showMessage } from "siyuan";
 import { loadSketchData } from "@/storage";
 import SketchEditor from "@/editor/SketchEditor.vue";
 
@@ -36,7 +37,13 @@ export function setLoadDataFn(fn: (key: string) => Promise<any>) {
 
 export async function openSketchEditor(blockId: string) {
   editorBlockId.value = blockId;
-  editorData.value = await loadSketchData(loadDataFn, blockId);
+  try {
+    editorData.value = await loadSketchData(loadDataFn, blockId);
+  } catch (e) {
+    console.error("[Sketch Note] Failed to load sketch data:", e);
+    showMessage("Sketch Note: " + (pluginI18n.value["loadFailed"] || "Data load failed"), 5000, "error");
+    editorData.value = null;
+  }
   editorVisible.value = true;
 }
 
@@ -45,7 +52,25 @@ function closeEditor() {
   editorVisible.value = false;
   editorBlockId.value = "";
   editorData.value = null;
-  window.dispatchEvent(new CustomEvent("sketch-note-saved", { detail: { blockId: savedBlockId } }));
+
+  // Refresh the sketch-note image in the document to show updated content
+  refreshSketchImage(savedBlockId);
+}
+
+/**
+ * Force-refresh the displayed image for a sketch block.
+ * Uses cache-busting to ensure the browser loads the updated PNG from assets.
+ */
+function refreshSketchImage(blockId: string) {
+  const pattern = `sketch-note-${blockId}.png`;
+  document.querySelectorAll("img").forEach((img) => {
+    const dataSrc = img.getAttribute("data-src") || "";
+    if (dataSrc.includes(pattern)) {
+      // Append cache-busting timestamp to force reload
+      const baseSrc = dataSrc.split("?")[0];
+      img.src = `${baseSrc}?t=${Date.now()}`;
+    }
+  });
 }
 
 export default {

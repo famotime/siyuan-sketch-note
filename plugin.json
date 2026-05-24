@@ -1,24 +1,21 @@
 {
-  "name": "sketch-note",
-  "author": "sketch-note",
-  "url": "",
+  "name": "siyuan-sketch-note",
+  "author": "famotime",
+  "url": "https://github.com/famotime/siyuan-sketch-note",
   "version": "0.1.0",
   "minAppVersion": "2.10.14",
-  "backends": ["all"],
-  "frontends": ["all"],
+  "backends": ["windows", "linux", "darwin", "docker"],
+  "frontends": ["desktop", "browser-desktop", "desktop-window"],
   "displayName": {
     "default": "Sketch Note",
-    "zh_CN": "手写笔记"
+    "zh_CN": "闲笔"
   },
   "description": {
-    "default": "Handwriting plugin for SiYuan Note with vector strokes, templates, and undo/redo",
-    "zh_CN": "思源笔记手写插件，支持矢量笔迹、稿纸模板和撤销重做"
+    "default": "Handwriting plugin for SiYuan Note with vector strokes, templates, and multiple edits",
+    "zh_CN": "思源笔记手写插件，支持矢量笔迹、稿纸模板和多次编辑"
   },
   "readme": {
     "default": "README.md"
-  },
-  "funding": {
-    "custom": []
   },
   "keywords": ["sketch", "handwriting", "canvas", "drawing", "手写", "绘图"]
 }

@@ -1,52 +1,146 @@
 <template>
   <div v-if="visible" class="sketch-editor">
     <div class="sketch-editor__header">
-      <button class="sketch-editor__back" @click="goBack">← {{ t("back") }}</button>
-      <select class="sketch-editor__template-select" v-model="currentTemplate">
-        <option v-for="tpl in templates" :key="tpl.id" :value="tpl.id">{{ t(tpl.nameKey) }}</option>
-      </select>
-      <span class="sketch-editor__title">{{ t("sketchNote") }}</span>
-      <button class="sketch-editor__save" @click="doSave">{{ t("save") }}</button>
+      <EditorTopBar
+        v-model:templateId="currentTemplate"
+        :autoSave="autoSave"
+        :backgroundFit="activeCustomBackground?.fit"
+        :exportIncludeBackground="exportIncludeBackground"
+        :ocrState="ocrState"
+        :pageOverview="pageOverview"
+        :pageState="pageState"
+        :recovered="Boolean(loadedData?.recovery?.recovered)"
+        :saveStatus="saveStatus"
+        :searchResultCount="searchResults.length"
+        :statusLabel="statusLabel"
+        :stylusOnly="inputSettings.stylusOnly"
+        :t="t"
+        :templates="templates"
+        @addPage="canvasRef?.addPage()"
+        @back="goBack"
+        @backgroundFitChange="onBackgroundFitChange"
+        @clearSearch="onClearSearch"
+        @deletePage="deleteCurrentPage"
+        @duplicatePage="canvasRef?.duplicateCurrentPage()"
+        @exportJson="exportJson"
+        @exportPdf="exportPdf"
+        @exportPng="exportPng"
+        @goToPage="canvasRef?.goToPage($event)"
+        @importBackground="triggerBackgroundImport"
+        @importJson="triggerJsonImport"
+        @nextPage="canvasRef?.goToNextPage()"
+        @previousPage="canvasRef?.goToPreviousPage()"
+        @recognize="recognizeText"
+        @save="manualSave"
+        @search="onSearch"
+        @searchNext="onSearchNext"
+        @searchPrev="onSearchPrev"
+        @toggleAutoSave="toggleAutoSave"
+        @toggleExportBackground="exportIncludeBackground = !exportIncludeBackground"
+        @toggleStylusOnly="toggleStylusOnly"
+      />
+      <ToolBar
+        v-model:lassoMode="lassoMode"
+        :activePreset="activePreset"
+        :activeTool="activeTool"
+        :canRedo="canRedo"
+        :canUndo="canUndo"
+        :colors="colors"
+        :t="t"
+        @clear="canvasRef?.doClear()"
+        @deleteSelection="canvasRef?.deleteLassoSelection()"
+        @duplicateSelection="canvasRef?.duplicateLassoSelection()"
+        @recolorSelection="canvasRef?.recolorLasso(activePreset.color)"
+        @redo="canvasRef?.doRedo()"
+        @selectColor="selectColor"
+        @selectCustomColor="selectCustomColor"
+        @selectTool="selectTool"
+        @undo="canvasRef?.doUndo()"
+        @updatePreset="updateActivePreset"
+      />
+      <input
+        ref="imageInputRef"
+        class="sketch-file-input"
+        type="file"
+        accept="image/*"
+        @change="onImageSelected"
+      >
+      <input
+        ref="jsonInputRef"
+        class="sketch-file-input"
+        type="file"
+        accept="application/json,.json"
+        @change="onJsonSelected"
+      >
+      <input
+        ref="backgroundInputRef"
+        class="sketch-file-input"
+        type="file"
+        accept="image/*"
+        @change="onBackgroundSelected"
+      >
     </div>
+
     <div class="sketch-editor__body">
       <SketchCanvas
         ref="canvasRef"
         :initialData="loadedData"
         :tool="activeTool"
-        :color="activeColor"
+        :toolPresets="toolPresets"
+        :inputSettings="inputSettings"
+        :templateId="currentTemplate"
+        :lassoMode="lassoMode"
         @update:canUndo="canUndo = $event"
         @update:canRedo="canRedo = $event"
         @heightChanged="onHeightChanged"
+        @pagesChanged="onPagesChanged"
+        @stroke="onStroke"
       />
     </div>
-    <SketchToolbar
-      :modelColor="activeColor"
-      :modelTool="activeTool"
-      :canUndo="canUndo"
-      :canRedo="canRedo"
-      @update:modelColor="activeColor = $event"
-      @update:modelTool="activeTool = $event"
-      @undo="canvasRef?.doUndo()"
-      @redo="canvasRef?.doRedo()"
-      @clear="canvasRef?.doClear()"
-    />
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from "vue";
-import type { SketchData, SketchTool } from "@/types/sketch";
+import { ref, computed, onMounted, onUnmounted } from "vue";
+import type { SketchData, ToolPreset } from "@/types/sketch";
 import { PRESET_COLORS } from "@/types/sketch";
 import { getAllTemplates } from "@/template";
-import { thumbnailCanvas } from "@/storage/thumbnail";
+import { renderSketchPdfPageImages, renderSketchPngPageImage, thumbnailSketchDataAsync } from "@/storage/thumbnail";
+import { showMessage } from "siyuan";
+import { sketchAssetFileName, uploadDataUrlToAssets } from "@/utils/uploadPng";
+import { normalizeToolPresets, updateToolPreset } from "@/tools/presets";
+import { createCurrentPagePngExportPlan, createExportPngFileName, dataUrlToBlob, downloadBlob } from "@/export/png";
+import { createExportPdfFileName, createPdfExportPlanFromSketch, exportPdf as exportPdfBlob } from "@/export/pdf";
+import { createExportJsonFileName, exportSketchJson, importSketchJson } from "@/export/json";
+import { SaveQueue } from "@/storage/saveQueue";
+import { createSaveStatusLabel } from "@/storage/saveStatus";
+import type { SaveStatus } from "@/storage/saveStatus";
+import { normalizeInputSettings } from "./inputMode";
+import { createCustomBackgroundTemplate, getCustomBackgroundTemplate, updateCustomBackgroundFit } from "@/template/customBackground";
+import type { CustomBackgroundTemplate } from "@/template/customBackground";
+import type { PageOverviewItem } from "@/pages/model";
+import {
+  addRecentColor,
+  normalizeRecentColors,
+} from "@/tools/palette";
+import { getFirstImageFileFromClipboard } from "./clipboard";
+import { resolveEditorShortcut } from "./shortcuts";
+import { getDrawingToolForEditorTool } from "./tools";
+import type { EditorTool } from "./tools";
+import type { OcrProvider } from "@/search/ocrProvider";
+import { createNoopOcrProvider } from "@/search/ocrProvider";
+import { createPageAwareOcrIndex, searchOcrIndex } from "@/search/ocrIndex";
+import type { OcrSearchResult } from "@/search/ocrIndex";
+import EditorTopBar from "./EditorTopBar.vue";
 import SketchCanvas from "./SketchCanvas.vue";
-import SketchToolbar from "./SketchToolbar.vue";
+import ToolBar from "./ToolBar.vue";
 
 const props = defineProps<{
   blockId: string;
   initialData: SketchData | null;
   i18n: Record<string, string>;
   saveData: (key: string, data: any) => Promise<void>;
+  ocrProvider?: OcrProvider;
 }>();
 
 const emit = defineEmits<{ (e: "close"): void }>();
@@ -55,35 +149,481 @@ function t(key: string): string { return props.i18n[key] ?? key; }
 
 const visible = ref(false);
 const canvasRef = ref<InstanceType<typeof SketchCanvas>>();
-const activeTool = ref<SketchTool>("pen");
+const imageInputRef = ref<HTMLInputElement>();
+const jsonInputRef = ref<HTMLInputElement>();
+const backgroundInputRef = ref<HTMLInputElement>();
+const activeTool = ref<EditorTool>("pen");
+const lassoMode = ref<"freehand" | "box">("freehand");
 const activeColor = ref(PRESET_COLORS[0]);
+const toolPresets = ref(normalizeToolPresets(props.initialData?.toolPresets));
+const inputSettings = ref(normalizeInputSettings(props.initialData?.inputSettings));
+const customBackgrounds = ref(props.initialData?.customBackgrounds ?? []);
+const recentColors = ref(normalizeRecentColors(props.initialData?.recentColors));
 const canUndo = ref(false);
 const canRedo = ref(false);
+const pageState = ref({ current: 1, total: 1 });
+const pageOverview = ref<PageOverviewItem[]>([]);
 const currentTemplate = ref(props.initialData?.template ?? "blank");
-const templates = getAllTemplates();
+const templates = computed(() => [
+  ...getAllTemplates(),
+  ...customBackgrounds.value,
+]);
 const loadedData = ref<SketchData | null>(props.initialData);
+const saveStatus = ref<SaveStatus>("idle");
+const lastSavedAt = ref<number | null>(null);
+const autoSave = ref(true);
+const exportIncludeBackground = ref(true);
+
+const ocrState = ref<"idle" | "recognizing" | "completed" | "error">("idle");
+const ocrIndex = ref<SketchData["ocrIndex"]>(props.initialData?.ocrIndex ?? undefined);
+const searchResults = ref<OcrSearchResult[]>([]);
+const searchResultIndex = ref(0);
+
+let autoSaveTimer: ReturnType<typeof setTimeout> | null = null;
+const saveQueue = new SaveQueue();
+
+const statusLabel = computed(() => createSaveStatusLabel(saveStatus.value, t, lastSavedAt.value));
+
+const activePreset = computed(() => toolPresets.value[getDrawingToolForEditorTool(activeTool.value)]);
+const colors = computed(() => recentColors.value);
+const activeCustomBackground = computed(() => getCustomBackgroundTemplate({
+  template: currentTemplate.value,
+  customBackgrounds: customBackgrounds.value,
+}));
 
 onMounted(() => {
   visible.value = true;
   document.body.style.overflow = "hidden";
+  window.addEventListener("paste", onPaste);
+  window.addEventListener("keydown", onKeyDown);
 });
 
-async function doSave() {
+onUnmounted(() => {
+  document.body.style.overflow = "";
+  if (autoSaveTimer) clearTimeout(autoSaveTimer);
+  window.removeEventListener("paste", onPaste);
+  window.removeEventListener("keydown", onKeyDown);
+});
+
+// ─── Toolbar actions ───
+
+function selectColor(c: string) {
+  activeColor.value = c;
+  if (activeTool.value === "eraser") {
+    activeTool.value = "pen";
+  }
+  updateActivePreset({ color: c });
+  recentColors.value = addRecentColor(recentColors.value, c);
+}
+
+function selectCustomColor(c: string) {
+  selectColor(c);
+}
+
+function selectTool(tool: EditorTool) {
+  if (tool === "text") {
+    insertTextElement();
+    return;
+  }
+  if (tool === "image") {
+    triggerImageImport();
+    return;
+  }
+  activeTool.value = tool;
+}
+
+function updateActivePreset(patch: Partial<Omit<ToolPreset, "tool">>) {
+  toolPresets.value = updateToolPreset(toolPresets.value, getDrawingToolForEditorTool(activeTool.value), patch);
+}
+
+function toggleAutoSave() {
+  autoSave.value = !autoSave.value;
+  if (!autoSave.value && autoSaveTimer) {
+    clearTimeout(autoSaveTimer);
+    autoSaveTimer = null;
+  }
+}
+
+function toggleStylusOnly() {
+  inputSettings.value = {
+    ...inputSettings.value,
+    stylusOnly: !inputSettings.value.stylusOnly,
+  };
+  markDirty();
+  if (autoSave.value) scheduleAutoSave();
+}
+
+// ─── Save logic ───
+
+function markDirty() {
+  if (saveStatus.value === "saved" || saveStatus.value === "idle") {
+    saveStatus.value = "dirty";
+  }
+}
+
+function onStroke() {
+  syncPageOverview();
+  markDirty();
+  if (autoSave.value) scheduleAutoSave();
+}
+
+function scheduleAutoSave() {
+  if (autoSaveTimer) clearTimeout(autoSaveTimer);
+  autoSaveTimer = setTimeout(() => {
+    autoSaveTimer = null;
+    if (saveStatus.value === "dirty" || saveStatus.value === "error") doSave();
+  }, 1500);
+}
+
+async function doSave(): Promise<boolean> {
+  return saveQueue.enqueue(runSave);
+}
+
+async function runSave(): Promise<boolean> {
+  if (!canvasRef.value) return false;
+  saveStatus.value = "saving";
+  const data = canvasRef.value.getData();
+  data.template = currentTemplate.value;
+  data.toolPresets = toolPresets.value;
+  data.inputSettings = inputSettings.value;
+  data.customBackgrounds = customBackgrounds.value;
+  data.recentColors = recentColors.value;
+  if (ocrIndex.value) {
+    data.ocrIndex = ocrIndex.value;
+  }
+  delete data.recovery;
+
+  let pngDataUrl: string;
+  try {
+    pngDataUrl = await thumbnailSketchDataAsync(data);
+  } catch (e) {
+    console.error("[Sketch Note] Thumbnail generation failed:", e);
+    pngDataUrl = createFallbackThumbnail();
+  }
+
+  try {
+    const fileName = sketchAssetFileName(props.blockId);
+    await uploadDataUrlToAssets(pngDataUrl, fileName);
+    await props.saveData(`sketch:${props.blockId}`, data);
+    saveStatus.value = "saved";
+    lastSavedAt.value = Date.now();
+    canvasRef.value.getState().isDirty = false;
+    return true;
+  } catch (e) {
+    console.error("[Sketch Note] Save failed:", e);
+    saveStatus.value = "error";
+    showMessage(t("saveFailed"), 5000, "error");
+    return false;
+  }
+}
+
+async function manualSave() {
+  if (autoSaveTimer) { clearTimeout(autoSaveTimer); autoSaveTimer = null; }
+  await doSave();
+}
+
+// ─── OCR & Search ───
+
+async function recognizeText() {
+  if (!canvasRef.value) return;
+  const provider = props.ocrProvider ?? createNoopOcrProvider();
+
+  ocrState.value = "recognizing";
+  try {
+    const data = canvasRef.value.getData();
+    data.template = currentTemplate.value;
+    const plan = createCurrentPagePngExportPlan(props.blockId, data);
+    const pngDataUrl = await renderSketchPngPageImage(data, plan, false);
+    const blob = dataUrlToBlob(pngDataUrl);
+
+    const lines = await provider({
+      imageBlob: blob,
+      canvasWidth: data.canvasWidth,
+      canvasHeight: data.canvasHeight,
+    });
+
+    if (lines.length === 0) {
+      ocrState.value = "completed";
+      return;
+    }
+
+    ocrIndex.value = createPageAwareOcrIndex(props.blockId, lines, data);
+
+    markDirty();
+    if (autoSave.value) scheduleAutoSave();
+
+    ocrState.value = "completed";
+  } catch (e) {
+    console.error("[Sketch Note] OCR failed:", e);
+    ocrState.value = "error";
+  }
+}
+
+function onSearch(query: string) {
+  if (!ocrIndex.value || !query.trim()) {
+    searchResults.value = [];
+    searchResultIndex.value = 0;
+    return;
+  }
+  searchResults.value = searchOcrIndex(ocrIndex.value, query);
+  searchResultIndex.value = 0;
+  if (searchResults.value.length > 0) {
+    navigateToSearchResult(0);
+  }
+}
+
+function onSearchNext() {
+  if (searchResults.value.length === 0) return;
+  searchResultIndex.value = (searchResultIndex.value + 1) % searchResults.value.length;
+  navigateToSearchResult(searchResultIndex.value);
+}
+
+function onSearchPrev() {
+  if (searchResults.value.length === 0) return;
+  searchResultIndex.value = (searchResultIndex.value - 1 + searchResults.value.length) % searchResults.value.length;
+  navigateToSearchResult(searchResultIndex.value);
+}
+
+function navigateToSearchResult(index: number) {
+  const result = searchResults.value[index];
+  if (!result || !canvasRef.value) return;
+  canvasRef.value.highlightSearchResult(result);
+}
+
+function onClearSearch() {
+  searchResults.value = [];
+  searchResultIndex.value = 0;
+}
+
+async function exportPng() {
   if (!canvasRef.value) return;
   const data = canvasRef.value.getData();
-  data.thumbnail = thumbnailCanvas(data.strokes, data.template, data.canvasHeight);
   data.template = currentTemplate.value;
-  const key = `sketch:${props.blockId}`;
-  await props.saveData(key, data);
-  document.body.style.overflow = "";
+  data.recentColors = recentColors.value;
+  const plan = createCurrentPagePngExportPlan(props.blockId, data);
+  const pngDataUrl = await renderSketchPngPageImage(data, plan, exportIncludeBackground.value);
+  const blob = dataUrlToBlob(pngDataUrl);
+  downloadBlob(blob, createExportPngFileName(props.blockId, new Date(), plan.pageNumber));
+}
+
+async function exportPdf() {
+  if (!canvasRef.value) return;
+  const data = canvasRef.value.getData();
+  data.template = currentTemplate.value;
+  data.recentColors = recentColors.value;
+  const plan = createPdfExportPlanFromSketch(
+    props.blockId,
+    data,
+    undefined,
+    exportIncludeBackground.value,
+  );
+  const pageImages = await renderSketchPdfPageImages(data, plan);
+  const blob = await exportPdfBlob(plan, { pageImages });
+  downloadBlob(blob, createExportPdfFileName(props.blockId));
+}
+
+function exportJson() {
+  if (!canvasRef.value) return;
+  const data = canvasRef.value.getData();
+  data.template = currentTemplate.value;
+  data.toolPresets = toolPresets.value;
+  data.inputSettings = inputSettings.value;
+  data.customBackgrounds = customBackgrounds.value;
+  data.recentColors = recentColors.value;
+  const blob = exportSketchJson(data);
+  downloadBlob(blob, createExportJsonFileName(props.blockId));
+}
+
+function triggerJsonImport() {
+  jsonInputRef.value?.click();
+}
+
+function triggerBackgroundImport() {
+  backgroundInputRef.value?.click();
+}
+
+async function onBackgroundFitChange(value: string) {
+  if (!canvasRef.value || !activeCustomBackground.value) return;
+  const fit = value as CustomBackgroundTemplate["fit"];
+  customBackgrounds.value = updateCustomBackgroundFit(
+    customBackgrounds.value,
+    activeCustomBackground.value.id,
+    fit,
+  );
+  loadedData.value = {
+    ...(canvasRef.value.getData()),
+    template: currentTemplate.value,
+    customBackgrounds: customBackgrounds.value,
+  };
+  await canvasRef.value.restoreData(loadedData.value);
+  onStroke();
+}
+
+function deleteCurrentPage() {
+  const removed = canvasRef.value?.deleteCurrentPage();
+  syncPageOverview();
+  if (!removed) {
+    showMessage(t("deletePageFailed"), 4000, "error");
+  }
+}
+
+function onPagesChanged(pages: { current: number; total: number }) {
+  pageState.value = pages;
+  syncPageOverview();
+}
+
+function syncPageOverview() {
+  pageOverview.value = canvasRef.value?.getPageOverviewItems() ?? [];
+}
+
+async function onJsonSelected(event: Event) {
+  const input = event.target as HTMLInputElement;
+  const file = input.files?.[0];
+  input.value = "";
+  if (!file || !canvasRef.value) return;
+
+  try {
+    const imported = importSketchJson(await file.text());
+    const importedPresets = normalizeToolPresets(imported.toolPresets);
+    imported.toolPresets = importedPresets;
+    currentTemplate.value = imported.template;
+    toolPresets.value = importedPresets;
+    inputSettings.value = normalizeInputSettings(imported.inputSettings);
+    customBackgrounds.value = imported.customBackgrounds ?? [];
+    recentColors.value = normalizeRecentColors(imported.recentColors);
+    loadedData.value = imported;
+    await canvasRef.value.restoreData(imported);
+    onStroke();
+  } catch (error) {
+    console.error("[Sketch Note] JSON restore failed:", error);
+    showMessage(t("importJsonFailed"), 5000, "error");
+  }
+}
+
+async function onBackgroundSelected(event: Event) {
+  const input = event.target as HTMLInputElement;
+  const file = input.files?.[0];
+  input.value = "";
+  if (!file || !canvasRef.value) return;
+
+  const dataUrl = await readFileAsDataUrl(file);
+  const background = createCustomBackgroundTemplate(`bg-${Date.now()}`, dataUrl);
+  customBackgrounds.value = [
+    ...customBackgrounds.value.filter((item) => item.id !== background.id),
+    background,
+  ];
+  currentTemplate.value = background.id;
+  loadedData.value = {
+    ...(canvasRef.value.getData()),
+    template: background.id,
+    customBackgrounds: customBackgrounds.value,
+  };
+  await canvasRef.value.restoreData(loadedData.value);
+  onStroke();
+}
+
+function insertTextElement() {
+  activeTool.value = "text";
+  canvasRef.value?.insertText();
+  onStroke();
+}
+
+function triggerImageImport() {
+  activeTool.value = "image";
+  imageInputRef.value?.click();
+}
+
+async function onImageSelected(event: Event) {
+  const input = event.target as HTMLInputElement;
+  const file = input.files?.[0];
+  input.value = "";
+  if (!file) return;
+  const dataUrl = await readFileAsDataUrl(file);
+  await canvasRef.value?.insertImage(dataUrl);
+  onStroke();
+}
+
+async function onPaste(event: ClipboardEvent) {
+  const file = event.clipboardData
+    ? getFirstImageFileFromClipboard(event.clipboardData.items)
+    : null;
+  if (!file) return;
+
+  event.preventDefault();
+  activeTool.value = "image";
+  const dataUrl = await readFileAsDataUrl(file);
+  await canvasRef.value?.insertImage(dataUrl);
+  onStroke();
+}
+
+function onKeyDown(event: KeyboardEvent) {
+  const shortcut = resolveEditorShortcut(event);
+  if (!shortcut) return;
+
+  event.preventDefault();
+  event.stopPropagation();
+
+  switch (shortcut.type) {
+    case "deleteSelection":
+      if (activeTool.value === "lasso") {
+        canvasRef.value?.deleteLassoSelection();
+      }
+      break;
+    case "duplicateSelection":
+      if (activeTool.value === "lasso") {
+        canvasRef.value?.duplicateLassoSelection();
+      }
+      break;
+    case "save":
+      manualSave();
+      break;
+    case "undo":
+      canvasRef.value?.doUndo();
+      break;
+    case "redo":
+      canvasRef.value?.doRedo();
+      break;
+    case "tool":
+      activeTool.value = shortcut.tool;
+      break;
+  }
+}
+
+function readFileAsDataUrl(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result));
+    reader.onerror = () => reject(reader.error);
+    reader.readAsDataURL(file);
+  });
+}
+
+function createFallbackThumbnail(): string {
+  const c = document.createElement("canvas");
+  c.width = 800; c.height = 200;
+  const ctx = c.getContext("2d")!;
+  ctx.fillStyle = "#fff"; ctx.fillRect(0, 0, 800, 200);
+  ctx.fillStyle = "#999"; ctx.font = "16px sans-serif"; ctx.textAlign = "center";
+  ctx.fillText("Sketch Note", 400, 105);
+  return c.toDataURL("image/png");
+}
+
+// ─── Back / Close ───
+
+async function goBack() {
+  if (autoSave.value) {
+    await doSave();
+    emit("close");
+    return;
+  }
+  if (saveStatus.value === "dirty" || saveStatus.value === "error") {
+    if (confirm(t("unsavedConfirm"))) { emit("close"); }
+    return;
+  }
   emit("close");
 }
 
-async function goBack() { await doSave(); }
-
-function onHeightChanged(_height: number) {
-  // Auto-scroll handled by overflow-y: auto on .sketch-editor__body
-}
+function onHeightChanged(_h: number) {}
 </script>
 
 <style scoped>
@@ -92,30 +632,255 @@ function onHeightChanged(_height: number) {
   background: var(--b3-theme-background);
   display: flex; flex-direction: column;
 }
+
+/* ── Header ── */
 .sketch-editor__header {
-  display: flex; align-items: center; gap: 12px;
-  padding: 8px 16px;
   background: var(--b3-theme-surface);
   border-bottom: 1px solid var(--b3-border-color);
   flex-shrink: 0;
+  padding: 6px 12px;
 }
-.sketch-editor__back, .sketch-editor__save {
-  padding: 6px 12px; border-radius: 6px;
+.sketch-editor__row {
+  display: flex; align-items: center; gap: 8px;
+  min-height: 36px;
+  overflow-x: auto;
+  scrollbar-width: thin;
+}
+.sketch-editor__row--tools {
+  margin-top: 6px;
+  padding-top: 6px;
+  border-top: 1px solid var(--b3-border-color);
+}
+.sketch-editor__title {
+  font-weight: 500; font-size: 14px; color: var(--b3-theme-on-surface);
+  white-space: nowrap;
+}
+.sketch-spacer { flex: 1; }
+
+/* ── Shared button base ── */
+.sketch-btn {
+  pointer-events: auto !important;
+  box-sizing: border-box;
+  display: inline-flex; align-items: center; justify-content: center;
+  padding: 5px 10px; border-radius: 6px;
   border: 1px solid var(--b3-border-color);
-  background: var(--b3-theme-surface); cursor: pointer; font-size: 14px;
+  background: var(--b3-theme-surface) !important;
+  color: var(--b3-theme-on-surface);
+  cursor: pointer; font-size: 13px;
+  white-space: nowrap; user-select: none;
+  -webkit-tap-highlight-color: transparent;
+  min-height: 30px;
 }
-.sketch-editor__save {
-  background: var(--b3-theme-primary);
-  color: var(--b3-theme-on-primary);
-  border-color: var(--b3-theme-primary); margin-left: auto;
+.sketch-btn:active { opacity: 0.8; }
+.sketch-btn:disabled { opacity: 0.35; cursor: not-allowed; }
+
+.sketch-btn--back   { font-size: 13px; }
+.sketch-btn--save   { background: var(--b3-theme-primary) !important; color: var(--b3-theme-on-primary); border-color: var(--b3-theme-primary); }
+
+.sketch-btn--toggle { font-size: 12px; }
+.sketch-btn--toggle-on { border-color: var(--b3-theme-primary); color: var(--b3-theme-primary); }
+
+.sketch-btn--tool { font-size: 13px; min-width: 44px; }
+.sketch-btn--tool-active { background: var(--b3-theme-primary-light) !important; border-color: var(--b3-theme-primary); }
+.sketch-btn--icon-tool {
+  gap: 4px;
+  padding: 5px 8px;
 }
-.sketch-editor__template-select {
+.sketch-btn__icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 16px;
+  font-size: 15px;
+  line-height: 1;
+}
+.sketch-btn__label {
+  font-size: 12px;
+}
+
+.sketch-btn--action { font-size: 13px; min-width: 52px; }
+
+.sketch-tool-options {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  padding: 3px 6px;
+  border: 1px solid var(--b3-border-color);
+  border-radius: 6px;
+  background: var(--b3-theme-background);
+}
+.sketch-file-input {
+  display: none;
+}
+.sketch-range {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--b3-theme-on-surface);
+  font-size: 12px;
+  white-space: nowrap;
+}
+.sketch-range input {
+  width: 92px;
+}
+.sketch-range output {
+  min-width: 32px;
+  text-align: right;
+  color: var(--b3-theme-on-surface-light);
+}
+.sketch-mode {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--b3-theme-on-surface);
+  font-size: 12px;
+  white-space: nowrap;
+}
+.sketch-mode select {
+  min-height: 26px;
+  border: 1px solid var(--b3-border-color);
+  border-radius: 4px;
+  background: var(--b3-theme-surface);
+  color: var(--b3-theme-on-surface);
+  font-size: 12px;
+}
+
+/* ── Select ── */
+.sketch-select {
+  pointer-events: auto !important;
   padding: 4px 8px; border-radius: 4px;
   border: 1px solid var(--b3-border-color);
   background: var(--b3-theme-surface); font-size: 13px;
+  min-height: 30px;
 }
-.sketch-editor__title { font-weight: 500; font-size: 15px; color: var(--b3-theme-on-surface); }
+
+/* ── Colors ── */
+.sketch-colors { display: flex; gap: 6px; align-items: center; }
+.sketch-color {
+  pointer-events: auto !important;
+  width: 26px; height: 26px; border-radius: 50%;
+  border: 2px solid transparent; cursor: pointer;
+  box-sizing: border-box;
+  -webkit-tap-highlight-color: transparent;
+}
+.sketch-color-picker {
+  pointer-events: auto !important;
+  position: relative;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  border: 1px dashed var(--b3-border-color);
+  color: var(--b3-theme-on-surface-light);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+  line-height: 1;
+  box-sizing: border-box;
+  overflow: hidden;
+  -webkit-tap-highlight-color: transparent;
+}
+.sketch-color-picker input {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+.sketch-color--active {
+  border-color: var(--b3-theme-primary);
+  box-shadow: 0 0 0 2px var(--b3-theme-primary-light);
+}
+
+/* ── Separator ── */
+.sketch-sep { width: 1px; height: 20px; background: var(--b3-border-color); flex-shrink: 0; }
+
+/* ── Status ── */
+.sketch-status { font-size: 12px; min-width: 36px; text-align: center; white-space: nowrap; }
+.sketch-status--saved  { color: var(--b3-theme-primary); }
+.sketch-status--saving { color: var(--b3-theme-on-surface-light); }
+.sketch-status--error  { color: #e74c3c; }
+.sketch-status--dirty  { color: #f39c12; }
+.sketch-recovery {
+  color: #d97706;
+  font-size: 12px;
+  white-space: nowrap;
+}
+.sketch-pages {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.sketch-page-overview {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  max-width: 180px;
+  overflow-x: auto;
+  padding: 0 2px;
+}
+.sketch-page-overview__item {
+  width: 24px;
+  height: 28px;
+  flex: 0 0 24px;
+  border: 1px solid var(--b3-border-color);
+  border-radius: 4px;
+  background: var(--b3-theme-surface);
+  color: var(--b3-theme-on-surface);
+  cursor: pointer;
+  font-size: 11px;
+  line-height: 1;
+}
+.sketch-page-overview__item--filled {
+  border-bottom-width: 3px;
+  border-bottom-color: var(--b3-theme-primary);
+}
+.sketch-page-overview__item--active {
+  background: var(--b3-theme-primary-light);
+  border-color: var(--b3-theme-primary);
+  font-weight: 700;
+}
+.sketch-btn--page {
+  min-width: 28px;
+  width: 28px;
+  padding: 0;
+  font-size: 18px;
+}
+.sketch-btn--page-label {
+  min-width: 72px;
+  padding: 4px 8px;
+  font-size: 12px;
+}
+.sketch-btn--page-add {
+  min-width: 52px;
+  font-size: 12px;
+}
+
+/* ── Body ── */
 .sketch-editor__body {
-  flex: 1; overflow-y: auto; padding: 16px 0 60px; touch-action: none;
+  flex: 1; overflow-y: auto; touch-action: none;
+  padding: 12px 0;
+}
+
+@media (max-width: 760px) {
+  .sketch-btn--icon-tool {
+    min-width: 34px;
+    width: 34px;
+    padding-inline: 0;
+  }
+
+  .sketch-btn__label {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+  }
+
+  .sketch-tool-options {
+    flex: 0 0 auto;
+  }
 }
 </style>

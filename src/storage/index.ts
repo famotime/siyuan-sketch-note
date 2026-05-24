@@ -1,5 +1,6 @@
 import type { SketchData } from "@/types/sketch";
 import { DEFAULT_SKETCH_DATA } from "@/types/sketch";
+import { recoverSketchData } from "./migrations";
 
 export { thumbnailCanvas } from "./thumbnail";
 
@@ -21,13 +22,11 @@ export async function loadSketchData(
   const raw = await loadData(key);
   if (!raw) return null;
 
-  // Validate version
-  if (raw.version !== 1) {
-    console.warn(`[Sketch Note] Unknown data version: ${raw.version}`);
-    return null;
+  const recovery = recoverSketchData(raw);
+  if (recovery.recovered) {
+    console.warn(`[Sketch Note] Recovered corrupted data for block ${blockId}: ${recovery.reason}`);
   }
-
-  return raw as SketchData;
+  return recovery.data;
 }
 
 /**
@@ -49,7 +48,7 @@ export function createEmptySketchData(templateId: string): SketchData {
   return {
     ...DEFAULT_SKETCH_DATA,
     template: templateId,
+    elements: [],
     strokes: [],
-    thumbnail: null,
   };
 }
