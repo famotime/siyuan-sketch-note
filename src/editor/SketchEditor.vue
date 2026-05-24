@@ -89,6 +89,11 @@
         >／ {{ t("line") }}</button>
         <button
           class="sketch-btn sketch-btn--tool"
+          :class="{ 'sketch-btn--tool-active': activeTool === 'arrow' }"
+          @click="activeTool = 'arrow'"
+        >→ {{ t("arrow") }}</button>
+        <button
+          class="sketch-btn sketch-btn--tool"
           :class="{ 'sketch-btn--tool-active': activeTool === 'rectangle' }"
           @click="activeTool = 'rectangle'"
         >□ {{ t("rectangle") }}</button>

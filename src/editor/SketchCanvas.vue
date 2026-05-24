@@ -43,6 +43,7 @@ import {
 } from "@/engine/canvasEngine";
 import type { EngineState } from "@/engine/canvasEngine";
 import {
+  createArrowStroke,
   createEllipseStroke,
   createLineStroke,
   createRectangleStroke,
@@ -379,6 +380,8 @@ function onPointerUp(e: PointerEvent) {
     const end = eventPoint(e);
     const stroke = props.tool === "line"
       ? createLineStroke(`shape-${Date.now()}`, shapeStart, end, preset)
+      : props.tool === "arrow"
+        ? createArrowStroke(`shape-${Date.now()}`, shapeStart, end, preset)
       : props.tool === "rectangle"
         ? createRectangleStroke(`shape-${Date.now()}`, shapeStart, end, preset)
         : createEllipseStroke(`shape-${Date.now()}`, shapeStart, end, preset);

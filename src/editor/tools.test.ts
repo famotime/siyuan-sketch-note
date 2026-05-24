@@ -18,6 +18,7 @@ describe("editor tools", () => {
 
   it("identifies supported shape tools", () => {
     expect(isShapeEditorTool("line")).toBe(true);
+    expect(isShapeEditorTool("arrow")).toBe(true);
     expect(isShapeEditorTool("rectangle")).toBe(true);
     expect(isShapeEditorTool("ellipse")).toBe(true);
     expect(isShapeEditorTool("pen")).toBe(false);

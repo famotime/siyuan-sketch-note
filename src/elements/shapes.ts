@@ -15,7 +15,7 @@ export interface ShapeStyle {
 export interface ShapeElement {
   id: string;
   type: "shape";
-  shape: "line" | "rectangle" | "ellipse";
+  shape: "line" | "arrow" | "rectangle" | "ellipse";
   start: Point;
   end: Point;
   style: ShapeStyle;
@@ -77,6 +77,15 @@ export function createLineShape(
   return createShape(id, "line", start, end, style);
 }
 
+export function createArrowShape(
+  id: string,
+  start: Point,
+  end: Point,
+  style: ShapeStyle,
+): ShapeElement {
+  return createShape(id, "arrow", start, end, style);
+}
+
 export function createRectangleShape(
   id: string,
   start: Point,
@@ -130,6 +139,35 @@ export function createLineStroke(
   preset: ToolPreset,
 ): Stroke {
   return createShapeStroke(id, [start, end], preset);
+}
+
+export function createArrowStroke(
+  id: string,
+  start: Point,
+  end: Point,
+  preset: ToolPreset,
+): Stroke {
+  const angle = Math.atan2(end.y - start.y, end.x - start.x);
+  const length = Math.hypot(end.x - start.x, end.y - start.y);
+  const headLength = Math.max(12, Math.min(28, length * 0.25));
+  const wingAngle = Math.PI / 7;
+  const left = {
+    x: end.x - Math.cos(angle - wingAngle) * headLength,
+    y: end.y - Math.sin(angle - wingAngle) * headLength,
+  };
+  const right = {
+    x: end.x - Math.cos(angle + wingAngle) * headLength,
+    y: end.y - Math.sin(angle + wingAngle) * headLength,
+  };
+
+  return createShapeStroke(id, [
+    start,
+    end,
+    left,
+    end,
+    right,
+    end,
+  ], preset);
 }
 
 export function createRectangleStroke(
