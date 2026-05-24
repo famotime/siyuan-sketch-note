@@ -1,5 +1,5 @@
 {
-  "name": "sketch-note",
+  "name": "siyuan-sketch-note",
   "author": "sketch-note",
   "url": "",
   "version": "0.1.0",
@@ -11,8 +11,8 @@
     "zh_CN": "闲笔"
   },
   "description": {
-    "default": "Handwriting plugin for SiYuan Note with vector strokes, templates, and undo/redo",
-    "zh_CN": "思源笔记手写插件，支持矢量笔迹、稿纸模板和撤销重做"
+    "default": "Handwriting plugin for SiYuan Note with vector strokes, templates, and multiple edits",
+    "zh_CN": "思源笔记手写插件，支持矢量笔迹、稿纸模板和多次编辑"
   },
   "readme": {
     "default": "README.md"

@@ -14,7 +14,7 @@
 
 <script setup lang="ts">
 import { ref, onMounted, watch } from "vue";
-import type { SketchData, SketchTool } from "@/types/sketch";
+import type { SketchData, SketchTool, ToolPresetCollection } from "@/types/sketch";
 import {
   createEngineState,
   restoreEngineState,
@@ -35,7 +35,7 @@ import type { EngineState } from "@/engine/canvasEngine";
 const props = defineProps<{
   initialData: SketchData | null;
   tool: SketchTool;
-  color: string;
+  toolPresets: ToolPresetCollection;
   templateId: string;
 }>();
 
@@ -62,7 +62,9 @@ onMounted(() => {
 });
 
 watch(() => props.tool, (t) => { if (state) state.tool = t; });
-watch(() => props.color, (c) => { if (state) state.color = c; });
+watch(() => props.toolPresets, (presets) => {
+  if (state) state.toolPresets = presets;
+}, { deep: true });
 watch(() => props.templateId, (tpl) => {
   if (state && bgCanvasRef.value && strokeCanvasRef.value) {
     state.templateId = tpl;

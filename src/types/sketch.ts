@@ -10,7 +10,8 @@ export interface Stroke {
   points: StrokePoint[];
   color: string;       // hex color
   width: number;       // base line width in px
-  tool: "pen" | "eraser";
+  opacity?: number;    // 0~1, default 1 for old data
+  tool: SketchTool;
 }
 
 export interface SketchData {
@@ -18,6 +19,7 @@ export interface SketchData {
   template: string;         // template id: "blank" | "grid"
   canvasWidth: number;
   canvasHeight: number;
+  toolPresets?: ToolPresetCollection;
   strokes: Stroke[];
 }
 
@@ -29,7 +31,17 @@ export const DEFAULT_SKETCH_DATA: SketchData = {
   strokes: [],
 };
 
-export type SketchTool = "pen" | "eraser";
+export type SketchTool = "pen" | "highlighter" | "eraser";
+
+export interface ToolPreset {
+  tool: SketchTool;
+  color: string;
+  width: number;
+  opacity: number;
+  mode: "ink" | "marker" | "pixel" | "stroke";
+}
+
+export type ToolPresetCollection = Record<SketchTool, ToolPreset>;
 
 export const PRESET_COLORS = [
   "#000000",
@@ -40,6 +52,7 @@ export const PRESET_COLORS = [
 ] as const;
 
 export const DEFAULT_PEN_WIDTH = 3;
+export const DEFAULT_HIGHLIGHTER_WIDTH = 18;
 export const DEFAULT_ERASER_WIDTH = 20;
 export const CANVAS_LOGICAL_WIDTH = 800;
 export const CANVAS_INITIAL_HEIGHT = 1200;

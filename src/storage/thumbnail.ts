@@ -151,6 +151,7 @@ function renderStrokeToCtx(ctx: CanvasRenderingContext2D, stroke: Stroke): void 
     ctx.globalCompositeOperation = "destination-out";
     ctx.strokeStyle = "rgba(0,0,0,1)";
   } else {
+    ctx.globalAlpha = stroke.opacity ?? 1;
     ctx.globalCompositeOperation = "source-over";
     ctx.strokeStyle = color;
   }

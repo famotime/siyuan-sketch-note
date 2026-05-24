@@ -29,7 +29,7 @@
             v-for="c in colors"
             :key="c"
             class="sketch-color"
-            :class="{ 'sketch-color--active': activeColor === c && activeTool === 'pen' }"
+            :class="{ 'sketch-color--active': activeTool !== 'eraser' && activePreset.color === c }"
             :style="{ backgroundColor: c }"
             @click="selectColor(c)"
           />
@@ -42,9 +42,39 @@
         >✏️ {{ t("pen") }}</button>
         <button
           class="sketch-btn sketch-btn--tool"
+          :class="{ 'sketch-btn--tool-active': activeTool === 'highlighter' }"
+          @click="activeTool = 'highlighter'"
+        >▰ {{ t("highlighter") }}</button>
+        <button
+          class="sketch-btn sketch-btn--tool"
           :class="{ 'sketch-btn--tool-active': activeTool === 'eraser' }"
           @click="activeTool = 'eraser'"
         >🧹 {{ t("eraser") }}</button>
+        <div class="sketch-tool-options">
+          <label class="sketch-range">
+            <span>{{ t("width") }}</span>
+            <input
+              v-model.number="activePreset.width"
+              type="range"
+              min="1"
+              max="30"
+              @input="updateActivePreset({ width: activePreset.width })"
+            >
+            <output>{{ activePreset.width }}</output>
+          </label>
+          <label v-if="activeTool !== 'eraser'" class="sketch-range">
+            <span>{{ t("opacity") }}</span>
+            <input
+              v-model.number="activePreset.opacity"
+              type="range"
+              min="0.1"
+              max="1"
+              step="0.05"
+              @input="updateActivePreset({ opacity: activePreset.opacity })"
+            >
+            <output>{{ Math.round(activePreset.opacity * 100) }}%</output>
+          </label>
+        </div>
         <span class="sketch-sep" />
         <button class="sketch-btn sketch-btn--action" :disabled="!canUndo" @click="canvasRef?.doUndo()">↩️ {{ t("undo") }}</button>
         <button class="sketch-btn sketch-btn--action" :disabled="!canRedo" @click="canvasRef?.doRedo()">↪️ {{ t("redo") }}</button>
@@ -57,7 +87,7 @@
         ref="canvasRef"
         :initialData="loadedData"
         :tool="activeTool"
-        :color="activeColor"
+        :toolPresets="toolPresets"
         :templateId="currentTemplate"
         @update:canUndo="canUndo = $event"
         @update:canRedo="canRedo = $event"
@@ -70,12 +100,13 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted } from "vue";
-import type { SketchData, SketchTool } from "@/types/sketch";
+import type { SketchData, SketchTool, ToolPreset } from "@/types/sketch";
 import { PRESET_COLORS } from "@/types/sketch";
 import { getAllTemplates } from "@/template";
 import { thumbnailCanvas } from "@/storage/thumbnail";
 import { showMessage } from "siyuan";
 import { sketchAssetFileName, uploadDataUrlToAssets } from "@/utils/uploadPng";
+import { normalizeToolPresets, updateToolPreset } from "@/tools/presets";
 import SketchCanvas from "./SketchCanvas.vue";
 
 type SaveStatus = "idle" | "saving" | "saved" | "error" | "dirty";
@@ -96,6 +127,7 @@ const visible = ref(false);
 const canvasRef = ref<InstanceType<typeof SketchCanvas>>();
 const activeTool = ref<SketchTool>("pen");
 const activeColor = ref(PRESET_COLORS[0]);
+const toolPresets = ref(normalizeToolPresets(props.initialData?.toolPresets));
 const canUndo = ref(false);
 const canRedo = ref(false);
 const currentTemplate = ref(props.initialData?.template ?? "blank");
@@ -116,6 +148,8 @@ const statusLabel = computed(() => {
   }
 });
 
+const activePreset = computed(() => toolPresets.value[activeTool.value]);
+
 onMounted(() => {
   visible.value = true;
   document.body.style.overflow = "hidden";
@@ -130,7 +164,14 @@ onUnmounted(() => {
 
 function selectColor(c: string) {
   activeColor.value = c;
-  activeTool.value = "pen";
+  if (activeTool.value === "eraser") {
+    activeTool.value = "pen";
+  }
+  updateActivePreset({ color: c });
+}
+
+function updateActivePreset(patch: Partial<Omit<ToolPreset, "tool">>) {
+  toolPresets.value = updateToolPreset(toolPresets.value, activeTool.value, patch);
 }
 
 function toggleAutoSave() {
@@ -167,6 +208,7 @@ async function doSave(): Promise<boolean> {
   saveStatus.value = "saving";
   const data = canvasRef.value.getData();
   data.template = currentTemplate.value;
+  data.toolPresets = toolPresets.value;
 
   let pngDataUrl: string;
   try {
@@ -280,6 +322,29 @@ function onHeightChanged(_h: number) {}
 .sketch-btn--tool-active { background: var(--b3-theme-primary-light) !important; border-color: var(--b3-theme-primary); }
 
 .sketch-btn--action { font-size: 13px; min-width: 52px; }
+
+.sketch-tool-options {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+.sketch-range {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--b3-theme-on-surface);
+  font-size: 12px;
+  white-space: nowrap;
+}
+.sketch-range input {
+  width: 92px;
+}
+.sketch-range output {
+  min-width: 32px;
+  text-align: right;
+  color: var(--b3-theme-on-surface-light);
+}
 
 /* ── Select ── */
 .sketch-select {

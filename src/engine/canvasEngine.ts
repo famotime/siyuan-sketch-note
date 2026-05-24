@@ -1,11 +1,10 @@
-import type { Stroke, StrokePoint, SketchTool, SketchData } from "@/types/sketch";
+import type { Stroke, StrokePoint, SketchTool, SketchData, ToolPresetCollection } from "@/types/sketch";
 import {
-  DEFAULT_PEN_WIDTH,
-  DEFAULT_ERASER_WIDTH,
   CANVAS_LOGICAL_WIDTH,
   CANVAS_HEIGHT_INCREMENT,
 } from "@/types/sketch";
 import { getTemplate } from "@/template";
+import { normalizeToolPresets } from "@/tools/presets";
 
 let idCounter = 0;
 function newId(): string {
@@ -18,9 +17,7 @@ export interface EngineState {
   undoStack: Stroke[][];
   redoStack: Stroke[][];
   tool: SketchTool;
-  color: string;
-  penWidth: number;
-  eraserWidth: number;
+  toolPresets: ToolPresetCollection;
   canvasWidth: number;
   canvasHeight: number;
   templateId: string;
@@ -38,9 +35,7 @@ export function createEngineState(
     undoStack: [],
     redoStack: [],
     tool: "pen",
-    color: "#000000",
-    penWidth: DEFAULT_PEN_WIDTH,
-    eraserWidth: DEFAULT_ERASER_WIDTH,
+    toolPresets: normalizeToolPresets(),
     canvasWidth,
     canvasHeight,
     templateId,
@@ -55,9 +50,7 @@ export function restoreEngineState(data: SketchData): EngineState {
     undoStack: [],
     redoStack: [],
     tool: "pen",
-    color: "#000000",
-    penWidth: DEFAULT_PEN_WIDTH,
-    eraserWidth: DEFAULT_ERASER_WIDTH,
+    toolPresets: normalizeToolPresets(data.toolPresets),
     canvasWidth: data.canvasWidth,
     canvasHeight: data.canvasHeight,
     templateId: data.template,
@@ -104,11 +97,13 @@ export function handlePointerDown(
   const rect = canvas.getBoundingClientRect();
   const x = e.clientX - rect.left;
   const y = e.clientY - rect.top;
+  const preset = state.toolPresets[state.tool];
   state.currentStroke = {
     id: newId(),
     points: [{ x, y, pressure: e.pressure || 0.5, timestamp: e.timeStamp }],
-    color: state.tool === "eraser" ? "#000000" : state.color,
-    width: state.tool === "eraser" ? state.eraserWidth : state.penWidth,
+    color: state.tool === "eraser" ? "#000000" : preset.color,
+    width: preset.width,
+    opacity: preset.opacity,
     tool: state.tool,
   };
 }
@@ -140,6 +135,7 @@ export function handlePointerMove(
       ctx.globalCompositeOperation = "destination-out";
       ctx.strokeStyle = "rgba(0,0,0,1)";
     } else {
+      ctx.globalAlpha = state.currentStroke.opacity ?? 1;
       ctx.globalCompositeOperation = "source-over";
       ctx.strokeStyle = state.currentStroke.color;
     }
@@ -218,6 +214,7 @@ export function serializeState(state: EngineState): SketchData {
     template: state.templateId,
     canvasWidth: state.canvasWidth,
     canvasHeight: state.canvasHeight,
+    toolPresets: state.toolPresets,
     strokes: state.strokes,
   };
 }
@@ -230,6 +227,7 @@ function renderStroke(ctx: CanvasRenderingContext2D, stroke: Stroke): void {
     ctx.globalCompositeOperation = "destination-out";
     ctx.strokeStyle = "rgba(0,0,0,1)";
   } else {
+    ctx.globalAlpha = stroke.opacity ?? 1;
     ctx.globalCompositeOperation = "source-over";
     ctx.strokeStyle = color;
   }
