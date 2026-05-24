@@ -6,6 +6,8 @@ import {
   exportPdf,
 } from "./pdf";
 
+const JPEG_1X1 = "/9j/4AAQSkZJRgABAQAAAQABAAD/2w==";
+
 describe("pdf export helpers", () => {
   it("creates a stable pdf export file name from block id and timestamp", () => {
     expect(createExportPdfFileName("20260524123456-abc", new Date("2026-05-24T07:08:09Z"))).toBe(
@@ -51,12 +53,45 @@ describe("pdf export helpers", () => {
     expect(plan.pages[1].height).toBe(200);
   });
 
-  it("exposes an explicit not-implemented PDF renderer boundary", async () => {
+  it("exports planned pages into a PDF blob", async () => {
+    const plan = createPdfExportPlan({
+      blockId: "block-1",
+      canvasWidth: 800,
+      canvasHeight: 1200,
+      pageHeight: 1000,
+    });
+
+    const blob = await exportPdf(plan, {
+      pageImages: [
+        `data:image/jpeg;base64,${JPEG_1X1}`,
+        `data:image/jpeg;base64,${JPEG_1X1}`,
+      ],
+    });
+
+    expect(blob.type).toBe("application/pdf");
+    expect(blob.size).toBeGreaterThan(100);
+    expect((await blob.text()).slice(0, 5)).toBe("%PDF-");
+  });
+
+  it("requires one rendered image per planned PDF page", async () => {
     await expect(exportPdf(createPdfExportPlan({
       blockId: "block-1",
       canvasWidth: 800,
       canvasHeight: 1200,
       pageHeight: 1000,
-    }))).rejects.toThrow("PDF rendering backend is not configured");
+    }), {
+      pageImages: [`data:image/jpeg;base64,${JPEG_1X1}`],
+    })).rejects.toThrow("one rendered image per planned PDF page");
+  });
+
+  it("rejects unsupported page image formats", async () => {
+    await expect(exportPdf(createPdfExportPlan({
+      blockId: "block-1",
+      canvasWidth: 800,
+      canvasHeight: 1000,
+      pageHeight: 1000,
+    }), {
+      pageImages: ["data:image/png;base64,QUJD"],
+    })).rejects.toThrow("JPEG data URLs");
   });
 });

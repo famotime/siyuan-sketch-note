@@ -1,4 +1,5 @@
 import { getTemplate } from "@/template";
+import type { PdfExportPlan } from "@/export/pdf";
 import type { SketchData, Stroke } from "@/types/sketch";
 import type { SketchElement } from "@/elements/model";
 import { splitElementsForRender } from "@/elements/renderOrder";
@@ -157,6 +158,23 @@ export async function thumbnailSketchDataAsync(data: SketchData): Promise<string
   );
 }
 
+export async function renderSketchPdfPageImages(
+  data: SketchData,
+  plan: PdfExportPlan,
+): Promise<string[]> {
+  const elements = data.elements ?? [];
+  return Promise.all(plan.pages.map((page) => renderToDataUrlAsync(
+    page.width,
+    page.height,
+    data.template,
+    data.strokes,
+    0,
+    -page.sourceY,
+    elements,
+    "image/jpeg",
+  )));
+}
+
 /**
  * Render the final PNG: template background + translated strokes.
  */
@@ -198,6 +216,7 @@ async function renderToDataUrlAsync(
   tx = 0,
   ty = 0,
   elements: SketchElement[] = [],
+  type = "image/png",
 ): Promise<string> {
   const canvas = document.createElement("canvas");
   canvas.width = width;
@@ -217,7 +236,7 @@ async function renderToDataUrlAsync(
   }
   await renderNonStrokeElementsAsync(ctx, layers.foreground);
 
-  return canvas.toDataURL("image/png");
+  return canvas.toDataURL(type);
 }
 
 function renderNonStrokeElements(ctx: CanvasRenderingContext2D, elements: SketchElement[]): void {

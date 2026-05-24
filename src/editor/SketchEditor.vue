@@ -28,6 +28,10 @@
           class="sketch-btn sketch-btn--action"
           @click="exportPng"
         >⇩ {{ t("exportPng") }}</button>
+        <button
+          class="sketch-btn sketch-btn--action"
+          @click="exportPdf"
+        >⇩ {{ t("exportPdf") }}</button>
       </div>
 
       <!-- Row 2: drawing tools -->
@@ -148,11 +152,12 @@ import { ref, computed, onMounted, onUnmounted } from "vue";
 import type { SketchData, ToolPreset } from "@/types/sketch";
 import { PRESET_COLORS } from "@/types/sketch";
 import { getAllTemplates } from "@/template";
-import { thumbnailSketchDataAsync } from "@/storage/thumbnail";
+import { renderSketchPdfPageImages, thumbnailSketchDataAsync } from "@/storage/thumbnail";
 import { showMessage } from "siyuan";
 import { sketchAssetFileName, uploadDataUrlToAssets } from "@/utils/uploadPng";
 import { normalizeToolPresets, updateToolPreset } from "@/tools/presets";
 import { createExportPngFileName, dataUrlToBlob, downloadBlob } from "@/export/png";
+import { createExportPdfFileName, createPdfExportPlanFromSketch, exportPdf as exportPdfBlob } from "@/export/pdf";
 import { SaveQueue } from "@/storage/saveQueue";
 import { getFirstImageFileFromClipboard } from "./clipboard";
 import { getDrawingToolForEditorTool } from "./tools";
@@ -304,6 +309,16 @@ async function exportPng() {
   const pngDataUrl = await thumbnailSketchDataAsync(data);
   const blob = dataUrlToBlob(pngDataUrl);
   downloadBlob(blob, createExportPngFileName(props.blockId));
+}
+
+async function exportPdf() {
+  if (!canvasRef.value) return;
+  const data = canvasRef.value.getData();
+  data.template = currentTemplate.value;
+  const plan = createPdfExportPlanFromSketch(props.blockId, data);
+  const pageImages = await renderSketchPdfPageImages(data, plan);
+  const blob = await exportPdfBlob(plan, { pageImages });
+  downloadBlob(blob, createExportPdfFileName(props.blockId));
 }
 
 function insertTextElement() {
