@@ -1,4 +1,5 @@
 import type { Bounds, SketchElement } from "@/elements/model";
+import type { SketchInputSettings } from "@/editor/inputMode";
 import type { OcrIndex } from "@/search/ocrIndex";
 
 export interface StrokePoint {
@@ -29,6 +30,7 @@ export interface SketchData {
   recovery?: SketchDataRecoveryInfo;
   ocrIndex?: OcrIndex;
   toolPresets?: ToolPresetCollection;
+  inputSettings?: SketchInputSettings;
   recentColors?: string[];
   elements?: SketchElement[];
   strokes: Stroke[];

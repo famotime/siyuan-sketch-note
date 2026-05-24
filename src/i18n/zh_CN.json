@@ -49,6 +49,7 @@
   "importJsonFailed": "JSON 恢复失败，请检查备份文件",
   "back": "返回",
   "autoSave": "自动保存",
+  "stylusOnly": "仅触控笔",
   "unsavedConfirm": "有未保存的更改，确定放弃并退出？",
   "saveFailed": "保存失败，请重试",
   "loadFailed": "手写数据加载异常",

@@ -47,6 +47,11 @@
           :class="{ 'sketch-btn--toggle-on': autoSave }"
           @click="toggleAutoSave"
         >{{ autoSave ? "ON" : "OFF" }} {{ t("autoSave") }}</button>
+        <button
+          class="sketch-btn sketch-btn--toggle"
+          :class="{ 'sketch-btn--toggle-on': inputSettings.stylusOnly }"
+          @click="toggleStylusOnly"
+        >{{ inputSettings.stylusOnly ? "ON" : "OFF" }} {{ t("stylusOnly") }}</button>
         <span class="sketch-status" :class="`sketch-status--${saveStatus}`">{{ statusLabel }}</span>
         <button
           class="sketch-btn sketch-btn--save"
@@ -247,6 +252,7 @@
         :initialData="loadedData"
         :tool="activeTool"
         :toolPresets="toolPresets"
+        :inputSettings="inputSettings"
         :templateId="currentTemplate"
         :lassoMode="lassoMode"
         @update:canUndo="canUndo = $event"
@@ -274,6 +280,7 @@ import { createExportJsonFileName, exportSketchJson, importSketchJson } from "@/
 import { SaveQueue } from "@/storage/saveQueue";
 import { createSaveStatusLabel } from "@/storage/saveStatus";
 import type { SaveStatus } from "@/storage/saveStatus";
+import { normalizeInputSettings } from "./inputMode";
 import {
   addRecentColor,
   normalizeRecentColors,
@@ -303,6 +310,7 @@ const activeTool = ref<EditorTool>("pen");
 const lassoMode = ref<"freehand" | "box">("freehand");
 const activeColor = ref(PRESET_COLORS[0]);
 const toolPresets = ref(normalizeToolPresets(props.initialData?.toolPresets));
+const inputSettings = ref(normalizeInputSettings(props.initialData?.inputSettings));
 const recentColors = ref(normalizeRecentColors(props.initialData?.recentColors));
 const canUndo = ref(false);
 const canRedo = ref(false);
@@ -363,6 +371,15 @@ function toggleAutoSave() {
   }
 }
 
+function toggleStylusOnly() {
+  inputSettings.value = {
+    ...inputSettings.value,
+    stylusOnly: !inputSettings.value.stylusOnly,
+  };
+  markDirty();
+  if (autoSave.value) scheduleAutoSave();
+}
+
 // ─── Save logic ───
 
 function markDirty() {
@@ -394,6 +411,7 @@ async function runSave(): Promise<boolean> {
   const data = canvasRef.value.getData();
   data.template = currentTemplate.value;
   data.toolPresets = toolPresets.value;
+  data.inputSettings = inputSettings.value;
   data.recentColors = recentColors.value;
   delete data.recovery;
 
@@ -453,6 +471,7 @@ function exportJson() {
   const data = canvasRef.value.getData();
   data.template = currentTemplate.value;
   data.toolPresets = toolPresets.value;
+  data.inputSettings = inputSettings.value;
   data.recentColors = recentColors.value;
   const blob = exportSketchJson(data);
   downloadBlob(blob, createExportJsonFileName(props.blockId));
@@ -481,6 +500,7 @@ async function onJsonSelected(event: Event) {
     imported.toolPresets = importedPresets;
     currentTemplate.value = imported.template;
     toolPresets.value = importedPresets;
+    inputSettings.value = normalizeInputSettings(imported.inputSettings);
     recentColors.value = normalizeRecentColors(imported.recentColors);
     loadedData.value = imported;
     await canvasRef.value.restoreData(imported);

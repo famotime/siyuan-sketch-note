@@ -93,6 +93,8 @@ import {
   getSketchPages,
   removeSketchPage,
 } from "@/pages/model";
+import { shouldDrawFromPointer } from "./inputMode";
+import type { SketchInputSettings } from "./inputMode";
 import { isShapeEditorTool } from "./tools";
 import type { EditorTool } from "./tools";
 
@@ -100,6 +102,7 @@ const props = defineProps<{
   initialData: SketchData | null;
   tool: EditorTool;
   toolPresets: ToolPresetCollection;
+  inputSettings: SketchInputSettings;
   templateId: string;
   lassoMode: "freehand" | "box";
 }>();
@@ -226,6 +229,7 @@ function isPointOnRuler(point: StrokePoint): boolean {
 
 function onPointerDown(e: PointerEvent) {
   e.preventDefault();
+  if (!shouldDrawFromPointer(e, props.inputSettings)) return;
   (e.target as HTMLElement).setPointerCapture(e.pointerId);
   if (props.tool === "lasso") {
     const point = eventPoint(e);
