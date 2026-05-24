@@ -700,7 +700,11 @@ function createFallbackThumbnail(): string {
 
 async function goBack() {
   if (autoSave.value) {
-    await doSave();
+    const ok = await doSave();
+    if (!ok) {
+      showMessage(t("saveFailed") || "Save failed, please try again", 5000, "error");
+      return;
+    }
     emit("close");
     return;
   }

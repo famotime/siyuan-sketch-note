@@ -76,11 +76,89 @@ function scanVisibleBounds(
 }
 
 /**
+ * Composite strokes onto a transparent canvas and scan for visible pixel bounds.
+ * Accounts for eraser destination-out compositing.
+ * Returns null if no visible content.
+ */
+function findStrokeVisibleBounds(
+  strokes: Stroke[],
+  width: number,
+  height: number,
+): { x: number; y: number; w: number; h: number } | null {
+  const scanCanvas = document.createElement("canvas");
+  scanCanvas.width = width;
+  scanCanvas.height = height;
+  const scanCtx = scanCanvas.getContext("2d")!;
+  compositeStrokes(scanCtx, strokes);
+  const imageData = scanCtx.getImageData(0, 0, width, height);
+  return scanVisibleBounds(imageData, width, height);
+}
+
+/**
+ * Compute the axis-aligned bounding box covering strokes + non-stroke elements.
+ * Uses point coordinates for strokes (fast, no rendering needed) and element bounds for text/images.
+ * Returns null if there is no content at all.
+ */
+function computeContentBounds(
+  strokes: Stroke[],
+  elements: SketchElement[],
+): { minX: number; minY: number; maxX: number; maxY: number } | null {
+  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+  let found = false;
+
+  for (const stroke of strokes) {
+    const halfW = stroke.width / 2;
+    for (const pt of stroke.points) {
+      if (pt.x - halfW < minX) minX = pt.x - halfW;
+      if (pt.y - halfW < minY) minY = pt.y - halfW;
+      if (pt.x + halfW > maxX) maxX = pt.x + halfW;
+      if (pt.y + halfW > maxY) maxY = pt.y + halfW;
+      found = true;
+    }
+  }
+
+  for (const el of elements) {
+    const b = el.bounds;
+    if (b.x < minX) minX = b.x;
+    if (b.y < minY) minY = b.y;
+    if (b.x + b.width > maxX) maxX = b.x + b.width;
+    if (b.y + b.height > maxY) maxY = b.y + b.height;
+    found = true;
+  }
+
+  return found ? { minX, minY, maxX, maxY } : null;
+}
+
+interface CropRegion { x: number; y: number; w: number; h: number }
+
+/**
+ * Given content bounding box, compute a crop region with padding.
+ * Minimum size is MIN_WIDTH × MIN_HEIGHT. Canvas dimensions clamp the region.
+ */
+function computeCropRegion(
+  bounds: { minX: number; minY: number; maxX: number; maxY: number },
+  canvasW: number,
+  canvasH: number,
+): CropRegion {
+  const contentW = bounds.maxX - bounds.minX;
+  const contentH = bounds.maxY - bounds.minY;
+  const cropX = Math.max(0, Math.floor(bounds.minX - PADDING));
+  const cropY = Math.max(0, Math.floor(bounds.minY - PADDING));
+  const cropW = Math.min(Math.ceil(contentW + PADDING * 2), canvasW - cropX);
+  const cropH = Math.min(Math.ceil(contentH + PADDING * 2), canvasH - cropY);
+  return {
+    x: cropX,
+    y: cropY,
+    w: Math.max(cropW, MIN_WIDTH),
+    h: Math.max(cropH, MIN_HEIGHT),
+  };
+}
+
+/**
  * Render strokes to a PNG data URL with correct eraser compositing and auto-cropping.
  *
- * 1. Render all strokes on a transparent scan canvas (same order as the editor)
- *    so that eraser's destination-out correctly removes earlier stroke pixels.
- * 2. Scan pixels to find the actual visible bounding box after erasing.
+ * 1. Compute content bounds from stroke coordinates.
+ * 2. Render all strokes on a transparent scan canvas to find visible bounds after erasing.
  * 3. Crop to the visible bounds + padding, render the final PNG.
  */
 export function thumbnailCanvas(strokes: Stroke[], templateId: string): string {
@@ -93,31 +171,18 @@ export function thumbnailCanvas(strokes: Stroke[], templateId: string): string {
     return renderToDataUrl(MIN_WIDTH, MIN_HEIGHT, templateId, []);
   }
 
-  // Step 1: Composite render on transparent scan canvas
-  const scanCanvas = document.createElement("canvas");
-  scanCanvas.width = Math.ceil(size.w);
-  scanCanvas.height = Math.ceil(size.h);
-  const scanCtx = scanCanvas.getContext("2d")!;
-  compositeStrokes(scanCtx, strokes);
-
-  // Step 2: Scan pixels for true visible bounds (accounts for erasing)
-  const imageData = scanCtx.getImageData(0, 0, scanCanvas.width, scanCanvas.height);
-  const visible = scanVisibleBounds(imageData, scanCanvas.width, scanCanvas.height);
-
+  const visible = findStrokeVisibleBounds(strokes, Math.ceil(size.w), Math.ceil(size.h));
   if (!visible) {
-    // All content erased — return placeholder
     return renderToDataUrl(MIN_WIDTH, MIN_HEIGHT, templateId, []);
   }
 
-  // Step 3: Calculate final cropped size with padding
-  const cropX = Math.max(0, visible.x - PADDING);
-  const cropY = Math.max(0, visible.y - PADDING);
-  const cropW = Math.min(Math.ceil(visible.w + PADDING * 2), scanCanvas.width - cropX);
-  const cropH = Math.min(Math.ceil(visible.h + PADDING * 2), scanCanvas.height - cropY);
-  const outW = Math.max(cropW, MIN_WIDTH);
-  const outH = Math.max(cropH, MIN_HEIGHT);
+  const crop = computeCropRegion(
+    { minX: visible.x, minY: visible.y, maxX: visible.x + visible.w, maxY: visible.y + visible.h },
+    Math.ceil(size.w),
+    Math.ceil(size.h),
+  );
 
-  return renderToDataUrl(outW, outH, templateId, strokes, -cropX, -cropY);
+  return renderToDataUrl(crop.w, crop.h, templateId, strokes, -crop.x, -crop.y);
 }
 
 export function thumbnailSketchData(data: SketchData): string {
@@ -133,15 +198,36 @@ function thumbnailCanvasWithElements(
     return renderToDataUrl(MIN_WIDTH, MIN_HEIGHT, templateId, [], 0, 0, elements);
   }
 
-  return renderToDataUrl(
-    Math.max(MIN_WIDTH, 800),
-    Math.max(MIN_HEIGHT, 400),
-    templateId,
-    strokes,
-    0,
-    0,
-    elements,
-  );
+  const contentBounds = computeContentBounds(strokes, elements);
+  if (!contentBounds) {
+    return renderToDataUrl(MIN_WIDTH, MIN_HEIGHT, templateId, [], 0, 0, elements);
+  }
+
+  // Scan stroke visible bounds (handles eraser compositing)
+  let visibleBounds = null;
+  if (strokes.length > 0) {
+    const safeSize = safeCanvasSize(strokes);
+    if (safeSize) {
+      const scanW = Math.max(Math.ceil(safeSize.w), Math.ceil(contentBounds.maxX + SAFE_MARGIN));
+      const scanH = Math.max(Math.ceil(safeSize.h), Math.ceil(contentBounds.maxY + SAFE_MARGIN));
+      visibleBounds = findStrokeVisibleBounds(strokes, scanW, scanH);
+    }
+  }
+
+  // Merge stroke visible bounds with element bounds for crop region
+  const merged = { ...contentBounds };
+  if (visibleBounds) {
+    merged.minX = Math.min(merged.minX, visibleBounds.x);
+    merged.minY = Math.min(merged.minY, visibleBounds.y);
+    merged.maxX = Math.max(merged.maxX, visibleBounds.x + visibleBounds.w);
+    merged.maxY = Math.max(merged.maxY, visibleBounds.y + visibleBounds.h);
+  }
+
+  const canvasW = Math.max(MIN_WIDTH, Math.ceil(merged.maxX + SAFE_MARGIN));
+  const canvasH = Math.max(MIN_HEIGHT, Math.ceil(merged.maxY + SAFE_MARGIN));
+  const crop = computeCropRegion(merged, canvasW, canvasH);
+
+  return renderToDataUrl(crop.w, crop.h, templateId, strokes, -crop.x, -crop.y, elements);
 }
 
 export async function thumbnailSketchDataAsync(data: SketchData): Promise<string> {
@@ -150,18 +236,42 @@ export async function thumbnailSketchDataAsync(data: SketchData): Promise<string
     return thumbnailSketchData(data);
   }
 
-  return renderToDataUrlAsync(
-    Math.max(MIN_WIDTH, data.canvasWidth || 800),
-    Math.max(MIN_HEIGHT, data.canvasHeight || 400),
-    data.template,
-    data.strokes,
-    0,
-    0,
-    data.elements ?? [],
-    "image/png",
-    true,
-    data,
-  );
+  const strokes = data.strokes;
+  const elements = data.elements ?? [];
+  const canvasW = Math.max(MIN_WIDTH, data.canvasWidth || 800);
+  const canvasH = Math.max(MIN_HEIGHT, data.canvasHeight || 400);
+
+  // Custom background fills the entire canvas — skip cropping
+  if (getCustomBackgroundSource(data)) {
+    return renderToDataUrlAsync(canvasW, canvasH, data.template, strokes, 0, 0, elements, "image/png", true, data);
+  }
+
+  // Auto-crop to content bounds + padding
+  const contentBounds = computeContentBounds(strokes, elements);
+  if (!contentBounds) {
+    return renderToDataUrlAsync(MIN_WIDTH, MIN_HEIGHT, data.template, [], 0, 0, elements, "image/png", true, data);
+  }
+
+  let visibleBounds = null;
+  if (strokes.length > 0) {
+    const safeSize = safeCanvasSize(strokes);
+    if (safeSize) {
+      const scanW = Math.max(Math.ceil(safeSize.w), canvasW);
+      const scanH = Math.max(Math.ceil(safeSize.h), canvasH);
+      visibleBounds = findStrokeVisibleBounds(strokes, scanW, scanH);
+    }
+  }
+
+  const merged = { ...contentBounds };
+  if (visibleBounds) {
+    merged.minX = Math.min(merged.minX, visibleBounds.x);
+    merged.minY = Math.min(merged.minY, visibleBounds.y);
+    merged.maxX = Math.max(merged.maxX, visibleBounds.x + visibleBounds.w);
+    merged.maxY = Math.max(merged.maxY, visibleBounds.y + visibleBounds.h);
+  }
+
+  const crop = computeCropRegion(merged, canvasW, canvasH);
+  return renderToDataUrlAsync(crop.w, crop.h, data.template, strokes, -crop.x, -crop.y, elements, "image/png", true, data);
 }
 
 export async function renderSketchPdfPageImages(

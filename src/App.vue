@@ -10,7 +10,7 @@
 </template>
 
 <script lang="ts">
-import { ref } from "vue";
+import { ref, nextTick } from "vue";
 import { showMessage } from "siyuan";
 import { loadSketchData } from "@/storage";
 import SketchEditor from "@/editor/SketchEditor.vue";
@@ -59,17 +59,39 @@ function closeEditor() {
 
 /**
  * Force-refresh the displayed image for a sketch block.
- * Uses cache-busting to ensure the browser loads the updated PNG from assets.
+ * Uses nextTick + setTimeout to wait for Vue DOM update, then
+ * force-fetches to bust HTTP cache and updates both data-src and src.
  */
 function refreshSketchImage(blockId: string) {
   const pattern = `sketch-note-${blockId}.png`;
-  document.querySelectorAll("img").forEach((img) => {
-    const dataSrc = img.getAttribute("data-src") || "";
-    if (dataSrc.includes(pattern)) {
-      // Append cache-busting timestamp to force reload
-      const baseSrc = dataSrc.split("?")[0];
-      img.src = `${baseSrc}?t=${Date.now()}`;
-    }
+
+  // Wait for Vue DOM update (editor overlay removal) to complete
+  nextTick(() => {
+    setTimeout(() => {
+      const imgs = document.querySelectorAll("img");
+      let found = false;
+      imgs.forEach((img) => {
+        const dataSrc = img.getAttribute("data-src") || "";
+        if (dataSrc.includes(pattern)) {
+          found = true;
+          const baseSrc = dataSrc.split("?")[0];
+          const bustSrc = `${baseSrc}?t=${Date.now()}`;
+
+          // Force browser HTTP cache refresh (like excalidraw approach)
+          fetch(baseSrc, { cache: "reload" }).then(() => {
+            img.setAttribute("data-src", bustSrc);
+            img.src = bustSrc;
+          }).catch(() => {
+            // Still update src even if fetch fails
+            img.setAttribute("data-src", bustSrc);
+            img.src = bustSrc;
+          });
+        }
+      });
+      if (!found) {
+        console.warn(`[Sketch Note] refreshSketchImage: no img found for pattern "${pattern}"`);
+      }
+    }, 100);
   });
 }
 
