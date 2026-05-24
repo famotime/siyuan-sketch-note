@@ -2,7 +2,7 @@ import type { SketchTool } from "@/types/sketch";
 
 export type ShapeEditorTool = "line" | "rectangle" | "ellipse";
 export type InsertElementEditorTool = "text" | "image";
-export type EditorTool = SketchTool | ShapeEditorTool | "ruler" | InsertElementEditorTool;
+export type EditorTool = SketchTool | ShapeEditorTool | "ruler" | "lasso" | InsertElementEditorTool;
 
 const strokeTools: EditorTool[] = ["pen", "highlighter", "eraser"];
 const shapeTools: EditorTool[] = ["line", "rectangle", "ellipse"];

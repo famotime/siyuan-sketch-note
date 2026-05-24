@@ -64,6 +64,11 @@
         >🧹 {{ t("eraser") }}</button>
         <button
           class="sketch-btn sketch-btn--tool"
+          :class="{ 'sketch-btn--tool-active': activeTool === 'lasso' }"
+          @click="activeTool = 'lasso'"
+        >◇ {{ t("lasso") }}</button>
+        <button
+          class="sketch-btn sketch-btn--tool"
           :class="{ 'sketch-btn--tool-active': activeTool === 'line' }"
           @click="activeTool = 'line'"
         >／ {{ t("line") }}</button>
@@ -124,6 +129,17 @@
             <output>{{ Math.round(activePreset.opacity * 100) }}%</output>
           </label>
         </div>
+        <span class="sketch-sep" />
+        <button
+          class="sketch-btn sketch-btn--action"
+          :disabled="activeTool !== 'lasso'"
+          @click="canvasRef?.recolorLasso(activePreset.color)"
+        >🎨 {{ t("recolor") }}</button>
+        <button
+          class="sketch-btn sketch-btn--action"
+          :disabled="activeTool !== 'lasso'"
+          @click="canvasRef?.deleteLassoSelection()"
+        >⌫ {{ t("deleteSelection") }}</button>
         <span class="sketch-sep" />
         <button class="sketch-btn sketch-btn--action" :disabled="!canUndo" @click="canvasRef?.doUndo()">↩️ {{ t("undo") }}</button>
         <button class="sketch-btn sketch-btn--action" :disabled="!canRedo" @click="canvasRef?.doRedo()">↪️ {{ t("redo") }}</button>

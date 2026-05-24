@@ -13,6 +13,7 @@ describe("editor tools", () => {
     expect(isStrokeEditorTool("eraser")).toBe(true);
     expect(isStrokeEditorTool("rectangle")).toBe(false);
     expect(isStrokeEditorTool("ruler")).toBe(false);
+    expect(isStrokeEditorTool("lasso")).toBe(false);
   });
 
   it("identifies supported shape tools", () => {
@@ -31,6 +32,7 @@ describe("editor tools", () => {
   it("maps non-stroke editor tools to pen for the drawing engine", () => {
     expect(getDrawingToolForEditorTool("rectangle")).toBe("pen");
     expect(getDrawingToolForEditorTool("ruler")).toBe("pen");
+    expect(getDrawingToolForEditorTool("lasso")).toBe("pen");
     expect(getDrawingToolForEditorTool("image")).toBe("pen");
     expect(getDrawingToolForEditorTool("eraser")).toBe("eraser");
   });

@@ -58,6 +58,17 @@ import {
   moveElement,
   resizeElementFromCorner,
 } from "@/elements/transform";
+import { findElementsInLasso } from "@/elements/lasso";
+import type { Point as LassoPoint } from "@/elements/lasso";
+import {
+  recolorLassoSelection,
+  recolorStrokeSelection,
+  removeLassoSelection,
+  removeStrokeSelection,
+  translateStrokeSelection,
+  translateLassoSelection,
+} from "@/elements/lassoEdit";
+import { migrateStrokesToElements } from "@/elements/model";
 import { isShapeEditorTool } from "./tools";
 import type { EditorTool } from "./tools";
 
@@ -91,6 +102,11 @@ let elementTransform: {
   mode: "move" | "resize";
 } | null = null;
 let selectedElementId: string | null = null;
+let lassoPath: LassoPoint[] = [];
+let selectedLassoIds: string[] = [];
+let lassoMove: {
+  lastPoint: StrokePoint;
+} | null = null;
 const rulerY = ref(220);
 
 onMounted(async () => {
@@ -132,6 +148,24 @@ function eventPoint(e: PointerEvent): StrokePoint {
 function onPointerDown(e: PointerEvent) {
   e.preventDefault();
   (e.target as HTMLElement).setPointerCapture(e.pointerId);
+  if (props.tool === "lasso") {
+    const point = eventPoint(e);
+    const selectedElement = hitTestElement(
+      getSelectableElements().filter((element) => selectedLassoIds.includes(element.id)),
+      point.x,
+      point.y,
+    );
+    if (selectedElement) {
+      lassoMove = { lastPoint: point };
+      pushHistorySnapshot(state);
+      return;
+    }
+    lassoPath = [point];
+    selectedLassoIds = [];
+    fullRedrawStrokeCanvas(getCanvas(), state);
+    drawLassoPath();
+    return;
+  }
   if (props.tool === "image") {
     const point = eventPoint(e);
     const element = hitTestElement(
@@ -184,6 +218,26 @@ function onPointerDown(e: PointerEvent) {
 
 function onPointerMove(e: PointerEvent) {
   e.preventDefault();
+  if (props.tool === "lasso") {
+    const point = eventPoint(e);
+    if (lassoMove) {
+      const dx = point.x - lassoMove.lastPoint.x;
+      const dy = point.y - lassoMove.lastPoint.y;
+      state.elements = translateLassoSelection(state.elements, selectedLassoIds, dx, dy);
+      state.strokes = translateStrokeSelection(state.strokes, selectedLassoIds, dx, dy);
+      lassoMove.lastPoint = point;
+      state.isDirty = true;
+      fullRedrawStrokeCanvas(getCanvas(), state);
+      drawLassoSelectionOutline();
+      return;
+    }
+    if (lassoPath.length > 0) {
+      lassoPath.push(point);
+      fullRedrawStrokeCanvas(getCanvas(), state);
+      drawLassoPath();
+      return;
+    }
+  }
   if (imageTransform) {
     const point = eventPoint(e);
     const dx = point.x - imageTransform.lastPoint.x;
@@ -226,6 +280,22 @@ function onPointerMove(e: PointerEvent) {
 }
 
 function onPointerUp(e: PointerEvent) {
+  if (props.tool === "lasso") {
+    if (lassoMove) {
+      lassoMove = null;
+      updateUndoRedoState();
+      emit("stroke");
+      return;
+    }
+    if (lassoPath.length > 0) {
+      selectedLassoIds = findElementsInLasso(getSelectableElements(), lassoPath).map((element) => element.id);
+      lassoPath = [];
+      fullRedrawStrokeCanvas(getCanvas(), state);
+      drawLassoSelectionOutline();
+      updateUndoRedoState();
+      return;
+    }
+  }
   if (imageTransform) {
     imageTransform = null;
     updateUndoRedoState();
@@ -287,6 +357,50 @@ function drawSelectionOutline() {
   ctx.restore();
 }
 
+function drawLassoPath() {
+  if (lassoPath.length === 0) return;
+  const ctx = getCanvas().getContext("2d")!;
+  ctx.save();
+  ctx.strokeStyle = "#2f80ed";
+  ctx.lineWidth = 1.5;
+  ctx.setLineDash([7, 5]);
+  ctx.beginPath();
+  ctx.moveTo(lassoPath[0].x, lassoPath[0].y);
+  for (const point of lassoPath.slice(1)) {
+    ctx.lineTo(point.x, point.y);
+  }
+  ctx.stroke();
+  ctx.restore();
+}
+
+function drawLassoSelectionOutline() {
+  const selected = getSelectableElements().filter((element) => selectedLassoIds.includes(element.id));
+  if (selected.length === 0) return;
+  const ctx = getCanvas().getContext("2d")!;
+  ctx.save();
+  ctx.strokeStyle = "#2f80ed";
+  ctx.lineWidth = 1.25;
+  ctx.setLineDash([6, 4]);
+  for (const element of selected) {
+    ctx.strokeRect(element.bounds.x, element.bounds.y, element.bounds.width, element.bounds.height);
+  }
+  ctx.setLineDash([]);
+  ctx.fillStyle = "rgba(47, 128, 237, 0.12)";
+  for (const element of selected) {
+    ctx.fillRect(element.bounds.x, element.bounds.y, element.bounds.width, element.bounds.height);
+  }
+  ctx.restore();
+}
+
+function getSelectableElements() {
+  const strokeElements = migrateStrokesToElements(state.strokes);
+  const strokeIds = new Set(state.strokes.map((stroke) => stroke.id));
+  return [
+    ...strokeElements,
+    ...state.elements.filter((element) => element.type !== "stroke" || !strokeIds.has(element.id)),
+  ];
+}
+
 function onCanvasDoubleClick(e: MouseEvent) {
   if (props.tool !== "text") return;
   const point = eventPoint(e as PointerEvent);
@@ -312,11 +426,33 @@ function onCanvasDoubleClick(e: MouseEvent) {
   emit("stroke");
 }
 
-function doUndo() { engineUndo(state); fullRedrawStrokeCanvas(getCanvas(), state); updateUndoRedoState(); emit("stroke"); }
-function doRedo() { engineRedo(state); fullRedrawStrokeCanvas(getCanvas(), state); updateUndoRedoState(); emit("stroke"); }
-function doClear() { engineClear(state); fullRedrawStrokeCanvas(getCanvas(), state); updateUndoRedoState(); emit("stroke"); }
+function doUndo() { selectedLassoIds = []; engineUndo(state); fullRedrawStrokeCanvas(getCanvas(), state); updateUndoRedoState(); emit("stroke"); }
+function doRedo() { selectedLassoIds = []; engineRedo(state); fullRedrawStrokeCanvas(getCanvas(), state); updateUndoRedoState(); emit("stroke"); }
+function doClear() { selectedLassoIds = []; engineClear(state); fullRedrawStrokeCanvas(getCanvas(), state); updateUndoRedoState(); emit("stroke"); }
 function getData(): SketchData { return serializeState(state); }
 function getState(): EngineState { return state; }
+function deleteLassoSelection() {
+  if (selectedLassoIds.length === 0) return;
+  pushHistorySnapshot(state);
+  state.elements = removeLassoSelection(state.elements, selectedLassoIds);
+  state.strokes = removeStrokeSelection(state.strokes, selectedLassoIds);
+  selectedLassoIds = [];
+  state.isDirty = true;
+  fullRedrawStrokeCanvas(getCanvas(), state);
+  updateUndoRedoState();
+  emit("stroke");
+}
+function recolorLasso(color: string) {
+  if (selectedLassoIds.length === 0) return;
+  pushHistorySnapshot(state);
+  state.elements = recolorLassoSelection(state.elements, selectedLassoIds, color);
+  state.strokes = recolorStrokeSelection(state.strokes, selectedLassoIds, color);
+  state.isDirty = true;
+  fullRedrawStrokeCanvas(getCanvas(), state);
+  drawLassoSelectionOutline();
+  updateUndoRedoState();
+  emit("stroke");
+}
 function insertText() {
   const text = window.prompt("Text", "Text") ?? "Text";
   const element = createTextElement(`text-${Date.now()}`, {
@@ -342,7 +478,17 @@ async function insertImage(src: string) {
   updateUndoRedoState();
 }
 
-defineExpose({ doUndo, doRedo, doClear, getData, getState, insertText, insertImage });
+defineExpose({
+  doUndo,
+  doRedo,
+  doClear,
+  getData,
+  getState,
+  insertText,
+  insertImage,
+  deleteLassoSelection,
+  recolorLasso,
+});
 </script>
 
 <style scoped>
