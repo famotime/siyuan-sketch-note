@@ -26,12 +26,11 @@ describe("editor shortcuts", () => {
     expect(resolveEditorShortcut(keyEvent({ key: "2" }))).toEqual({ type: "tool", tool: "highlighter" });
     expect(resolveEditorShortcut(keyEvent({ key: "3" }))).toEqual({ type: "tool", tool: "eraser" });
     expect(resolveEditorShortcut(keyEvent({ key: "4" }))).toEqual({ type: "tool", tool: "lasso" });
-    expect(resolveEditorShortcut(keyEvent({ key: "5" }))).toEqual({ type: "tool", tool: "ruler" });
-    expect(resolveEditorShortcut(keyEvent({ key: "6" }))).toEqual({ type: "tool", tool: "arrow" });
-    expect(resolveEditorShortcut(keyEvent({ key: "7" }))).toEqual({ type: "tool", tool: "triangle" });
-    expect(resolveEditorShortcut(keyEvent({ key: "8" }))).toEqual({ type: "tool", tool: "line" });
-    expect(resolveEditorShortcut(keyEvent({ key: "9" }))).toEqual({ type: "tool", tool: "rectangle" });
-    expect(resolveEditorShortcut(keyEvent({ key: "0" }))).toEqual({ type: "tool", tool: "ellipse" });
+    expect(resolveEditorShortcut(keyEvent({ key: "5" }))).toEqual({ type: "tool", tool: "arrow" });
+    expect(resolveEditorShortcut(keyEvent({ key: "6" }))).toEqual({ type: "tool", tool: "triangle" });
+    expect(resolveEditorShortcut(keyEvent({ key: "7" }))).toEqual({ type: "tool", tool: "line" });
+    expect(resolveEditorShortcut(keyEvent({ key: "8" }))).toEqual({ type: "tool", tool: "rectangle" });
+    expect(resolveEditorShortcut(keyEvent({ key: "9" }))).toEqual({ type: "tool", tool: "ellipse" });
   });
 
   it("maps letter keys to insert tools", () => {

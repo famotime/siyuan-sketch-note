@@ -18,7 +18,6 @@ describe("editor toolbar model", () => {
       "rectangle",
       "ellipse",
       "triangle",
-      "ruler",
       "text",
       "image",
     ]);

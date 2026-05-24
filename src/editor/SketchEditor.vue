@@ -52,7 +52,6 @@
         @duplicateSelection="canvasRef?.duplicateLassoSelection()"
         @recolorSelection="canvasRef?.recolorLasso(activePreset.color)"
         @redo="canvasRef?.doRedo()"
-        @rotateRuler="canvasRef?.rotateRulerBy($event)"
         @selectColor="selectColor"
         @selectCustomColor="selectCustomColor"
         @selectTool="selectTool"

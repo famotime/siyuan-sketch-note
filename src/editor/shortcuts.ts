@@ -13,12 +13,11 @@ const numberToolMap: Record<string, EditorTool> = {
   "2": "highlighter",
   "3": "eraser",
   "4": "lasso",
-  "5": "ruler",
-  "6": "arrow",
-  "7": "triangle",
-  "8": "line",
-  "9": "rectangle",
-  "0": "ellipse",
+  "5": "arrow",
+  "6": "triangle",
+  "7": "line",
+  "8": "rectangle",
+  "9": "ellipse",
 };
 
 const letterToolMap: Record<string, EditorTool> = {

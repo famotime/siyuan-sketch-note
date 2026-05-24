@@ -24,7 +24,6 @@ export function createEditorToolButtons(): EditorToolButton[] {
     { icon: "□", labelKey: "rectangle", tool: "rectangle" },
     { icon: "○", labelKey: "ellipse", tool: "ellipse" },
     { icon: "△", labelKey: "triangle", tool: "triangle" },
-    { icon: "▤", labelKey: "ruler", tool: "ruler" },
     { icon: "T", labelKey: "text", tool: "text" },
     { icon: "▧", labelKey: "image", tool: "image" },
   ];

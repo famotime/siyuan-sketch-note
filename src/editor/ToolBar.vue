@@ -28,8 +28,6 @@
       <span class="sketch-btn__icon" aria-hidden="true">{{ button.icon }}</span>
       <span class="sketch-btn__label">{{ t(button.labelKey) }}</span>
     </button>
-    <button class="sketch-btn sketch-btn--action" :disabled="activeTool !== 'ruler'" @click="$emit('rotateRuler', -45)">↺ {{ t("rotateLeft") }}</button>
-    <button class="sketch-btn sketch-btn--action" :disabled="activeTool !== 'ruler'" @click="$emit('rotateRuler', 45)">↻ {{ t("rotateRight") }}</button>
     <ToolOptionsPopover
       :lassoMode="lassoMode"
       :preset="activePreset"
@@ -72,7 +70,6 @@ defineEmits<{
   (e: "duplicateSelection"): void;
   (e: "recolorSelection"): void;
   (e: "redo"): void;
-  (e: "rotateRuler", delta: number): void;
   (e: "selectColor", color: string): void;
   (e: "selectCustomColor", color: string): void;
   (e: "selectTool", tool: EditorTool): void;

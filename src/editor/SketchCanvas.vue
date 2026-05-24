@@ -1,13 +1,6 @@
 <template>
   <div class="sketch-canvas-container" ref="containerRef">
     <canvas ref="bgCanvasRef" class="sketch-canvas sketch-canvas--bg" />
-    <div
-      v-if="tool === 'ruler'"
-      class="sketch-ruler"
-      :style="rulerStyle"
-    >
-      <span>{{ ruler.angle }}°</span>
-    </div>
     <canvas
       ref="strokeCanvasRef"
       class="sketch-canvas sketch-canvas--stroke"
@@ -21,7 +14,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref, onMounted, watch } from "vue";
+import { ref, onMounted, watch } from "vue";
 import type { SketchData, Stroke, StrokePoint, ToolPresetCollection } from "@/types/sketch";
 import {
   createEngineState,
@@ -79,13 +72,6 @@ import {
 } from "@/elements/lassoEdit";
 import type { Bounds, SketchElement } from "@/elements/model";
 import { migrateStrokesToElements } from "@/elements/model";
-import {
-  createRulerState,
-  moveRuler,
-  projectPointToRuler,
-  rotateRuler,
-} from "@/tools/ruler";
-import type { RulerState } from "@/tools/ruler";
 import {
   addSketchPage,
   createPageNavigator,
@@ -149,26 +135,9 @@ let lassoResize: {
   elements: SketchElement[];
   strokes: SketchData["strokes"];
 } | null = null;
-const ruler = ref<RulerState>(createRulerState({
-  x: 80,
-  y: 220,
-  angle: 0,
-  length: 640,
-}));
-let rulerMove: {
-  lastPoint: StrokePoint;
-} | null = null;
 const LASSO_DUPLICATE_OFFSET = 24;
 const LASSO_RESIZE_HANDLE_SIZE = 14;
 const LASSO_MIN_RESIZE_SIZE = 16;
-
-const rulerStyle = computed(() => ({
-  left: `${ruler.value.x}px`,
-  top: `${ruler.value.y}px`,
-  width: `${ruler.value.length}px`,
-  transform: `translateY(-17px) rotate(${ruler.value.angle}deg)`,
-  transformOrigin: "0 50%",
-}));
 
 onMounted(async () => {
   if (!bgCanvasRef.value || !strokeCanvasRef.value) return;
@@ -204,30 +173,7 @@ function eventPoint(e: PointerEvent): StrokePoint {
     pressure: e.pressure || 0.5,
     timestamp: e.timeStamp,
   };
-  if (props.tool !== "ruler") return rawPoint;
-  return {
-    ...rawPoint,
-    ...projectPointToRuler(rawPoint, ruler.value),
-  };
-}
-
-function rawEventPoint(e: PointerEvent): StrokePoint {
-  const rect = getCanvas().getBoundingClientRect();
-  return {
-    x: e.clientX - rect.left,
-    y: e.clientY - rect.top,
-    pressure: e.pressure || 0.5,
-    timestamp: e.timeStamp,
-  };
-}
-
-function isPointOnRuler(point: StrokePoint): boolean {
-  const projected = projectPointToRuler(point, ruler.value);
-  const distance = Math.hypot(point.x - projected.x, point.y - projected.y);
-  const radians = (ruler.value.angle * Math.PI) / 180;
-  const along = (point.x - ruler.value.x) * Math.cos(radians)
-    + (point.y - ruler.value.y) * Math.sin(radians);
-  return distance <= 28 && along >= 0 && along <= ruler.value.length;
+  return rawPoint;
 }
 
 function onPointerDown(e: PointerEvent) {
@@ -321,17 +267,6 @@ function onPointerDown(e: PointerEvent) {
     shapeStart = eventPoint(e);
     return;
   }
-  if (props.tool === "ruler") {
-    const point = rawEventPoint(e);
-    if (e.detail >= 2) {
-      ruler.value = rotateRuler(ruler.value, ruler.value.angle + 45);
-      return;
-    }
-    if (isPointOnRuler(point)) {
-      rulerMove = { lastPoint: point };
-      return;
-    }
-  }
   enginePointerDown(state, e, getCanvas());
 }
 
@@ -419,14 +354,6 @@ function onPointerMove(e: PointerEvent) {
     drawSelectionOutline();
     return;
   }
-  if (rulerMove) {
-    const point = rawEventPoint(e);
-    const dx = point.x - rulerMove.lastPoint.x;
-    const dy = point.y - rulerMove.lastPoint.y;
-    ruler.value = moveRuler(ruler.value, dx, dy);
-    rulerMove.lastPoint = point;
-    return;
-  }
   if (shapeStart) return;
   const prevHeight = state.canvasHeight;
   const heightChanged = enginePointerMove(state, e, getCanvas());
@@ -483,10 +410,6 @@ function onPointerUp(e: PointerEvent) {
     elementTransform = null;
     updateUndoRedoState();
     emit("stroke");
-    return;
-  }
-  if (rulerMove) {
-    rulerMove = null;
     return;
   }
   if (shapeStart && isShapeEditorTool(props.tool)) {
@@ -675,7 +598,6 @@ function clearInteractionState() {
   selectedLassoIds = [];
   lassoMove = null;
   lassoResize = null;
-  rulerMove = null;
 }
 
 function onCanvasDoubleClick(e: MouseEvent) {
@@ -847,9 +769,6 @@ function duplicateLassoSelection() {
   updateUndoRedoState();
   emit("stroke");
 }
-function rotateRulerBy(delta: number) {
-  ruler.value = rotateRuler(ruler.value, ruler.value.angle + delta);
-}
 function insertText() {
   const text = window.prompt("Text", "Text") ?? "Text";
   const position = createInsertElementPosition({
@@ -931,7 +850,6 @@ defineExpose({
   deleteLassoSelection,
   duplicateLassoSelection,
   recolorLasso,
-  rotateRulerBy,
   addPage,
   duplicateCurrentPage,
   deleteCurrentPage,
@@ -948,29 +866,4 @@ defineExpose({
 .sketch-canvas { display: block; }
 .sketch-canvas--bg { position: relative; }
 .sketch-canvas--stroke { position: absolute; top: 0; left: 0; cursor: crosshair; }
-.sketch-ruler {
-  position: absolute;
-  z-index: 2;
-  height: 34px;
-  border: 1px solid rgba(32, 40, 48, 0.35);
-  border-radius: 3px;
-  background: rgba(255, 255, 255, 0.68);
-  box-shadow: 0 8px 18px rgba(0, 0, 0, 0.14);
-  pointer-events: none;
-}
-.sketch-ruler::before {
-  content: "";
-  position: absolute;
-  left: 0;
-  right: 0;
-  top: 50%;
-  border-top: 1px solid rgba(32, 40, 48, 0.55);
-}
-.sketch-ruler span {
-  position: absolute;
-  left: 10px;
-  top: 7px;
-  color: rgba(32, 40, 48, 0.76);
-  font-size: 12px;
-}
 </style>
