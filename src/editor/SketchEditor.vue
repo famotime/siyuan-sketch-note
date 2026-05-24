@@ -1,47 +1,84 @@
 <template>
   <div v-if="visible" class="sketch-editor">
     <div class="sketch-editor__header">
-      <button class="sketch-editor__back" @click="goBack">← {{ t("back") }}</button>
-      <select class="sketch-editor__template-select" v-model="currentTemplate">
-        <option v-for="tpl in templates" :key="tpl.id" :value="tpl.id">{{ t(tpl.nameKey) }}</option>
-      </select>
-      <span class="sketch-editor__title">{{ t("sketchNote") }}</span>
-      <button class="sketch-editor__save" @click="doSave">{{ t("save") }}</button>
+      <!-- Row 1: navigation -->
+      <div class="sketch-editor__row">
+        <button class="sketch-btn sketch-btn--back" @click="goBack">← {{ t("back") }}</button>
+        <select class="sketch-select" v-model="currentTemplate">
+          <option v-for="tpl in templates" :key="tpl.id" :value="tpl.id">{{ t(tpl.nameKey) }}</option>
+        </select>
+        <span class="sketch-editor__title">{{ t("sketchNote") }}</span>
+        <span class="sketch-spacer" />
+        <button
+          class="sketch-btn sketch-btn--toggle"
+          :class="{ 'sketch-btn--toggle-on': autoSave }"
+          @click="toggleAutoSave"
+        >{{ autoSave ? "ON" : "OFF" }} {{ t("autoSave") }}</button>
+        <span class="sketch-status" :class="`sketch-status--${saveStatus}`">{{ statusLabel }}</span>
+        <button
+          class="sketch-btn sketch-btn--save"
+          :disabled="saveStatus === 'saving'"
+          @click="manualSave"
+        >{{ t("save") }}</button>
+      </div>
+
+      <!-- Row 2: drawing tools -->
+      <div class="sketch-editor__row sketch-editor__row--tools">
+        <div class="sketch-colors">
+          <button
+            v-for="c in colors"
+            :key="c"
+            class="sketch-color"
+            :class="{ 'sketch-color--active': activeColor === c && activeTool === 'pen' }"
+            :style="{ backgroundColor: c }"
+            @click="selectColor(c)"
+          />
+        </div>
+        <span class="sketch-sep" />
+        <button
+          class="sketch-btn sketch-btn--tool"
+          :class="{ 'sketch-btn--tool-active': activeTool === 'pen' }"
+          @click="activeTool = 'pen'"
+        >✏️ {{ t("pen") }}</button>
+        <button
+          class="sketch-btn sketch-btn--tool"
+          :class="{ 'sketch-btn--tool-active': activeTool === 'eraser' }"
+          @click="activeTool = 'eraser'"
+        >🧹 {{ t("eraser") }}</button>
+        <span class="sketch-sep" />
+        <button class="sketch-btn sketch-btn--action" :disabled="!canUndo" @click="canvasRef?.doUndo()">↩️ {{ t("undo") }}</button>
+        <button class="sketch-btn sketch-btn--action" :disabled="!canRedo" @click="canvasRef?.doRedo()">↪️ {{ t("redo") }}</button>
+        <button class="sketch-btn sketch-btn--action" @click="canvasRef?.doClear()">🗑️ {{ t("clear") }}</button>
+      </div>
     </div>
+
     <div class="sketch-editor__body">
       <SketchCanvas
         ref="canvasRef"
         :initialData="loadedData"
         :tool="activeTool"
         :color="activeColor"
+        :templateId="currentTemplate"
         @update:canUndo="canUndo = $event"
         @update:canRedo="canRedo = $event"
         @heightChanged="onHeightChanged"
+        @stroke="onStroke"
       />
     </div>
-    <SketchToolbar
-      :modelColor="activeColor"
-      :modelTool="activeTool"
-      :canUndo="canUndo"
-      :canRedo="canRedo"
-      @update:modelColor="activeColor = $event"
-      @update:modelTool="activeTool = $event"
-      @undo="canvasRef?.doUndo()"
-      @redo="canvasRef?.doRedo()"
-      @clear="canvasRef?.doClear()"
-    />
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from "vue";
+import { ref, computed, onMounted, onUnmounted } from "vue";
 import type { SketchData, SketchTool } from "@/types/sketch";
 import { PRESET_COLORS } from "@/types/sketch";
 import { getAllTemplates } from "@/template";
 import { thumbnailCanvas } from "@/storage/thumbnail";
+import { showMessage } from "siyuan";
 import { sketchAssetFileName, uploadDataUrlToAssets } from "@/utils/uploadPng";
 import SketchCanvas from "./SketchCanvas.vue";
-import SketchToolbar from "./SketchToolbar.vue";
+
+type SaveStatus = "idle" | "saving" | "saved" | "error" | "dirty";
 
 const props = defineProps<{
   blockId: string;
@@ -54,6 +91,7 @@ const emit = defineEmits<{ (e: "close"): void }>();
 
 function t(key: string): string { return props.i18n[key] ?? key; }
 
+const colors = PRESET_COLORS;
 const visible = ref(false);
 const canvasRef = ref<InstanceType<typeof SketchCanvas>>();
 const activeTool = ref<SketchTool>("pen");
@@ -63,35 +101,127 @@ const canRedo = ref(false);
 const currentTemplate = ref(props.initialData?.template ?? "blank");
 const templates = getAllTemplates();
 const loadedData = ref<SketchData | null>(props.initialData);
+const saveStatus = ref<SaveStatus>("idle");
+const autoSave = ref(true);
+
+let autoSaveTimer: ReturnType<typeof setTimeout> | null = null;
+
+const statusLabel = computed(() => {
+  switch (saveStatus.value) {
+    case "saving":  return t("statusSaving");
+    case "saved":   return t("statusSaved");
+    case "error":   return t("statusError");
+    case "dirty":   return t("statusDirty");
+    default:        return "";
+  }
+});
 
 onMounted(() => {
   visible.value = true;
   document.body.style.overflow = "hidden";
 });
 
-async function doSave() {
-  if (!canvasRef.value) return;
+onUnmounted(() => {
+  document.body.style.overflow = "";
+  if (autoSaveTimer) clearTimeout(autoSaveTimer);
+});
+
+// ─── Toolbar actions ───
+
+function selectColor(c: string) {
+  activeColor.value = c;
+  activeTool.value = "pen";
+}
+
+function toggleAutoSave() {
+  autoSave.value = !autoSave.value;
+  if (!autoSave.value && autoSaveTimer) {
+    clearTimeout(autoSaveTimer);
+    autoSaveTimer = null;
+  }
+}
+
+// ─── Save logic ───
+
+function markDirty() {
+  if (saveStatus.value === "saved" || saveStatus.value === "idle") {
+    saveStatus.value = "dirty";
+  }
+}
+
+function onStroke() {
+  markDirty();
+  if (autoSave.value) scheduleAutoSave();
+}
+
+function scheduleAutoSave() {
+  if (autoSaveTimer) clearTimeout(autoSaveTimer);
+  autoSaveTimer = setTimeout(() => {
+    autoSaveTimer = null;
+    if (saveStatus.value === "dirty" || saveStatus.value === "error") doSave();
+  }, 1500);
+}
+
+async function doSave(): Promise<boolean> {
+  if (!canvasRef.value) return false;
+  saveStatus.value = "saving";
   const data = canvasRef.value.getData();
   data.template = currentTemplate.value;
 
-  // Generate PNG and upload to assets
-  const pngDataUrl = thumbnailCanvas(data.strokes, data.template);
-  const fileName = sketchAssetFileName(props.blockId);
-  await uploadDataUrlToAssets(pngDataUrl, fileName);
+  let pngDataUrl: string;
+  try {
+    pngDataUrl = thumbnailCanvas(data.strokes, data.template);
+  } catch (e) {
+    console.error("[Sketch Note] Thumbnail generation failed:", e);
+    pngDataUrl = createFallbackThumbnail();
+  }
 
-  // Save stroke data to plugin storage
-  const key = `sketch:${props.blockId}`;
-  await props.saveData(key, data);
+  try {
+    const fileName = sketchAssetFileName(props.blockId);
+    await uploadDataUrlToAssets(pngDataUrl, fileName);
+    await props.saveData(`sketch:${props.blockId}`, data);
+    saveStatus.value = "saved";
+    canvasRef.value.getState().isDirty = false;
+    return true;
+  } catch (e) {
+    console.error("[Sketch Note] Save failed:", e);
+    saveStatus.value = "error";
+    showMessage(t("saveFailed"), 5000, "error");
+    return false;
+  }
+}
 
-  document.body.style.overflow = "";
+async function manualSave() {
+  if (autoSaveTimer) { clearTimeout(autoSaveTimer); autoSaveTimer = null; }
+  await doSave();
+}
+
+function createFallbackThumbnail(): string {
+  const c = document.createElement("canvas");
+  c.width = 800; c.height = 200;
+  const ctx = c.getContext("2d")!;
+  ctx.fillStyle = "#fff"; ctx.fillRect(0, 0, 800, 200);
+  ctx.fillStyle = "#999"; ctx.font = "16px sans-serif"; ctx.textAlign = "center";
+  ctx.fillText("Sketch Note", 400, 105);
+  return c.toDataURL("image/png");
+}
+
+// ─── Back / Close ───
+
+async function goBack() {
+  if (autoSave.value) {
+    await doSave();
+    emit("close");
+    return;
+  }
+  if (saveStatus.value === "dirty" || saveStatus.value === "error") {
+    if (confirm(t("unsavedConfirm"))) { emit("close"); }
+    return;
+  }
   emit("close");
 }
 
-async function goBack() { await doSave(); }
-
-function onHeightChanged(_height: number) {
-  // Auto-scroll handled by overflow-y: auto on .sketch-editor__body
-}
+function onHeightChanged(_h: number) {}
 </script>
 
 <style scoped>
@@ -100,30 +230,93 @@ function onHeightChanged(_height: number) {
   background: var(--b3-theme-background);
   display: flex; flex-direction: column;
 }
+
+/* ── Header ── */
 .sketch-editor__header {
-  display: flex; align-items: center; gap: 12px;
-  padding: 8px 16px;
   background: var(--b3-theme-surface);
   border-bottom: 1px solid var(--b3-border-color);
   flex-shrink: 0;
+  padding: 6px 12px;
 }
-.sketch-editor__back, .sketch-editor__save {
-  padding: 6px 12px; border-radius: 6px;
+.sketch-editor__row {
+  display: flex; align-items: center; gap: 8px;
+  min-height: 36px;
+}
+.sketch-editor__row--tools {
+  margin-top: 6px;
+  padding-top: 6px;
+  border-top: 1px solid var(--b3-border-color);
+}
+.sketch-editor__title {
+  font-weight: 500; font-size: 14px; color: var(--b3-theme-on-surface);
+  white-space: nowrap;
+}
+.sketch-spacer { flex: 1; }
+
+/* ── Shared button base ── */
+.sketch-btn {
+  pointer-events: auto !important;
+  box-sizing: border-box;
+  display: inline-flex; align-items: center; justify-content: center;
+  padding: 5px 10px; border-radius: 6px;
   border: 1px solid var(--b3-border-color);
-  background: var(--b3-theme-surface); cursor: pointer; font-size: 14px;
+  background: var(--b3-theme-surface) !important;
+  color: var(--b3-theme-on-surface);
+  cursor: pointer; font-size: 13px;
+  white-space: nowrap; user-select: none;
+  -webkit-tap-highlight-color: transparent;
+  min-height: 30px;
 }
-.sketch-editor__save {
-  background: var(--b3-theme-primary);
-  color: var(--b3-theme-on-primary);
-  border-color: var(--b3-theme-primary); margin-left: auto;
-}
-.sketch-editor__template-select {
+.sketch-btn:active { opacity: 0.8; }
+.sketch-btn:disabled { opacity: 0.35; cursor: not-allowed; }
+
+.sketch-btn--back   { font-size: 13px; }
+.sketch-btn--save   { background: var(--b3-theme-primary) !important; color: var(--b3-theme-on-primary); border-color: var(--b3-theme-primary); }
+
+.sketch-btn--toggle { font-size: 12px; }
+.sketch-btn--toggle-on { border-color: var(--b3-theme-primary); color: var(--b3-theme-primary); }
+
+.sketch-btn--tool { font-size: 13px; min-width: 60px; }
+.sketch-btn--tool-active { background: var(--b3-theme-primary-light) !important; border-color: var(--b3-theme-primary); }
+
+.sketch-btn--action { font-size: 13px; min-width: 52px; }
+
+/* ── Select ── */
+.sketch-select {
+  pointer-events: auto !important;
   padding: 4px 8px; border-radius: 4px;
   border: 1px solid var(--b3-border-color);
   background: var(--b3-theme-surface); font-size: 13px;
+  min-height: 30px;
 }
-.sketch-editor__title { font-weight: 500; font-size: 15px; color: var(--b3-theme-on-surface); }
+
+/* ── Colors ── */
+.sketch-colors { display: flex; gap: 6px; align-items: center; }
+.sketch-color {
+  pointer-events: auto !important;
+  width: 26px; height: 26px; border-radius: 50%;
+  border: 2px solid transparent; cursor: pointer;
+  box-sizing: border-box;
+  -webkit-tap-highlight-color: transparent;
+}
+.sketch-color--active {
+  border-color: var(--b3-theme-primary);
+  box-shadow: 0 0 0 2px var(--b3-theme-primary-light);
+}
+
+/* ── Separator ── */
+.sketch-sep { width: 1px; height: 20px; background: var(--b3-border-color); flex-shrink: 0; }
+
+/* ── Status ── */
+.sketch-status { font-size: 12px; min-width: 36px; text-align: center; white-space: nowrap; }
+.sketch-status--saved  { color: var(--b3-theme-primary); }
+.sketch-status--saving { color: var(--b3-theme-on-surface-light); }
+.sketch-status--error  { color: #e74c3c; }
+.sketch-status--dirty  { color: #f39c12; }
+
+/* ── Body ── */
 .sketch-editor__body {
-  flex: 1; overflow-y: auto; padding: 16px 0 60px; touch-action: none;
+  flex: 1; overflow-y: auto; touch-action: none;
+  padding: 12px 0;
 }
 </style>

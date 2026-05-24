@@ -12,5 +12,13 @@
   "clear": "Clear",
   "save": "Save",
   "back": "Back",
-  "unsavedConfirm": "You have unsaved changes. Are you sure you want to leave?"
+  "autoSave": "Auto Save",
+  "unsavedConfirm": "You have unsaved changes. Discard and exit?",
+  "saveFailed": "Save failed, please retry",
+  "loadFailed": "Failed to load sketch data",
+  "editSketch": "Edit Sketch",
+  "statusSaving": "Saving…",
+  "statusSaved": "Saved",
+  "statusDirty": "Unsaved",
+  "statusError": "Error"
 }

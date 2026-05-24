@@ -11,6 +11,7 @@
 
 <script lang="ts">
 import { ref } from "vue";
+import { showMessage } from "siyuan";
 import { loadSketchData } from "@/storage";
 import SketchEditor from "@/editor/SketchEditor.vue";
 
@@ -36,7 +37,13 @@ export function setLoadDataFn(fn: (key: string) => Promise<any>) {
 
 export async function openSketchEditor(blockId: string) {
   editorBlockId.value = blockId;
-  editorData.value = await loadSketchData(loadDataFn, blockId);
+  try {
+    editorData.value = await loadSketchData(loadDataFn, blockId);
+  } catch (e) {
+    console.error("[Sketch Note] Failed to load sketch data:", e);
+    showMessage("Sketch Note: " + (pluginI18n.value["loadFailed"] || "Data load failed"), 5000, "error");
+    editorData.value = null;
+  }
   editorVisible.value = true;
 }
 

@@ -36,12 +36,14 @@ const props = defineProps<{
   initialData: SketchData | null;
   tool: SketchTool;
   color: string;
+  templateId: string;
 }>();
 
 const emit = defineEmits<{
   (e: "update:canUndo", value: boolean): void;
   (e: "update:canRedo", value: boolean): void;
   (e: "heightChanged", height: number): void;
+  (e: "stroke"): void;
 }>();
 
 const containerRef = ref<HTMLDivElement>();
@@ -61,6 +63,13 @@ onMounted(() => {
 
 watch(() => props.tool, (t) => { if (state) state.tool = t; });
 watch(() => props.color, (c) => { if (state) state.color = c; });
+watch(() => props.templateId, (tpl) => {
+  if (state && bgCanvasRef.value && strokeCanvasRef.value) {
+    state.templateId = tpl;
+    setupBackgroundCanvas(bgCanvasRef.value, state);
+    setupStrokeCanvas(strokeCanvasRef.value, state);
+  }
+});
 
 function getCanvas(): HTMLCanvasElement { return strokeCanvasRef.value!; }
 
@@ -82,7 +91,10 @@ function onPointerMove(e: PointerEvent) {
 
 function onPointerUp(_e: PointerEvent) {
   const completed = enginePointerUp(state);
-  if (completed) updateUndoRedoState();
+  if (completed) {
+    updateUndoRedoState();
+    emit("stroke");
+  }
 }
 
 function updateUndoRedoState() {
@@ -90,9 +102,9 @@ function updateUndoRedoState() {
   emit("update:canRedo", state.redoStack.length > 0);
 }
 
-function doUndo() { engineUndo(state); fullRedrawStrokeCanvas(getCanvas(), state); updateUndoRedoState(); }
-function doRedo() { engineRedo(state); fullRedrawStrokeCanvas(getCanvas(), state); updateUndoRedoState(); }
-function doClear() { engineClear(state); fullRedrawStrokeCanvas(getCanvas(), state); updateUndoRedoState(); }
+function doUndo() { engineUndo(state); fullRedrawStrokeCanvas(getCanvas(), state); updateUndoRedoState(); emit("stroke"); }
+function doRedo() { engineRedo(state); fullRedrawStrokeCanvas(getCanvas(), state); updateUndoRedoState(); emit("stroke"); }
+function doClear() { engineClear(state); fullRedrawStrokeCanvas(getCanvas(), state); updateUndoRedoState(); emit("stroke"); }
 function getData(): SketchData { return serializeState(state); }
 function getState(): EngineState { return state; }
 

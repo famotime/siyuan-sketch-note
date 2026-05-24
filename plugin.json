@@ -8,7 +8,7 @@
   "frontends": ["all"],
   "displayName": {
     "default": "Sketch Note",
-    "zh_CN": "手写笔记"
+    "zh_CN": "闲笔"
   },
   "description": {
     "default": "Handwriting plugin for SiYuan Note with vector strokes, templates, and undo/redo",

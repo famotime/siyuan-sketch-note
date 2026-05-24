@@ -27,6 +27,12 @@ export async function loadSketchData(
     return null;
   }
 
+  // Validate essential fields (data corruption guard)
+  if (!Array.isArray(raw.strokes)) {
+    console.warn(`[Sketch Note] Corrupted data for block ${blockId}: strokes is not an array`);
+    return null;
+  }
+
   return raw as SketchData;
 }
 

@@ -12,5 +12,13 @@
   "clear": "清除",
   "save": "保存",
   "back": "返回",
-  "unsavedConfirm": "有未保存的更改，确定要离开吗？"
+  "autoSave": "自动保存",
+  "unsavedConfirm": "有未保存的更改，确定放弃并退出？",
+  "saveFailed": "保存失败，请重试",
+  "loadFailed": "手写数据加载异常",
+  "editSketch": "编辑手写笔记",
+  "statusSaving": "保存中…",
+  "statusSaved": "已保存",
+  "statusDirty": "未保存",
+  "statusError": "保存失败"
 }
