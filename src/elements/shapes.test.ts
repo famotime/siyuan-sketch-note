@@ -4,6 +4,7 @@ import {
   createEllipseShape,
   createLineShape,
   createRectangleShape,
+  createTriangleStroke,
   getShapeBounds,
 } from "./shapes";
 
@@ -64,5 +65,25 @@ describe("shape elements", () => {
       height: expect.any(Number),
     });
     expect(stroke.color).toBe("#111111");
+  });
+
+  it("creates a closed triangle stroke inside the drag bounds", () => {
+    const stroke = createTriangleStroke("triangle-1", { x: 10, y: 20 }, { x: 70, y: 80 }, {
+      tool: "pen",
+      color: "#444444",
+      width: 4,
+      opacity: 0.7,
+      mode: "ink",
+    });
+
+    expect(stroke.points).toEqual([
+      { x: 40, y: 20, pressure: 0.5, timestamp: 0 },
+      { x: 70, y: 80, pressure: 0.5, timestamp: 1 },
+      { x: 10, y: 80, pressure: 0.5, timestamp: 2 },
+      { x: 40, y: 20, pressure: 0.5, timestamp: 3 },
+    ]);
+    expect(stroke.color).toBe("#444444");
+    expect(stroke.opacity).toBe(0.7);
+    expect(stroke.bounds).toEqual({ x: 8, y: 18, width: 64, height: 64 });
   });
 });

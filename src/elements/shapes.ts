@@ -16,7 +16,7 @@ export interface ShapeStyle {
 export interface ShapeElement {
   id: string;
   type: "shape";
-  shape: "line" | "arrow" | "rectangle" | "ellipse";
+  shape: "line" | "arrow" | "rectangle" | "ellipse" | "triangle";
   start: Point;
   end: Point;
   style: ShapeStyle;
@@ -105,6 +105,15 @@ export function createEllipseShape(
   return createShape(id, "ellipse", start, end, style);
 }
 
+export function createTriangleShape(
+  id: string,
+  start: Point,
+  end: Point,
+  style: ShapeStyle,
+): ShapeElement {
+  return createShape(id, "triangle", start, end, style);
+}
+
 export function getShapeBounds(shape: ShapeElement): Bounds {
   return boundsFromPoints(shape.start, shape.end, shape.style.width);
 }
@@ -184,6 +193,31 @@ export function createRectangleStroke(
     { x: start.x, y: end.y },
     start,
   ], preset);
+}
+
+export function createTriangleStroke(
+  id: string,
+  start: Point,
+  end: Point,
+  preset: ToolPreset,
+): Stroke {
+  const minX = Math.min(start.x, end.x);
+  const maxX = Math.max(start.x, end.x);
+  const minY = Math.min(start.y, end.y);
+  const maxY = Math.max(start.y, end.y);
+  const top = {
+    x: (minX + maxX) / 2,
+    y: minY,
+  };
+  const right = {
+    x: maxX,
+    y: maxY,
+  };
+  const left = {
+    x: minX,
+    y: maxY,
+  };
+  return createShapeStroke(id, [top, right, left, top], preset);
 }
 
 export function createEllipseStroke(

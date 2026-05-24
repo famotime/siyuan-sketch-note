@@ -22,7 +22,7 @@
 
 <script setup lang="ts">
 import { computed, ref, onMounted, watch } from "vue";
-import type { SketchData, StrokePoint, ToolPresetCollection } from "@/types/sketch";
+import type { SketchData, Stroke, StrokePoint, ToolPresetCollection } from "@/types/sketch";
 import {
   createEngineState,
   restoreEngineState,
@@ -47,6 +47,7 @@ import {
   createEllipseStroke,
   createLineStroke,
   createRectangleStroke,
+  createTriangleStroke,
 } from "@/elements/shapes";
 import { createImageElement } from "@/elements/image";
 import {
@@ -436,13 +437,7 @@ function onPointerUp(e: PointerEvent) {
   if (shapeStart && isShapeEditorTool(props.tool)) {
     const preset = props.toolPresets.pen;
     const end = eventPoint(e);
-    const stroke = props.tool === "line"
-      ? createLineStroke(`shape-${Date.now()}`, shapeStart, end, preset)
-      : props.tool === "arrow"
-        ? createArrowStroke(`shape-${Date.now()}`, shapeStart, end, preset)
-      : props.tool === "rectangle"
-        ? createRectangleStroke(`shape-${Date.now()}`, shapeStart, end, preset)
-        : createEllipseStroke(`shape-${Date.now()}`, shapeStart, end, preset);
+    const stroke = createShapeStrokeForTool(`shape-${Date.now()}`, props.tool, shapeStart, end, preset);
     pushHistorySnapshot(state);
     state.strokes.push(stroke);
     shapeStart = null;
@@ -456,6 +451,20 @@ function onPointerUp(e: PointerEvent) {
     updateUndoRedoState();
     emit("stroke");
   }
+}
+
+function createShapeStrokeForTool(
+  id: string,
+  tool: EditorTool,
+  start: StrokePoint,
+  end: StrokePoint,
+  preset: ToolPresetCollection["pen"],
+): Stroke {
+  if (tool === "line") return createLineStroke(id, start, end, preset);
+  if (tool === "arrow") return createArrowStroke(id, start, end, preset);
+  if (tool === "rectangle") return createRectangleStroke(id, start, end, preset);
+  if (tool === "triangle") return createTriangleStroke(id, start, end, preset);
+  return createEllipseStroke(id, start, end, preset);
 }
 
 function updateUndoRedoState() {

@@ -21,6 +21,7 @@ describe("editor shortcuts", () => {
     expect(resolveEditorShortcut(keyEvent({ key: "4" }))).toEqual({ type: "tool", tool: "lasso" });
     expect(resolveEditorShortcut(keyEvent({ key: "5" }))).toEqual({ type: "tool", tool: "ruler" });
     expect(resolveEditorShortcut(keyEvent({ key: "6" }))).toEqual({ type: "tool", tool: "arrow" });
+    expect(resolveEditorShortcut(keyEvent({ key: "7" }))).toEqual({ type: "tool", tool: "triangle" });
   });
 
   it("ignores shortcuts while typing in text fields", () => {

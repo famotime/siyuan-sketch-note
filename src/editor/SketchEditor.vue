@@ -112,6 +112,11 @@
         >○ {{ t("ellipse") }}</button>
         <button
           class="sketch-btn sketch-btn--tool"
+          :class="{ 'sketch-btn--tool-active': activeTool === 'triangle' }"
+          @click="activeTool = 'triangle'"
+        >△ {{ t("triangle") }}</button>
+        <button
+          class="sketch-btn sketch-btn--tool"
           :class="{ 'sketch-btn--tool-active': activeTool === 'ruler' }"
           @click="activeTool = 'ruler'"
         >▤ {{ t("ruler") }}</button>

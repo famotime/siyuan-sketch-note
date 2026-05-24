@@ -21,6 +21,7 @@ describe("editor tools", () => {
     expect(isShapeEditorTool("arrow")).toBe(true);
     expect(isShapeEditorTool("rectangle")).toBe(true);
     expect(isShapeEditorTool("ellipse")).toBe(true);
+    expect(isShapeEditorTool("triangle")).toBe(true);
     expect(isShapeEditorTool("pen")).toBe(false);
   });
 
@@ -32,6 +33,7 @@ describe("editor tools", () => {
 
   it("maps non-stroke editor tools to pen for the drawing engine", () => {
     expect(getDrawingToolForEditorTool("rectangle")).toBe("pen");
+    expect(getDrawingToolForEditorTool("triangle")).toBe("pen");
     expect(getDrawingToolForEditorTool("ruler")).toBe("pen");
     expect(getDrawingToolForEditorTool("lasso")).toBe("pen");
     expect(getDrawingToolForEditorTool("image")).toBe("pen");

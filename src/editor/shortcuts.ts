@@ -13,6 +13,7 @@ const numberToolMap: Record<string, EditorTool> = {
   "4": "lasso",
   "5": "ruler",
   "6": "arrow",
+  "7": "triangle",
 };
 
 export function resolveEditorShortcut(event: KeyboardEvent): EditorShortcut | null {

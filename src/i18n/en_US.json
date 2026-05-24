@@ -23,6 +23,7 @@
   "arrow": "Arrow",
   "rectangle": "Rectangle",
   "ellipse": "Ellipse",
+  "triangle": "Triangle",
   "ruler": "Ruler",
   "rotateLeft": "Rotate Left",
   "rotateRight": "Rotate Right",
