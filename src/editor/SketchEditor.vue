@@ -112,6 +112,7 @@ import { showMessage } from "siyuan";
 import { sketchAssetFileName, uploadDataUrlToAssets } from "@/utils/uploadPng";
 import { normalizeToolPresets, updateToolPreset } from "@/tools/presets";
 import { createExportPngFileName, dataUrlToBlob, downloadBlob } from "@/export/png";
+import { SaveQueue } from "@/storage/saveQueue";
 import SketchCanvas from "./SketchCanvas.vue";
 
 type SaveStatus = "idle" | "saving" | "saved" | "error" | "dirty";
@@ -142,6 +143,7 @@ const saveStatus = ref<SaveStatus>("idle");
 const autoSave = ref(true);
 
 let autoSaveTimer: ReturnType<typeof setTimeout> | null = null;
+const saveQueue = new SaveQueue();
 
 const statusLabel = computed(() => {
   switch (saveStatus.value) {
@@ -209,6 +211,10 @@ function scheduleAutoSave() {
 }
 
 async function doSave(): Promise<boolean> {
+  return saveQueue.enqueue(runSave);
+}
+
+async function runSave(): Promise<boolean> {
   if (!canvasRef.value) return false;
   saveStatus.value = "saving";
   const data = canvasRef.value.getData();
