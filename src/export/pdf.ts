@@ -12,6 +12,7 @@ export interface PdfExportPlanInput {
   canvasWidth: number;
   canvasHeight: number;
   pageHeight: number;
+  includeBackground?: boolean;
 }
 
 export interface PdfExportPage {
@@ -25,6 +26,7 @@ export interface PdfExportPage {
 export interface PdfExportPlan {
   blockId: string;
   pageHeight: number;
+  includeBackground: boolean;
   pages: PdfExportPage[];
 }
 
@@ -67,6 +69,7 @@ export function createPdfExportPlan(input: PdfExportPlanInput): PdfExportPlan {
   return {
     blockId: input.blockId,
     pageHeight: input.pageHeight,
+    includeBackground: input.includeBackground ?? true,
     pages,
   };
 }
@@ -75,11 +78,13 @@ export function createPdfExportPlanFromSketch(
   blockId: string,
   data: SketchData,
   pageHeight = DEFAULT_PDF_PAGE_HEIGHT,
+  includeBackground = true,
 ): PdfExportPlan {
   if (data.pageMode === "paged" && data.pages?.length) {
     return {
       blockId,
       pageHeight: data.pages[0].height,
+      includeBackground,
       pages: getSketchPages(data).map((page) => ({
         index: page.index,
         sourceX: page.x,
@@ -95,6 +100,7 @@ export function createPdfExportPlanFromSketch(
     canvasWidth: data.canvasWidth,
     canvasHeight: data.canvasHeight,
     pageHeight,
+    includeBackground,
   });
 }
 

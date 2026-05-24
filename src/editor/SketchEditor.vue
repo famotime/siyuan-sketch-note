@@ -52,6 +52,11 @@
           :class="{ 'sketch-btn--toggle-on': inputSettings.stylusOnly }"
           @click="toggleStylusOnly"
         >{{ inputSettings.stylusOnly ? "ON" : "OFF" }} {{ t("stylusOnly") }}</button>
+        <button
+          class="sketch-btn sketch-btn--toggle"
+          :class="{ 'sketch-btn--toggle-on': exportIncludeBackground }"
+          @click="exportIncludeBackground = !exportIncludeBackground"
+        >{{ exportIncludeBackground ? "ON" : "OFF" }} {{ t("exportBackground") }}</button>
         <span class="sketch-status" :class="`sketch-status--${saveStatus}`">{{ statusLabel }}</span>
         <button
           class="sketch-btn sketch-btn--save"
@@ -321,6 +326,7 @@ const loadedData = ref<SketchData | null>(props.initialData);
 const saveStatus = ref<SaveStatus>("idle");
 const lastSavedAt = ref<number | null>(null);
 const autoSave = ref(true);
+const exportIncludeBackground = ref(true);
 
 let autoSaveTimer: ReturnType<typeof setTimeout> | null = null;
 const saveQueue = new SaveQueue();
@@ -450,7 +456,7 @@ async function exportPng() {
   data.template = currentTemplate.value;
   data.recentColors = recentColors.value;
   const plan = createCurrentPagePngExportPlan(props.blockId, data);
-  const pngDataUrl = await renderSketchPngPageImage(data, plan);
+  const pngDataUrl = await renderSketchPngPageImage(data, plan, exportIncludeBackground.value);
   const blob = dataUrlToBlob(pngDataUrl);
   downloadBlob(blob, createExportPngFileName(props.blockId, new Date(), plan.pageNumber));
 }
@@ -460,7 +466,12 @@ async function exportPdf() {
   const data = canvasRef.value.getData();
   data.template = currentTemplate.value;
   data.recentColors = recentColors.value;
-  const plan = createPdfExportPlanFromSketch(props.blockId, data);
+  const plan = createPdfExportPlanFromSketch(
+    props.blockId,
+    data,
+    undefined,
+    exportIncludeBackground.value,
+  );
   const pageImages = await renderSketchPdfPageImages(data, plan);
   const blob = await exportPdfBlob(plan, { pageImages });
   downloadBlob(blob, createExportPdfFileName(props.blockId));

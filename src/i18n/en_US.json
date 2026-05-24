@@ -44,6 +44,7 @@
   "save": "Save",
   "exportPng": "Export PNG",
   "exportPdf": "Export PDF",
+  "exportBackground": "Export Background",
   "exportJson": "Backup JSON",
   "importJson": "Restore JSON",
   "importJsonFailed": "Failed to restore JSON backup",

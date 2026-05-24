@@ -44,6 +44,7 @@
   "save": "保存",
   "exportPng": "导出 PNG",
   "exportPdf": "导出 PDF",
+  "exportBackground": "导出背景",
   "exportJson": "备份 JSON",
   "importJson": "恢复 JSON",
   "importJsonFailed": "JSON 恢复失败，请检查备份文件",

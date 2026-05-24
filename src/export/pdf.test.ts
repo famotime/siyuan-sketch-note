@@ -75,6 +75,29 @@ describe("pdf export helpers", () => {
     ]);
   });
 
+  it("keeps background export enabled by default", () => {
+    const plan = createPdfExportPlan({
+      blockId: "block-1",
+      canvasWidth: 800,
+      canvasHeight: 1000,
+      pageHeight: 1000,
+    });
+
+    expect(plan.includeBackground).toBe(true);
+  });
+
+  it("can disable template background when planning PDF export", () => {
+    const plan = createPdfExportPlan({
+      blockId: "block-1",
+      canvasWidth: 800,
+      canvasHeight: 1000,
+      pageHeight: 1000,
+      includeBackground: false,
+    });
+
+    expect(plan.includeBackground).toBe(false);
+  });
+
   it("exports planned pages into a PDF blob", async () => {
     const plan = createPdfExportPlan({
       blockId: "block-1",

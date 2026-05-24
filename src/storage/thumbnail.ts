@@ -173,12 +173,14 @@ export async function renderSketchPdfPageImages(
     -page.sourceY,
     elements,
     "image/jpeg",
+    plan.includeBackground,
   )));
 }
 
 export async function renderSketchPngPageImage(
   data: SketchData,
   plan: PngExportPlan,
+  includeBackground = true,
 ): Promise<string> {
   return renderToDataUrlAsync(
     plan.width,
@@ -189,6 +191,7 @@ export async function renderSketchPngPageImage(
     -plan.sourceY,
     data.elements ?? [],
     "image/png",
+    includeBackground,
   );
 }
 
@@ -234,14 +237,19 @@ async function renderToDataUrlAsync(
   ty = 0,
   elements: SketchElement[] = [],
   type = "image/png",
+  includeBackground = true,
 ): Promise<string> {
   const canvas = document.createElement("canvas");
   canvas.width = width;
   canvas.height = height;
   const ctx = canvas.getContext("2d")!;
 
-  const template = getTemplate(templateId);
-  template.render(ctx, width, height);
+  if (includeBackground) {
+    const template = getTemplate(templateId);
+    template.render(ctx, width, height);
+  } else {
+    ctx.clearRect(0, 0, width, height);
+  }
 
   const layers = splitElementsForRender(elements);
   await renderNonStrokeElementsAsync(ctx, layers.background);
