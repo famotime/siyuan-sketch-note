@@ -60,15 +60,15 @@ function scanVisibleBounds(
 
 /**
  * Composite strokes onto a transparent canvas and scan for visible pixel bounds.
- * Automatically sizes the scan canvas from all stroke coordinates + width + margin.
- * Accounts for eraser destination-out compositing.
+ * Canvas size is based on non-eraser strokes only, so eraser movement
+ * does not inflate the scan area.
  * Returns null if no visible content.
  */
 function findStrokeVisibleBounds(strokes: Stroke[]): { x: number; y: number; w: number; h: number } | null {
-  if (strokes.length === 0) return null;
-
+  // Compute canvas size from content strokes only (exclude eraser)
   let maxX = 0, maxY = 0;
   for (const stroke of strokes) {
+    if (stroke.tool === "eraser") continue;
     const halfW = stroke.width / 2;
     for (const pt of stroke.points) {
       if (pt.x + halfW > maxX) maxX = pt.x + halfW;
