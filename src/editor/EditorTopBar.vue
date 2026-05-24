@@ -17,7 +17,7 @@
     <span class="sketch-editor__title">{{ t("sketchNote") }}</span>
     <span v-if="recovered" class="sketch-recovery">{{ t("dataRecovered") }}</span>
 
-    <div class="sketch-pages">
+    <div v-if="false" class="sketch-pages">
       <button class="sketch-btn sketch-btn--page" :disabled="pageState.current <= 1" @click="$emit('previousPage')">‹</button>
       <button class="sketch-btn sketch-btn--page-label" @click="$emit('goToPage', pageState.current - 1)">
         {{ t("page") }} {{ pageState.current }} / {{ pageState.total }}
@@ -45,13 +45,14 @@
 
     <span class="sketch-spacer" />
     <button
+      v-if="false"
       class="sketch-btn sketch-btn--action"
       :disabled="ocrState === 'recognizing'"
       @click="$emit('recognize')"
     >
       {{ ocrState === "recognizing" ? t("ocrRecognizing") : t("ocrRecognize") }}
     </button>
-    <div class="sketch-search" :class="{ 'sketch-search--open': searchOpen }">
+    <div v-if="false" class="sketch-search" :class="{ 'sketch-search--open': searchOpen }">
       <button
         class="sketch-btn sketch-btn--toggle"
         :class="{ 'sketch-btn--toggle-on': searchOpen }"
@@ -83,16 +84,16 @@
     <button class="sketch-btn sketch-btn--toggle" :class="{ 'sketch-btn--toggle-on': stylusOnly }" @click="$emit('toggleStylusOnly')">
       {{ stylusOnly ? "ON" : "OFF" }} {{ t("stylusOnly") }}
     </button>
-    <button class="sketch-btn sketch-btn--toggle" :class="{ 'sketch-btn--toggle-on': exportIncludeBackground }" @click="$emit('toggleExportBackground')">
+    <button v-if="false" class="sketch-btn sketch-btn--toggle" :class="{ 'sketch-btn--toggle-on': exportIncludeBackground }" @click="$emit('toggleExportBackground')">
       {{ exportIncludeBackground ? "ON" : "OFF" }} {{ t("exportBackground") }}
     </button>
     <span class="sketch-status" :class="`sketch-status--${saveStatus}`">{{ statusLabel }}</span>
     <button class="sketch-btn sketch-btn--save" :disabled="saveStatus === 'saving'" @click="$emit('save')">{{ t("save") }}</button>
-    <button class="sketch-btn sketch-btn--action" @click="$emit('exportPng')">⇩ {{ t("exportPng") }}</button>
-    <button class="sketch-btn sketch-btn--action" @click="$emit('exportPdf')">⇩ {{ t("exportPdf") }}</button>
-    <button class="sketch-btn sketch-btn--action" @click="$emit('exportJson')">⇩ {{ t("exportJson") }}</button>
-    <button class="sketch-btn sketch-btn--action" @click="$emit('importJson')">⇧ {{ t("importJson") }}</button>
-    <button class="sketch-btn sketch-btn--action" @click="$emit('importBackground')">▧ {{ t("importBackground") }}</button>
+    <button v-if="false" class="sketch-btn sketch-btn--action" @click="$emit('exportPng')">⇩ {{ t("exportPng") }}</button>
+    <button v-if="false" class="sketch-btn sketch-btn--action" @click="$emit('exportPdf')">⇩ {{ t("exportPdf") }}</button>
+    <button v-if="false" class="sketch-btn sketch-btn--action" @click="$emit('exportJson')">⇩ {{ t("exportJson") }}</button>
+    <button v-if="false" class="sketch-btn sketch-btn--action" @click="$emit('importJson')">⇧ {{ t("importJson") }}</button>
+    <button v-if="false" class="sketch-btn sketch-btn--action" @click="$emit('importBackground')">▧ {{ t("importBackground") }}</button>
   </div>
 </template>
 

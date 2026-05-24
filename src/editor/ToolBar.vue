@@ -74,6 +74,7 @@
 
       <!-- ▧ 图片 -->
       <button
+        v-if="false"
         class="sketch-btn sketch-btn--tool sketch-btn--icon-tool"
         :title="t('image')"
         :aria-label="t('image')"
