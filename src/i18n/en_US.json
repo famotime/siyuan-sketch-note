@@ -30,6 +30,7 @@
   "save": "Save",
   "exportPng": "Export PNG",
   "exportPdf": "Export PDF",
+  "exportJson": "Backup JSON",
   "back": "Back",
   "autoSave": "Auto Save",
   "unsavedConfirm": "You have unsaved changes. Discard and exit?",

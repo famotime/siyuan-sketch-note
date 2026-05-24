@@ -30,6 +30,7 @@
   "save": "保存",
   "exportPng": "导出 PNG",
   "exportPdf": "导出 PDF",
+  "exportJson": "备份 JSON",
   "back": "返回",
   "autoSave": "自动保存",
   "unsavedConfirm": "有未保存的更改，确定放弃并退出？",

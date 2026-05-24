@@ -32,6 +32,10 @@
           class="sketch-btn sketch-btn--action"
           @click="exportPdf"
         >⇩ {{ t("exportPdf") }}</button>
+        <button
+          class="sketch-btn sketch-btn--action"
+          @click="exportJson"
+        >⇩ {{ t("exportJson") }}</button>
       </div>
 
       <!-- Row 2: drawing tools -->
@@ -184,6 +188,7 @@ import { sketchAssetFileName, uploadDataUrlToAssets } from "@/utils/uploadPng";
 import { normalizeToolPresets, updateToolPreset } from "@/tools/presets";
 import { createExportPngFileName, dataUrlToBlob, downloadBlob } from "@/export/png";
 import { createExportPdfFileName, createPdfExportPlanFromSketch, exportPdf as exportPdfBlob } from "@/export/pdf";
+import { createExportJsonFileName, exportSketchJson } from "@/export/json";
 import { SaveQueue } from "@/storage/saveQueue";
 import { getFirstImageFileFromClipboard } from "./clipboard";
 import { getDrawingToolForEditorTool } from "./tools";
@@ -345,6 +350,15 @@ async function exportPdf() {
   const pageImages = await renderSketchPdfPageImages(data, plan);
   const blob = await exportPdfBlob(plan, { pageImages });
   downloadBlob(blob, createExportPdfFileName(props.blockId));
+}
+
+function exportJson() {
+  if (!canvasRef.value) return;
+  const data = canvasRef.value.getData();
+  data.template = currentTemplate.value;
+  data.toolPresets = toolPresets.value;
+  const blob = exportSketchJson(data);
+  downloadBlob(blob, createExportJsonFileName(props.blockId));
 }
 
 function insertTextElement() {
