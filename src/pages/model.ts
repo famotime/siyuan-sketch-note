@@ -66,7 +66,7 @@ export function createPagedSketchData(options: CreatePagedSketchDataOptions): Sk
 export function addSketchPage(data: SketchData, pageHeight = inferPageHeight(data)): SketchData {
   const pages = getSketchPages({ ...data, pageMode: "paged" }, pageHeight);
   const nextIndex = pages.length;
-  const nextPage = createPage(`page-${nextIndex + 1}`, nextIndex, data.canvasWidth, pageHeight);
+  const nextPage = createPage(createNextPageId(pages), nextIndex, data.canvasWidth, pageHeight);
   const nextPages = [...pages, nextPage];
 
   return {
@@ -75,6 +75,60 @@ export function addSketchPage(data: SketchData, pageHeight = inferPageHeight(dat
     pages: nextPages,
     activePageId: nextPage.id,
     canvasHeight: getCanvasHeightFromPages(nextPages),
+  };
+}
+
+export function insertSketchPageAfter(data: SketchData, pageId: string): SketchData {
+  const pages = getSketchPages({ ...data, pageMode: "paged" }, inferPageHeight(data));
+  const targetIndex = pages.findIndex((page) => page.id === pageId);
+  if (targetIndex < 0) return data;
+
+  const target = pages[targetIndex];
+  const nextPage = {
+    ...createPage(createNextPageId(pages), targetIndex + 1, data.canvasWidth, target.height),
+    y: target.y + target.height,
+  };
+  const nextPages = normalizePages([
+    ...pages.slice(0, targetIndex + 1),
+    nextPage,
+    ...pages.slice(targetIndex + 1),
+  ], data.canvasWidth);
+
+  return {
+    ...data,
+    pageMode: "paged",
+    pages: nextPages,
+    activePageId: nextPage.id,
+    canvasHeight: getCanvasHeightFromPages(nextPages),
+    strokes: shiftStrokesAtOrAfter(data.strokes, nextPage.y, nextPage.height),
+  };
+}
+
+export function duplicateSketchPage(
+  data: SketchData,
+  pageId: string,
+  createCopyId: (id: string) => string = (id) => `copy-${Date.now()}-${id}`,
+): SketchData {
+  const pages = getSketchPages({ ...data, pageMode: "paged" }, inferPageHeight(data));
+  const target = pages.find((page) => page.id === pageId);
+  if (!target) return data;
+
+  const inserted = insertSketchPageAfter(data, pageId);
+  const copiedStrokes = getStrokesInPage(data.strokes, target).map((stroke) =>
+    shiftStroke({
+      ...stroke,
+      id: createCopyId(stroke.id),
+      points: stroke.points.map((point) => ({ ...point })),
+      bounds: stroke.bounds ? { ...stroke.bounds } : undefined,
+    }, target.height),
+  );
+
+  return {
+    ...inserted,
+    strokes: [
+      ...inserted.strokes,
+      ...copiedStrokes,
+    ],
   };
 }
 
@@ -98,6 +152,7 @@ export function removeSketchPage(data: SketchData, pageId: string): SketchData {
     pages: nextPages,
     activePageId: nextActivePageId,
     canvasHeight: getCanvasHeightFromPages(nextPages),
+    strokes: shiftStrokesAtOrAfter(data.strokes, target.y + target.height, -target.height),
   };
 }
 
@@ -143,6 +198,14 @@ function createPage(id: string, index: number, width: number, height: number): S
   };
 }
 
+function createNextPageId(pages: SketchPage[]): string {
+  const maxPageNumber = pages.reduce((max, page) => {
+    const match = /^page-(\d+)$/.exec(page.id);
+    return match ? Math.max(max, Number(match[1])) : max;
+  }, 0);
+  return `page-${maxPageNumber + 1}`;
+}
+
 function normalizePages(pages: SketchPage[], canvasWidth: number): SketchPage[] {
   let y = 0;
   return pages.map((page, index) => {
@@ -173,4 +236,33 @@ function pageHasContent(page: SketchPage, strokes: Stroke[]): boolean {
       point.y >= page.y && point.y <= page.y + page.height,
     ),
   );
+}
+
+function getStrokesInPage(strokes: Stroke[], page: SketchPage): Stroke[] {
+  return strokes.filter((stroke) =>
+    stroke.points.some((point) => point.y >= page.y && point.y <= page.y + page.height),
+  );
+}
+
+function shiftStrokesAtOrAfter(strokes: Stroke[], y: number, dy: number): Stroke[] {
+  return strokes.map((stroke) => {
+    if (!stroke.points.some((point) => point.y >= y)) return stroke;
+    return shiftStroke(stroke, dy);
+  });
+}
+
+function shiftStroke(stroke: Stroke, dy: number): Stroke {
+  return {
+    ...stroke,
+    points: stroke.points.map((point) => ({
+      ...point,
+      y: point.y + dy,
+    })),
+    bounds: stroke.bounds
+      ? {
+          ...stroke.bounds,
+          y: stroke.bounds.y + dy,
+        }
+      : undefined,
+  };
 }

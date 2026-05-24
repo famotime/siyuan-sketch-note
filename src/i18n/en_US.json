@@ -59,5 +59,8 @@
   "statusError": "Error",
   "dataRecovered": "Recovered damaged data",
   "page": "Page",
-  "addPage": "Add Page"
+  "addPage": "Add Page",
+  "duplicatePage": "Duplicate Page",
+  "deletePage": "Delete Page",
+  "deletePageFailed": "Current page still has content and cannot be deleted"
 }

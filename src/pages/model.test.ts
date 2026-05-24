@@ -4,7 +4,9 @@ import {
   addSketchPage,
   createPageNavigator,
   createPagedSketchData,
+  duplicateSketchPage,
   getSketchPages,
+  insertSketchPageAfter,
   removeSketchPage,
 } from "./model";
 
@@ -115,5 +117,75 @@ describe("page model", () => {
     expect(createPageNavigator(data).goToIndex(99).activePageId).toBe("page-3");
     expect(createPageNavigator(data).goToPrevious().activePageId).toBe("page-2");
     expect(createPageNavigator(data).goToNext().activePageId).toBe("page-3");
+  });
+
+  it("inserts a blank page after the active page and shifts following page content", () => {
+    const data = addSketchPage(addSketchPage(createPagedSketchData({
+      template: "blank",
+      canvasWidth: 800,
+      pageHeight: 1000,
+    })));
+    data.activePageId = "page-1";
+    data.strokes = [stroke("third-page", 2120)];
+
+    const next = insertSketchPageAfter(data, "page-1");
+
+    expect(next.activePageId).toBe("page-4");
+    expect(next.canvasHeight).toBe(4000);
+    expect(next.pages?.map((page) => ({ id: page.id, index: page.index, y: page.y }))).toEqual([
+      { id: "page-1", index: 0, y: 0 },
+      { id: "page-4", index: 1, y: 1000 },
+      { id: "page-2", index: 2, y: 2000 },
+      { id: "page-3", index: 3, y: 3000 },
+    ]);
+    expect(next.strokes[0].points.map((point) => point.y)).toEqual([3120, 3160]);
+  });
+
+  it("duplicates a page with its strokes shifted into the inserted copy", () => {
+    const data = addSketchPage(createPagedSketchData({
+      template: "blank",
+      canvasWidth: 800,
+      pageHeight: 1000,
+    }));
+    data.activePageId = "page-1";
+    data.strokes = [
+      stroke("first-page", 120),
+      stroke("second-page", 1120),
+    ];
+
+    const next = duplicateSketchPage(data, "page-1", (id) => `copy-${id}`);
+
+    expect(next.activePageId).toBe("page-3");
+    expect(next.pages?.map((page) => ({ id: page.id, y: page.y }))).toEqual([
+      { id: "page-1", y: 0 },
+      { id: "page-3", y: 1000 },
+      { id: "page-2", y: 2000 },
+    ]);
+    expect(next.strokes.map((item) => ({
+      id: item.id,
+      y: item.points[0].y,
+    }))).toEqual([
+      { id: "first-page", y: 120 },
+      { id: "second-page", y: 2120 },
+      { id: "copy-first-page", y: 1120 },
+    ]);
+  });
+
+  it("removes an empty middle page and shifts following content upward", () => {
+    const data = addSketchPage(addSketchPage(createPagedSketchData({
+      template: "blank",
+      canvasWidth: 800,
+      pageHeight: 1000,
+    })));
+    data.strokes = [stroke("third-page", 2120)];
+
+    const next = removeSketchPage(data, "page-2");
+
+    expect(next.canvasHeight).toBe(2000);
+    expect(next.pages?.map((page) => ({ id: page.id, y: page.y }))).toEqual([
+      { id: "page-1", y: 0 },
+      { id: "page-3", y: 1000 },
+    ]);
+    expect(next.strokes[0].points.map((point) => point.y)).toEqual([1120, 1160]);
   });
 });

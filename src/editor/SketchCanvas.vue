@@ -89,7 +89,9 @@ import type { RulerState } from "@/tools/ruler";
 import {
   addSketchPage,
   createPageNavigator,
+  duplicateSketchPage,
   getSketchPages,
+  removeSketchPage,
 } from "@/pages/model";
 import { isShapeEditorTool } from "./tools";
 import type { EditorTool } from "./tools";
@@ -725,6 +727,45 @@ function addPage() {
   emit("stroke");
   scrollActivePageIntoView();
 }
+function duplicateCurrentPage() {
+  const current = createPageNavigator(serializeState(state)).current;
+  if (!current) return;
+  const next = duplicateSketchPage(serializeState(state), current.id);
+  pushHistorySnapshot(state);
+  restorePageState(next);
+  updateUndoRedoState();
+  emitPageState();
+  emit("stroke");
+  scrollActivePageIntoView();
+}
+function deleteCurrentPage(): boolean {
+  const before = serializeState(state);
+  const current = createPageNavigator(before).current;
+  if (!current) return false;
+  let next: SketchData;
+  try {
+    next = removeSketchPage(before, current.id);
+  } catch {
+    return false;
+  }
+  if (next === before) return false;
+  pushHistorySnapshot(state);
+  restorePageState(next);
+  updateUndoRedoState();
+  emitPageState();
+  emit("stroke");
+  scrollActivePageIntoView();
+  return true;
+}
+function restorePageState(data: SketchData) {
+  state.pageMode = data.pageMode;
+  state.pages = data.pages ?? getSketchPages(data);
+  state.activePageId = data.activePageId;
+  state.canvasHeight = data.canvasHeight;
+  state.strokes = data.strokes;
+  state.isDirty = true;
+  resizeCanvases(bgCanvasRef.value!, strokeCanvasRef.value!, state);
+}
 function goToPage(index: number) {
   const next = createPageNavigator(serializeState(state)).goToIndex(index);
   state.activePageId = next.activePageId;
@@ -843,6 +884,8 @@ defineExpose({
   recolorLasso,
   rotateRulerBy,
   addPage,
+  duplicateCurrentPage,
+  deleteCurrentPage,
   goToPage,
   goToPreviousPage,
   goToNextPage,

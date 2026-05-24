@@ -31,6 +31,15 @@
             class="sketch-btn sketch-btn--page-add"
             @click="canvasRef?.addPage()"
           >+ {{ t("addPage") }}</button>
+          <button
+            class="sketch-btn sketch-btn--page-add"
+            @click="canvasRef?.duplicateCurrentPage()"
+          >⧉ {{ t("duplicatePage") }}</button>
+          <button
+            class="sketch-btn sketch-btn--page-add"
+            :disabled="pageState.total <= 1"
+            @click="deleteCurrentPage"
+          >⌫ {{ t("deletePage") }}</button>
         </div>
         <span class="sketch-spacer" />
         <button
@@ -451,6 +460,13 @@ function exportJson() {
 
 function triggerJsonImport() {
   jsonInputRef.value?.click();
+}
+
+function deleteCurrentPage() {
+  const removed = canvasRef.value?.deleteCurrentPage();
+  if (!removed) {
+    showMessage(t("deletePageFailed"), 4000, "error");
+  }
 }
 
 async function onJsonSelected(event: Event) {
