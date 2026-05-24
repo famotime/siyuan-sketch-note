@@ -54,6 +54,26 @@
           :class="{ 'sketch-btn--tool-active': activeTool === 'eraser' }"
           @click="activeTool = 'eraser'"
         >🧹 {{ t("eraser") }}</button>
+        <button
+          class="sketch-btn sketch-btn--tool"
+          :class="{ 'sketch-btn--tool-active': activeTool === 'line' }"
+          @click="activeTool = 'line'"
+        >／ {{ t("line") }}</button>
+        <button
+          class="sketch-btn sketch-btn--tool"
+          :class="{ 'sketch-btn--tool-active': activeTool === 'rectangle' }"
+          @click="activeTool = 'rectangle'"
+        >□ {{ t("rectangle") }}</button>
+        <button
+          class="sketch-btn sketch-btn--tool"
+          :class="{ 'sketch-btn--tool-active': activeTool === 'ellipse' }"
+          @click="activeTool = 'ellipse'"
+        >○ {{ t("ellipse") }}</button>
+        <button
+          class="sketch-btn sketch-btn--tool"
+          :class="{ 'sketch-btn--tool-active': activeTool === 'ruler' }"
+          @click="activeTool = 'ruler'"
+        >▤ {{ t("ruler") }}</button>
         <div class="sketch-tool-options">
           <label class="sketch-range">
             <span>{{ t("width") }}</span>
@@ -104,7 +124,7 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted } from "vue";
-import type { SketchData, SketchTool, ToolPreset } from "@/types/sketch";
+import type { SketchData, ToolPreset } from "@/types/sketch";
 import { PRESET_COLORS } from "@/types/sketch";
 import { getAllTemplates } from "@/template";
 import { thumbnailCanvas } from "@/storage/thumbnail";
@@ -113,6 +133,8 @@ import { sketchAssetFileName, uploadDataUrlToAssets } from "@/utils/uploadPng";
 import { normalizeToolPresets, updateToolPreset } from "@/tools/presets";
 import { createExportPngFileName, dataUrlToBlob, downloadBlob } from "@/export/png";
 import { SaveQueue } from "@/storage/saveQueue";
+import { getDrawingToolForEditorTool } from "./tools";
+import type { EditorTool } from "./tools";
 import SketchCanvas from "./SketchCanvas.vue";
 
 type SaveStatus = "idle" | "saving" | "saved" | "error" | "dirty";
@@ -131,7 +153,7 @@ function t(key: string): string { return props.i18n[key] ?? key; }
 const colors = PRESET_COLORS;
 const visible = ref(false);
 const canvasRef = ref<InstanceType<typeof SketchCanvas>>();
-const activeTool = ref<SketchTool>("pen");
+const activeTool = ref<EditorTool>("pen");
 const activeColor = ref(PRESET_COLORS[0]);
 const toolPresets = ref(normalizeToolPresets(props.initialData?.toolPresets));
 const canUndo = ref(false);
@@ -155,7 +177,7 @@ const statusLabel = computed(() => {
   }
 });
 
-const activePreset = computed(() => toolPresets.value[activeTool.value]);
+const activePreset = computed(() => toolPresets.value[getDrawingToolForEditorTool(activeTool.value)]);
 
 onMounted(() => {
   visible.value = true;
@@ -178,7 +200,7 @@ function selectColor(c: string) {
 }
 
 function updateActivePreset(patch: Partial<Omit<ToolPreset, "tool">>) {
-  toolPresets.value = updateToolPreset(toolPresets.value, activeTool.value, patch);
+  toolPresets.value = updateToolPreset(toolPresets.value, getDrawingToolForEditorTool(activeTool.value), patch);
 }
 
 function toggleAutoSave() {

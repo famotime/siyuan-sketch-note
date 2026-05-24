@@ -1,4 +1,5 @@
 import type { Bounds, Transform } from "./model";
+import type { Stroke, StrokePoint, ToolPreset } from "@/types/sketch";
 
 export interface Point {
   x: number;
@@ -96,4 +97,76 @@ export function createEllipseShape(
 
 export function getShapeBounds(shape: ShapeElement): Bounds {
   return boundsFromPoints(shape.start, shape.end, shape.style.width);
+}
+
+function strokePoint(point: Point, timestamp: number): StrokePoint {
+  return {
+    x: point.x,
+    y: point.y,
+    pressure: 0.5,
+    timestamp,
+  };
+}
+
+function createShapeStroke(
+  id: string,
+  points: Point[],
+  preset: ToolPreset,
+): Stroke {
+  return {
+    id,
+    points: points.map((point, index) => strokePoint(point, index)),
+    color: preset.color,
+    width: preset.width,
+    opacity: preset.opacity,
+    tool: "pen",
+  };
+}
+
+export function createLineStroke(
+  id: string,
+  start: Point,
+  end: Point,
+  preset: ToolPreset,
+): Stroke {
+  return createShapeStroke(id, [start, end], preset);
+}
+
+export function createRectangleStroke(
+  id: string,
+  start: Point,
+  end: Point,
+  preset: ToolPreset,
+): Stroke {
+  return createShapeStroke(id, [
+    start,
+    { x: end.x, y: start.y },
+    end,
+    { x: start.x, y: end.y },
+    start,
+  ], preset);
+}
+
+export function createEllipseStroke(
+  id: string,
+  start: Point,
+  end: Point,
+  preset: ToolPreset,
+): Stroke {
+  const center = {
+    x: (start.x + end.x) / 2,
+    y: (start.y + end.y) / 2,
+  };
+  const radiusX = Math.abs(end.x - start.x) / 2;
+  const radiusY = Math.abs(end.y - start.y) / 2;
+  const points: Point[] = [];
+  const steps = 32;
+  for (let i = 0; i <= steps; i++) {
+    const angle = (i / steps) * Math.PI * 2;
+    points.push({
+      x: center.x + Math.cos(angle) * radiusX,
+      y: center.y + Math.sin(angle) * radiusY,
+    });
+  }
+  return createShapeStroke(id, points, preset);
 }
