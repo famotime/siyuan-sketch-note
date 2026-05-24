@@ -97,6 +97,7 @@ import {
 import { shouldDrawFromPointer } from "./inputMode";
 import type { SketchInputSettings } from "./inputMode";
 import { createInsertElementPosition } from "./insertPosition";
+import type { OcrSearchResult } from "@/search/ocrIndex";
 import { isShapeEditorTool } from "./tools";
 import type { EditorTool } from "./tools";
 
@@ -890,6 +891,32 @@ async function insertImage(src: string) {
   updateUndoRedoState();
 }
 
+function highlightSearchResult(result: OcrSearchResult) {
+  if (!result.localBounds && !result.bounds) return;
+
+  if (result.pageNumber != null) {
+    const nav = createPageNavigator(serializeState(state)).goToIndex(result.pageNumber - 1);
+    state.activePageId = nav.activePageId;
+    emitPageState();
+  }
+
+  fullRedrawStrokeCanvas(getCanvas(), state);
+
+  const bounds = result.localBounds ?? result.bounds;
+  const ctx = getCanvas().getContext("2d")!;
+  const pad = 4;
+  ctx.save();
+  ctx.fillStyle = "rgba(255, 213, 79, 0.35)";
+  ctx.strokeStyle = "rgba(255, 152, 0, 0.8)";
+  ctx.lineWidth = 2;
+  ctx.setLineDash([]);
+  ctx.fillRect(bounds.x - pad, bounds.y - pad, bounds.width + pad * 2, bounds.height + pad * 2);
+  ctx.strokeRect(bounds.x - pad, bounds.y - pad, bounds.width + pad * 2, bounds.height + pad * 2);
+  ctx.restore();
+
+  scrollActivePageIntoView();
+}
+
 defineExpose({
   doUndo,
   doRedo,
@@ -900,6 +927,7 @@ defineExpose({
   insertText,
   insertImage,
   restoreData,
+  highlightSearchResult,
   deleteLassoSelection,
   duplicateLassoSelection,
   recolorLasso,

@@ -6,10 +6,12 @@
         :autoSave="autoSave"
         :backgroundFit="activeCustomBackground?.fit"
         :exportIncludeBackground="exportIncludeBackground"
+        :ocrState="ocrState"
         :pageOverview="pageOverview"
         :pageState="pageState"
         :recovered="Boolean(loadedData?.recovery?.recovered)"
         :saveStatus="saveStatus"
+        :searchResultCount="searchResults.length"
         :statusLabel="statusLabel"
         :stylusOnly="inputSettings.stylusOnly"
         :t="t"
@@ -17,6 +19,7 @@
         @addPage="canvasRef?.addPage()"
         @back="goBack"
         @backgroundFitChange="onBackgroundFitChange"
+        @clearSearch="onClearSearch"
         @deletePage="deleteCurrentPage"
         @duplicatePage="canvasRef?.duplicateCurrentPage()"
         @exportJson="exportJson"
@@ -27,7 +30,11 @@
         @importJson="triggerJsonImport"
         @nextPage="canvasRef?.goToNextPage()"
         @previousPage="canvasRef?.goToPreviousPage()"
+        @recognize="recognizeText"
         @save="manualSave"
+        @search="onSearch"
+        @searchNext="onSearchNext"
+        @searchPrev="onSearchPrev"
         @toggleAutoSave="toggleAutoSave"
         @toggleExportBackground="exportIncludeBackground = !exportIncludeBackground"
         @toggleStylusOnly="toggleStylusOnly"
@@ -121,6 +128,10 @@ import { getFirstImageFileFromClipboard } from "./clipboard";
 import { resolveEditorShortcut } from "./shortcuts";
 import { getDrawingToolForEditorTool } from "./tools";
 import type { EditorTool } from "./tools";
+import type { OcrProvider } from "@/search/ocrProvider";
+import { createNoopOcrProvider } from "@/search/ocrProvider";
+import { createPageAwareOcrIndex, searchOcrIndex } from "@/search/ocrIndex";
+import type { OcrSearchResult } from "@/search/ocrIndex";
 import EditorTopBar from "./EditorTopBar.vue";
 import SketchCanvas from "./SketchCanvas.vue";
 import ToolBar from "./ToolBar.vue";
@@ -130,6 +141,7 @@ const props = defineProps<{
   initialData: SketchData | null;
   i18n: Record<string, string>;
   saveData: (key: string, data: any) => Promise<void>;
+  ocrProvider?: OcrProvider;
 }>();
 
 const emit = defineEmits<{ (e: "close"): void }>();
@@ -162,6 +174,11 @@ const saveStatus = ref<SaveStatus>("idle");
 const lastSavedAt = ref<number | null>(null);
 const autoSave = ref(true);
 const exportIncludeBackground = ref(true);
+
+const ocrState = ref<"idle" | "recognizing" | "completed" | "error">("idle");
+const ocrIndex = ref<SketchData["ocrIndex"]>(props.initialData?.ocrIndex ?? undefined);
+const searchResults = ref<OcrSearchResult[]>([]);
+const searchResultIndex = ref(0);
 
 let autoSaveTimer: ReturnType<typeof setTimeout> | null = null;
 const saveQueue = new SaveQueue();
@@ -272,6 +289,9 @@ async function runSave(): Promise<boolean> {
   data.inputSettings = inputSettings.value;
   data.customBackgrounds = customBackgrounds.value;
   data.recentColors = recentColors.value;
+  if (ocrIndex.value) {
+    data.ocrIndex = ocrIndex.value;
+  }
   delete data.recovery;
 
   let pngDataUrl: string;
@@ -301,6 +321,79 @@ async function runSave(): Promise<boolean> {
 async function manualSave() {
   if (autoSaveTimer) { clearTimeout(autoSaveTimer); autoSaveTimer = null; }
   await doSave();
+}
+
+// ─── OCR & Search ───
+
+async function recognizeText() {
+  if (!canvasRef.value) return;
+  const provider = props.ocrProvider ?? createNoopOcrProvider();
+
+  ocrState.value = "recognizing";
+  try {
+    const data = canvasRef.value.getData();
+    data.template = currentTemplate.value;
+    const plan = createCurrentPagePngExportPlan(props.blockId, data);
+    const pngDataUrl = await renderSketchPngPageImage(data, plan, false);
+    const blob = dataUrlToBlob(pngDataUrl);
+
+    const lines = await provider({
+      imageBlob: blob,
+      canvasWidth: data.canvasWidth,
+      canvasHeight: data.canvasHeight,
+    });
+
+    if (lines.length === 0) {
+      ocrState.value = "completed";
+      return;
+    }
+
+    ocrIndex.value = createPageAwareOcrIndex(props.blockId, lines, data);
+
+    markDirty();
+    if (autoSave.value) scheduleAutoSave();
+
+    ocrState.value = "completed";
+  } catch (e) {
+    console.error("[Sketch Note] OCR failed:", e);
+    ocrState.value = "error";
+  }
+}
+
+function onSearch(query: string) {
+  if (!ocrIndex.value || !query.trim()) {
+    searchResults.value = [];
+    searchResultIndex.value = 0;
+    return;
+  }
+  searchResults.value = searchOcrIndex(ocrIndex.value, query);
+  searchResultIndex.value = 0;
+  if (searchResults.value.length > 0) {
+    navigateToSearchResult(0);
+  }
+}
+
+function onSearchNext() {
+  if (searchResults.value.length === 0) return;
+  searchResultIndex.value = (searchResultIndex.value + 1) % searchResults.value.length;
+  navigateToSearchResult(searchResultIndex.value);
+}
+
+function onSearchPrev() {
+  if (searchResults.value.length === 0) return;
+  searchResultIndex.value = (searchResultIndex.value - 1 + searchResults.value.length) % searchResults.value.length;
+  navigateToSearchResult(searchResultIndex.value);
+}
+
+function navigateToSearchResult(index: number) {
+  const result = searchResults.value[index];
+  if (!result || !canvasRef.value) return;
+  canvasRef.value.highlightSearchResult(result);
+}
+
+function onClearSearch() {
+  searchResults.value = [];
+  searchResultIndex.value = 0;
 }
 
 async function exportPng() {

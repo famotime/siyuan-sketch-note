@@ -71,5 +71,10 @@
   "addPage": "加页",
   "duplicatePage": "复制页",
   "deletePage": "删页",
-  "deletePageFailed": "当前页仍有内容，无法删除"
+  "deletePageFailed": "当前页仍有内容，无法删除",
+  "ocrRecognize": "识别文字",
+  "ocrRecognizing": "识别中…",
+  "search": "搜索",
+  "searchPlaceholder": "搜索手写内容…",
+  "noResults": "无结果"
 }

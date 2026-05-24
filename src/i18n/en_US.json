@@ -71,5 +71,10 @@
   "addPage": "Add Page",
   "duplicatePage": "Duplicate Page",
   "deletePage": "Delete Page",
-  "deletePageFailed": "Current page still has content and cannot be deleted"
+  "deletePageFailed": "Current page still has content and cannot be deleted",
+  "ocrRecognize": "Recognize Text",
+  "ocrRecognizing": "Recognizing…",
+  "search": "Search",
+  "searchPlaceholder": "Search handwriting…",
+  "noResults": "No results"
 }

@@ -210,22 +210,21 @@
 **Files:**
 - Create: `src/search/ocrProvider.ts`
 - Create: `src/search/ocrProvider.test.ts`
-- Modify: `src/search/ocrIndex.ts`
 - Modify: `src/editor/SketchEditor.vue`
 - Modify: `src/editor/SketchCanvas.vue`
-- Modify: `src/storage/index.ts`
+- Modify: `src/editor/EditorTopBar.vue`
 - Modify: `src/i18n/zh_CN.json`
 - Modify: `src/i18n/en_US.json`
 - Modify: `README.md`
 
-- [ ] 设计 OCR provider 接口，默认本地空 provider，不上传用户数据。
-- [ ] 增加“识别当前页文字”入口和识别状态。
-- [ ] 将 OCR 结果保存到 `SketchData.ocrIndex`。
-- [ ] 提供手写块内搜索和结果页内定位。
-- [ ] 评估将识别文本写入思源块属性或伴随隐藏文本的方案。
-- [ ] 增加隐私提示、失败处理和测试。
-- [ ] 运行 `pnpm test` 和 `pnpm build`。
-- [ ] 提交：`feat: 增加手写 OCR 搜索闭环基础`。
+- [x] 设计 OCR provider 接口，默认本地空 provider，不上传用户数据。
+- [x] 增加”识别当前页文字”入口和识别状态。
+- [x] 将 OCR 结果保存到 `SketchData.ocrIndex`。
+- [x] 提供手写块内搜索和结果页内定位。
+- [x] 评估将识别文本写入思源块属性或伴随隐藏文本的方案。
+- [x] 增加隐私提示、失败处理和测试。
+- [x] 运行 `pnpm test` 和 `pnpm build`。
+- [x] 提交：`feat: 增加手写 OCR 搜索闭环基础`。
 
 ## Batch 10: 富文本、图片裁剪与 PDF 标注入口
 

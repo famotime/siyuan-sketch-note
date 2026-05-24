@@ -26,6 +26,7 @@
 - PDF 导出：按画布高度自动分页导出多页 PDF，可选择是否包含背景模板
 - JSON 备份/恢复：可导出并重新导入手写块源数据，便于迁移、诊断和恢复
 - 搜索基础：预留 OCR 文本索引结构，可按识别文本定位到手写块与具体页面
+- OCR 文字识别（实验性）：支持识别当前页手写文字，识别后可在块内搜索定位，隐私优先，默认不发送用户数据
 - 性能基础：笔迹保存时预计算边界，便于后续局部重绘、检索和大文档优化
 - DPI 适配：高分屏（iPad Retina 等）笔迹清晰
 - 明暗主题：跟随思源笔记主题
@@ -39,6 +40,26 @@
 4. 点击文档中的缩略图可再次编辑
 
 编辑器内可使用 `Ctrl/Cmd+S` 保存，`Ctrl/Cmd+Z` 撤销，`Ctrl/Cmd+Shift+Z` 或 `Ctrl/Cmd+Y` 重做，数字键 `1` 到 `7` 切换画笔、荧光笔、橡皮、套索、尺子、箭头和三角形。
+
+### OCR 文字识别（实验性）
+
+手写笔记支持 OCR 识别手写文字。该功能**隐私优先**：默认 provider 不发送任何数据到外部服务。
+
+1. 在手写编辑器中书写内容
+2. 点击顶栏「识别文字」按钮，等待识别完成
+3. 点击「搜索」按钮，输入关键词即可在手写内容中搜索
+4. 搜索结果会高亮显示并自动跳转到对应页面
+
+如需接入真实 OCR 引擎，可通过 `ocrProvider` 属性注入自定义 provider：
+
+```ts
+import type { OcrProvider } from "siyuan-sketch-note/src/search/ocrProvider";
+
+const myProvider: OcrProvider = async (input) => {
+  // 将 input.imageBlob 发送到你的 OCR 服务
+  // 返回 OcrLine[]，包含 text、confidence 和 bounds
+};
+```
 
 ## 开发
 
