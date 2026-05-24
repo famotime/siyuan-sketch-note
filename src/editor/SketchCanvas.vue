@@ -60,7 +60,10 @@ import {
   moveElement,
   resizeElementFromCorner,
 } from "@/elements/transform";
-import { findElementsInLasso } from "@/elements/lasso";
+import {
+  findElementsInBoxSelection,
+  findElementsInLasso,
+} from "@/elements/lasso";
 import type { Point as LassoPoint } from "@/elements/lasso";
 import {
   duplicateLassoSelection as duplicateLassoElements,
@@ -91,6 +94,7 @@ const props = defineProps<{
   tool: EditorTool;
   toolPresets: ToolPresetCollection;
   templateId: string;
+  lassoMode: "freehand" | "box";
 }>();
 
 const emit = defineEmits<{
@@ -118,6 +122,10 @@ let elementTransform: {
 let selectedElementId: string | null = null;
 let lassoPath: LassoPoint[] = [];
 let selectedLassoIds: string[] = [];
+let lassoBox: {
+  start: LassoPoint;
+  current: LassoPoint;
+} | null = null;
 let lassoMove: {
   lastPoint: StrokePoint;
 } | null = null;
@@ -236,10 +244,21 @@ function onPointerDown(e: PointerEvent) {
       pushHistorySnapshot(state);
       return;
     }
-    lassoPath = [point];
+    if (props.lassoMode === "box") {
+      lassoBox = {
+        start: point,
+        current: point,
+      };
+    } else {
+      lassoPath = [point];
+    }
     selectedLassoIds = [];
     fullRedrawStrokeCanvas(getCanvas(), state);
-    drawLassoPath();
+    if (props.lassoMode === "box") {
+      drawLassoBox();
+    } else {
+      drawLassoPath();
+    }
     return;
   }
   if (props.tool === "image") {
@@ -345,6 +364,12 @@ function onPointerMove(e: PointerEvent) {
       drawLassoPath();
       return;
     }
+    if (lassoBox) {
+      lassoBox.current = point;
+      fullRedrawStrokeCanvas(getCanvas(), state);
+      drawLassoBox();
+      return;
+    }
   }
   if (imageTransform) {
     const point = eventPoint(e);
@@ -412,6 +437,19 @@ function onPointerUp(e: PointerEvent) {
     if (lassoPath.length > 0) {
       selectedLassoIds = findElementsInLasso(getSelectableElements(), lassoPath).map((element) => element.id);
       lassoPath = [];
+      fullRedrawStrokeCanvas(getCanvas(), state);
+      drawLassoSelectionOutline();
+      updateUndoRedoState();
+      return;
+    }
+    if (lassoBox) {
+      selectedLassoIds = findElementsInBoxSelection(getSelectableElements(), {
+        x: lassoBox.start.x,
+        y: lassoBox.start.y,
+        width: lassoBox.current.x - lassoBox.start.x,
+        height: lassoBox.current.y - lassoBox.start.y,
+      }).map((element) => element.id);
+      lassoBox = null;
       fullRedrawStrokeCanvas(getCanvas(), state);
       drawLassoSelectionOutline();
       updateUndoRedoState();
@@ -509,6 +547,23 @@ function drawLassoPath() {
   ctx.restore();
 }
 
+function drawLassoBox() {
+  if (!lassoBox) return;
+  const x = Math.min(lassoBox.start.x, lassoBox.current.x);
+  const y = Math.min(lassoBox.start.y, lassoBox.current.y);
+  const width = Math.abs(lassoBox.current.x - lassoBox.start.x);
+  const height = Math.abs(lassoBox.current.y - lassoBox.start.y);
+  const ctx = getCanvas().getContext("2d")!;
+  ctx.save();
+  ctx.strokeStyle = "#2f80ed";
+  ctx.lineWidth = 1.5;
+  ctx.setLineDash([7, 5]);
+  ctx.strokeRect(x, y, width, height);
+  ctx.fillStyle = "rgba(47, 128, 237, 0.08)";
+  ctx.fillRect(x, y, width, height);
+  ctx.restore();
+}
+
 function drawLassoSelectionOutline() {
   const selected = getSelectableElements().filter((element) => selectedLassoIds.includes(element.id));
   if (selected.length === 0) return;
@@ -590,6 +645,7 @@ function clearInteractionState() {
   elementTransform = null;
   selectedElementId = null;
   lassoPath = [];
+  lassoBox = null;
   selectedLassoIds = [];
   lassoMove = null;
   lassoResize = null;

@@ -181,6 +181,13 @@
               <option value="stroke">{{ t("eraserModeStroke") }}</option>
             </select>
           </label>
+          <label v-if="activeTool === 'lasso'" class="sketch-mode">
+            <span>{{ t("lassoMode") }}</span>
+            <select v-model="lassoMode">
+              <option value="freehand">{{ t("lassoModeFreehand") }}</option>
+              <option value="box">{{ t("lassoModeBox") }}</option>
+            </select>
+          </label>
         </div>
         <span class="sketch-sep" />
         <button
@@ -212,6 +219,7 @@
         :tool="activeTool"
         :toolPresets="toolPresets"
         :templateId="currentTemplate"
+        :lassoMode="lassoMode"
         @update:canUndo="canUndo = $event"
         @update:canRedo="canRedo = $event"
         @heightChanged="onHeightChanged"
@@ -262,6 +270,7 @@ const canvasRef = ref<InstanceType<typeof SketchCanvas>>();
 const imageInputRef = ref<HTMLInputElement>();
 const jsonInputRef = ref<HTMLInputElement>();
 const activeTool = ref<EditorTool>("pen");
+const lassoMode = ref<"freehand" | "box">("freehand");
 const activeColor = ref(PRESET_COLORS[0]);
 const toolPresets = ref(normalizeToolPresets(props.initialData?.toolPresets));
 const recentColors = ref(normalizeRecentColors(props.initialData?.recentColors));

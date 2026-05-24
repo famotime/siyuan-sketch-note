@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 import type { SketchElement } from "./model";
-import { findElementsInLasso } from "./lasso";
+import {
+  findElementsInBoxSelection,
+  findElementsInLasso,
+} from "./lasso";
 
 const elements: SketchElement[] = [
   {
@@ -56,5 +59,16 @@ describe("lasso selection", () => {
       { x: 0, y: 0 },
       { x: 40, y: 0 },
     ])).toEqual([]);
+  });
+
+  it("selects elements whose center point is inside a rectangular box", () => {
+    const selected = findElementsInBoxSelection(elements, {
+      x: 40,
+      y: 40,
+      width: -40,
+      height: -40,
+    });
+
+    expect(selected.map((element) => element.id)).toEqual(["inside"]);
   });
 });
