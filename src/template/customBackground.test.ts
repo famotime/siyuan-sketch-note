@@ -5,6 +5,7 @@ import {
   getCustomBackgroundTemplate,
   getCustomBackgroundSource,
   isCustomBackgroundTemplateId,
+  updateCustomBackgroundFit,
 } from "./customBackground";
 
 describe("custom background templates", () => {
@@ -59,6 +60,29 @@ describe("custom background templates", () => {
       customBackgrounds: [background],
       strokes: [],
     })).toEqual(background);
+  });
+
+  it("updates the fit mode of a custom background", () => {
+    const backgrounds = [
+      createCustomBackgroundTemplate("bg-1", "data:image/png;base64,AAA"),
+      createCustomBackgroundTemplate("bg-2", "data:image/png;base64,BBB"),
+    ];
+
+    expect(updateCustomBackgroundFit(backgrounds, "custom:bg-1", "contain")).toEqual([
+      {
+        ...backgrounds[0],
+        fit: "contain",
+      },
+      backgrounds[1],
+    ]);
+  });
+
+  it("keeps custom backgrounds unchanged when updating a missing id", () => {
+    const backgrounds = [
+      createCustomBackgroundTemplate("bg-1", "data:image/png;base64,AAA"),
+    ];
+
+    expect(updateCustomBackgroundFit(backgrounds, "custom:missing", "stretch")).toBe(backgrounds);
   });
 
   it("stretches custom backgrounds to the target page", () => {

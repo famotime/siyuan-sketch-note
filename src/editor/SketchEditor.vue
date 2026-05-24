@@ -7,6 +7,16 @@
         <select class="sketch-select" v-model="currentTemplate">
           <option v-for="tpl in templates" :key="tpl.id" :value="tpl.id">{{ t(tpl.nameKey) }}</option>
         </select>
+        <select
+          v-if="activeCustomBackground"
+          class="sketch-select"
+          :value="activeCustomBackground.fit"
+          @change="onBackgroundFitChange(($event.target as HTMLSelectElement).value)"
+        >
+          <option value="cover">{{ t("backgroundFitCover") }}</option>
+          <option value="contain">{{ t("backgroundFitContain") }}</option>
+          <option value="stretch">{{ t("backgroundFitStretch") }}</option>
+        </select>
         <span class="sketch-editor__title">{{ t("sketchNote") }}</span>
         <span
           v-if="loadedData?.recovery?.recovered"
@@ -297,7 +307,8 @@ import { SaveQueue } from "@/storage/saveQueue";
 import { createSaveStatusLabel } from "@/storage/saveStatus";
 import type { SaveStatus } from "@/storage/saveStatus";
 import { normalizeInputSettings } from "./inputMode";
-import { createCustomBackgroundTemplate } from "@/template/customBackground";
+import { createCustomBackgroundTemplate, getCustomBackgroundTemplate, updateCustomBackgroundFit } from "@/template/customBackground";
+import type { CustomBackgroundTemplate } from "@/template/customBackground";
 import {
   addRecentColor,
   normalizeRecentColors,
@@ -352,6 +363,10 @@ const statusLabel = computed(() => createSaveStatusLabel(saveStatus.value, t, la
 
 const activePreset = computed(() => toolPresets.value[getDrawingToolForEditorTool(activeTool.value)]);
 const colors = computed(() => recentColors.value);
+const activeCustomBackground = computed(() => getCustomBackgroundTemplate({
+  template: currentTemplate.value,
+  customBackgrounds: customBackgrounds.value,
+}));
 
 onMounted(() => {
   visible.value = true;
@@ -513,6 +528,23 @@ function triggerJsonImport() {
 
 function triggerBackgroundImport() {
   backgroundInputRef.value?.click();
+}
+
+async function onBackgroundFitChange(value: string) {
+  if (!canvasRef.value || !activeCustomBackground.value) return;
+  const fit = value as CustomBackgroundTemplate["fit"];
+  customBackgrounds.value = updateCustomBackgroundFit(
+    customBackgrounds.value,
+    activeCustomBackground.value.id,
+    fit,
+  );
+  loadedData.value = {
+    ...(canvasRef.value.getData()),
+    template: currentTemplate.value,
+    customBackgrounds: customBackgrounds.value,
+  };
+  await canvasRef.value.restoreData(loadedData.value);
+  onStroke();
 }
 
 function deleteCurrentPage() {

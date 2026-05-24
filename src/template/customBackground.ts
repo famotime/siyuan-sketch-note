@@ -46,6 +46,15 @@ export function getCustomBackgroundSource(data: Pick<SketchData, "customBackgrou
   return getCustomBackgroundTemplate(data)?.src ?? null;
 }
 
+export function updateCustomBackgroundFit(
+  backgrounds: CustomBackgroundTemplate[],
+  id: string,
+  fit: CustomBackgroundTemplate["fit"],
+): CustomBackgroundTemplate[] {
+  if (!backgrounds.some((item) => item.id === id)) return backgrounds;
+  return backgrounds.map((item) => item.id === id ? { ...item, fit } : item);
+}
+
 export function getCustomBackgroundDrawRect(options: {
   imageWidth: number;
   imageHeight: number;
