@@ -6,6 +6,7 @@ import {
 import { getTemplate } from "@/template";
 import { normalizeToolPresets } from "@/tools/presets";
 import { migrateStrokesToElements } from "@/elements/model";
+import type { SketchElement } from "@/elements/model";
 import {
   filterStrokePointsByDistance,
   getPressureWidth,
@@ -20,6 +21,7 @@ function newId(): string {
 
 export interface EngineState {
   strokes: Stroke[];
+  elements: SketchElement[];
   currentStroke: Stroke | null;
   undoStack: Stroke[][];
   redoStack: Stroke[][];
@@ -38,6 +40,7 @@ export function createEngineState(
 ): EngineState {
   return {
     strokes: [],
+    elements: [],
     currentStroke: null,
     undoStack: [],
     redoStack: [],
@@ -53,6 +56,7 @@ export function createEngineState(
 export function restoreEngineState(data: SketchData): EngineState {
   return {
     strokes: [...data.strokes],
+    elements: data.elements ?? migrateStrokesToElements(data.strokes),
     currentStroke: null,
     undoStack: [],
     redoStack: [],
@@ -94,6 +98,7 @@ export function setupStrokeCanvas(
   for (const stroke of state.strokes) {
     renderStroke(ctx, stroke);
   }
+  renderNonStrokeElements(ctx, state.elements);
 }
 
 export function handlePointerDown(
@@ -194,6 +199,7 @@ export function fullRedrawStrokeCanvas(
   for (const stroke of state.strokes) {
     renderStroke(ctx, stroke);
   }
+  renderNonStrokeElements(ctx, state.elements);
 }
 
 export function resizeCanvases(
@@ -212,9 +218,24 @@ export function serializeState(state: EngineState): SketchData {
     canvasWidth: state.canvasWidth,
     canvasHeight: state.canvasHeight,
     toolPresets: state.toolPresets,
-    elements: migrateStrokesToElements(state.strokes),
+    elements: [
+      ...migrateStrokesToElements(state.strokes),
+      ...state.elements.filter((element) => element.type !== "stroke"),
+    ],
     strokes: state.strokes,
   };
+}
+
+function renderNonStrokeElements(ctx: CanvasRenderingContext2D, elements: SketchElement[]): void {
+  for (const element of elements) {
+    if (element.type !== "text") continue;
+    ctx.save();
+    ctx.fillStyle = element.style.color;
+    ctx.font = `${element.style.fontSize}px ${element.style.fontFamily}`;
+    ctx.textBaseline = "top";
+    ctx.fillText(element.text, element.bounds.x, element.bounds.y, element.bounds.width);
+    ctx.restore();
+  }
 }
 
 function renderStroke(ctx: CanvasRenderingContext2D, stroke: Stroke): void {

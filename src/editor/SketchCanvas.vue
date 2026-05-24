@@ -43,6 +43,7 @@ import {
   createLineStroke,
   createRectangleStroke,
 } from "@/elements/shapes";
+import { createTextElement } from "@/elements/text";
 import { isShapeEditorTool } from "./tools";
 import type { EditorTool } from "./tools";
 
@@ -161,8 +162,20 @@ function doRedo() { engineRedo(state); fullRedrawStrokeCanvas(getCanvas(), state
 function doClear() { engineClear(state); fullRedrawStrokeCanvas(getCanvas(), state); updateUndoRedoState(); emit("stroke"); }
 function getData(): SketchData { return serializeState(state); }
 function getState(): EngineState { return state; }
+function insertText() {
+  const element = createTextElement(`text-${Date.now()}`, {
+    x: state.canvasWidth / 2 - 110,
+    y: 120,
+    text: "Text",
+  });
+  state.undoStack.push([...state.strokes]);
+  state.redoStack = [];
+  state.elements = [...state.elements, element];
+  fullRedrawStrokeCanvas(getCanvas(), state);
+  updateUndoRedoState();
+}
 
-defineExpose({ doUndo, doRedo, doClear, getData, getState });
+defineExpose({ doUndo, doRedo, doClear, getData, getState, insertText });
 </script>
 
 <style scoped>

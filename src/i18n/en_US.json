@@ -15,6 +15,7 @@
   "rectangle": "Rectangle",
   "ellipse": "Ellipse",
   "ruler": "Ruler",
+  "text": "Text",
   "width": "Width",
   "opacity": "Opacity",
   "undo": "Undo",

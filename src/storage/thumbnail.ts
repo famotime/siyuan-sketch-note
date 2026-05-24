@@ -1,5 +1,6 @@
 import { getTemplate } from "@/template";
-import type { Stroke } from "@/types/sketch";
+import type { SketchData, Stroke } from "@/types/sketch";
+import type { SketchElement } from "@/elements/model";
 import { getPressureWidth, getSmoothedSegments } from "@/engine/strokeSmoothing";
 
 const PADDING = 40;
@@ -114,6 +115,30 @@ export function thumbnailCanvas(strokes: Stroke[], templateId: string): string {
   return renderToDataUrl(outW, outH, templateId, strokes, -cropX, -cropY);
 }
 
+export function thumbnailSketchData(data: SketchData): string {
+  return thumbnailCanvasWithElements(data.strokes, data.template, data.elements ?? []);
+}
+
+function thumbnailCanvasWithElements(
+  strokes: Stroke[],
+  templateId: string,
+  elements: SketchElement[],
+): string {
+  if (strokes.length === 0 && elements.length === 0) {
+    return renderToDataUrl(MIN_WIDTH, MIN_HEIGHT, templateId, [], 0, 0, elements);
+  }
+
+  return renderToDataUrl(
+    Math.max(MIN_WIDTH, 800),
+    Math.max(MIN_HEIGHT, 400),
+    templateId,
+    strokes,
+    0,
+    0,
+    elements,
+  );
+}
+
 /**
  * Render the final PNG: template background + translated strokes.
  */
@@ -123,7 +148,8 @@ function renderToDataUrl(
   templateId: string,
   strokes: Stroke[],
   tx = 0,
-  ty = 0
+  ty = 0,
+  elements: SketchElement[] = [],
 ): string {
   const canvas = document.createElement("canvas");
   canvas.width = width;
@@ -139,8 +165,21 @@ function renderToDataUrl(
     compositeStrokes(ctx, strokes);
     ctx.restore();
   }
+  renderNonStrokeElements(ctx, elements);
 
   return canvas.toDataURL("image/png");
+}
+
+function renderNonStrokeElements(ctx: CanvasRenderingContext2D, elements: SketchElement[]): void {
+  for (const element of elements) {
+    if (element.type !== "text") continue;
+    ctx.save();
+    ctx.fillStyle = element.style.color;
+    ctx.font = `${element.style.fontSize}px ${element.style.fontFamily}`;
+    ctx.textBaseline = "top";
+    ctx.fillText(element.text, element.bounds.x, element.bounds.y, element.bounds.width);
+    ctx.restore();
+  }
 }
 
 function renderStrokeToCtx(ctx: CanvasRenderingContext2D, stroke: Stroke): void {

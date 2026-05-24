@@ -74,6 +74,11 @@
           :class="{ 'sketch-btn--tool-active': activeTool === 'ruler' }"
           @click="activeTool = 'ruler'"
         >▤ {{ t("ruler") }}</button>
+        <button
+          class="sketch-btn sketch-btn--tool"
+          :class="{ 'sketch-btn--tool-active': activeTool === 'text' }"
+          @click="insertTextElement"
+        >T {{ t("text") }}</button>
         <div class="sketch-tool-options">
           <label class="sketch-range">
             <span>{{ t("width") }}</span>
@@ -127,7 +132,7 @@ import { ref, computed, onMounted, onUnmounted } from "vue";
 import type { SketchData, ToolPreset } from "@/types/sketch";
 import { PRESET_COLORS } from "@/types/sketch";
 import { getAllTemplates } from "@/template";
-import { thumbnailCanvas } from "@/storage/thumbnail";
+import { thumbnailSketchData } from "@/storage/thumbnail";
 import { showMessage } from "siyuan";
 import { sketchAssetFileName, uploadDataUrlToAssets } from "@/utils/uploadPng";
 import { normalizeToolPresets, updateToolPreset } from "@/tools/presets";
@@ -245,7 +250,7 @@ async function runSave(): Promise<boolean> {
 
   let pngDataUrl: string;
   try {
-    pngDataUrl = thumbnailCanvas(data.strokes, data.template);
+    pngDataUrl = thumbnailSketchData(data);
   } catch (e) {
     console.error("[Sketch Note] Thumbnail generation failed:", e);
     pngDataUrl = createFallbackThumbnail();
@@ -274,9 +279,16 @@ async function manualSave() {
 function exportPng() {
   if (!canvasRef.value) return;
   const data = canvasRef.value.getData();
-  const pngDataUrl = thumbnailCanvas(data.strokes, currentTemplate.value);
+  data.template = currentTemplate.value;
+  const pngDataUrl = thumbnailSketchData(data);
   const blob = dataUrlToBlob(pngDataUrl);
   downloadBlob(blob, createExportPngFileName(props.blockId));
+}
+
+function insertTextElement() {
+  activeTool.value = "text";
+  canvasRef.value?.insertText();
+  onStroke();
 }
 
 function createFallbackThumbnail(): string {

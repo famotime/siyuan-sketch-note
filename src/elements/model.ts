@@ -1,4 +1,6 @@
 import type { Stroke } from "@/types/sketch";
+import type { ShapeElement } from "./shapes";
+import type { TextElement } from "./text";
 
 export interface Bounds {
   x: number;
@@ -24,7 +26,7 @@ export interface StrokeElement {
   zIndex: number;
 }
 
-export type SketchElement = StrokeElement;
+export type SketchElement = StrokeElement | ShapeElement | TextElement;
 
 export function calculateStrokeBounds(stroke: Stroke): Bounds {
   if (stroke.points.length === 0) {
