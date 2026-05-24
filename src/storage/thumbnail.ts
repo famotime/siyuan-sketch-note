@@ -95,27 +95,14 @@ function findStrokeVisibleBounds(
 }
 
 /**
- * Compute the axis-aligned bounding box covering strokes + non-stroke elements.
- * Uses point coordinates for strokes (fast, no rendering needed) and element bounds for text/images.
- * Returns null if there is no content at all.
+ * Compute the axis-aligned bounding box of non-stroke elements only.
+ * Returns null if there are no elements.
  */
-function computeContentBounds(
-  strokes: Stroke[],
+function computeElementBounds(
   elements: SketchElement[],
 ): { minX: number; minY: number; maxX: number; maxY: number } | null {
   let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
   let found = false;
-
-  for (const stroke of strokes) {
-    const halfW = stroke.width / 2;
-    for (const pt of stroke.points) {
-      if (pt.x - halfW < minX) minX = pt.x - halfW;
-      if (pt.y - halfW < minY) minY = pt.y - halfW;
-      if (pt.x + halfW > maxX) maxX = pt.x + halfW;
-      if (pt.y + halfW > maxY) maxY = pt.y + halfW;
-      found = true;
-    }
-  }
 
   for (const el of elements) {
     const b = el.bounds;
@@ -198,34 +185,40 @@ function thumbnailCanvasWithElements(
     return renderToDataUrl(MIN_WIDTH, MIN_HEIGHT, templateId, [], 0, 0, elements);
   }
 
-  const contentBounds = computeContentBounds(strokes, elements);
+  // Scan visible stroke bounds on transparent canvas (correctly handles eraser)
+  let strokeBounds = null;
+  if (strokes.length > 0) {
+    const safeSize = safeCanvasSize(strokes);
+    if (safeSize) {
+      strokeBounds = findStrokeVisibleBounds(strokes, Math.ceil(safeSize.w), Math.ceil(safeSize.h));
+    }
+  }
+
+  // Compute element bounds (text, images)
+  const elBounds = computeElementBounds(elements);
+
+  // Union stroke visible bounds + element bounds
+  let contentBounds = null;
+  if (strokeBounds && elBounds) {
+    contentBounds = {
+      minX: Math.min(strokeBounds.x, elBounds.minX),
+      minY: Math.min(strokeBounds.y, elBounds.minY),
+      maxX: Math.max(strokeBounds.x + strokeBounds.w, elBounds.maxX),
+      maxY: Math.max(strokeBounds.y + strokeBounds.h, elBounds.maxY),
+    };
+  } else if (strokeBounds) {
+    contentBounds = { minX: strokeBounds.x, minY: strokeBounds.y, maxX: strokeBounds.x + strokeBounds.w, maxY: strokeBounds.y + strokeBounds.h };
+  } else if (elBounds) {
+    contentBounds = elBounds;
+  }
+
   if (!contentBounds) {
     return renderToDataUrl(MIN_WIDTH, MIN_HEIGHT, templateId, [], 0, 0, elements);
   }
 
-  // Scan stroke visible bounds (handles eraser compositing)
-  let visibleBounds = null;
-  if (strokes.length > 0) {
-    const safeSize = safeCanvasSize(strokes);
-    if (safeSize) {
-      const scanW = Math.max(Math.ceil(safeSize.w), Math.ceil(contentBounds.maxX + SAFE_MARGIN));
-      const scanH = Math.max(Math.ceil(safeSize.h), Math.ceil(contentBounds.maxY + SAFE_MARGIN));
-      visibleBounds = findStrokeVisibleBounds(strokes, scanW, scanH);
-    }
-  }
-
-  // Merge stroke visible bounds with element bounds for crop region
-  const merged = { ...contentBounds };
-  if (visibleBounds) {
-    merged.minX = Math.min(merged.minX, visibleBounds.x);
-    merged.minY = Math.min(merged.minY, visibleBounds.y);
-    merged.maxX = Math.max(merged.maxX, visibleBounds.x + visibleBounds.w);
-    merged.maxY = Math.max(merged.maxY, visibleBounds.y + visibleBounds.h);
-  }
-
-  const canvasW = Math.max(MIN_WIDTH, Math.ceil(merged.maxX + SAFE_MARGIN));
-  const canvasH = Math.max(MIN_HEIGHT, Math.ceil(merged.maxY + SAFE_MARGIN));
-  const crop = computeCropRegion(merged, canvasW, canvasH);
+  const canvasW = Math.max(MIN_WIDTH, Math.ceil(contentBounds.maxX + SAFE_MARGIN));
+  const canvasH = Math.max(MIN_HEIGHT, Math.ceil(contentBounds.maxY + SAFE_MARGIN));
+  const crop = computeCropRegion(contentBounds, canvasW, canvasH);
 
   return renderToDataUrl(crop.w, crop.h, templateId, strokes, -crop.x, -crop.y, elements);
 }
@@ -246,31 +239,36 @@ export async function thumbnailSketchDataAsync(data: SketchData): Promise<string
     return renderToDataUrlAsync(canvasW, canvasH, data.template, strokes, 0, 0, elements, "image/png", true, data);
   }
 
-  // Auto-crop to content bounds + padding
-  const contentBounds = computeContentBounds(strokes, elements);
+  // Auto-crop to visible content bounds + padding
+  let strokeBounds = null;
+  if (strokes.length > 0) {
+    const safeSize = safeCanvasSize(strokes);
+    if (safeSize) {
+      strokeBounds = findStrokeVisibleBounds(strokes, Math.max(Math.ceil(safeSize.w), canvasW), Math.max(Math.ceil(safeSize.h), canvasH));
+    }
+  }
+
+  const elBounds = computeElementBounds(elements);
+
+  let contentBounds = null;
+  if (strokeBounds && elBounds) {
+    contentBounds = {
+      minX: Math.min(strokeBounds.x, elBounds.minX),
+      minY: Math.min(strokeBounds.y, elBounds.minY),
+      maxX: Math.max(strokeBounds.x + strokeBounds.w, elBounds.maxX),
+      maxY: Math.max(strokeBounds.y + strokeBounds.h, elBounds.maxY),
+    };
+  } else if (strokeBounds) {
+    contentBounds = { minX: strokeBounds.x, minY: strokeBounds.y, maxX: strokeBounds.x + strokeBounds.w, maxY: strokeBounds.y + strokeBounds.h };
+  } else if (elBounds) {
+    contentBounds = elBounds;
+  }
+
   if (!contentBounds) {
     return renderToDataUrlAsync(MIN_WIDTH, MIN_HEIGHT, data.template, [], 0, 0, elements, "image/png", true, data);
   }
 
-  let visibleBounds = null;
-  if (strokes.length > 0) {
-    const safeSize = safeCanvasSize(strokes);
-    if (safeSize) {
-      const scanW = Math.max(Math.ceil(safeSize.w), canvasW);
-      const scanH = Math.max(Math.ceil(safeSize.h), canvasH);
-      visibleBounds = findStrokeVisibleBounds(strokes, scanW, scanH);
-    }
-  }
-
-  const merged = { ...contentBounds };
-  if (visibleBounds) {
-    merged.minX = Math.min(merged.minX, visibleBounds.x);
-    merged.minY = Math.min(merged.minY, visibleBounds.y);
-    merged.maxX = Math.max(merged.maxX, visibleBounds.x + visibleBounds.w);
-    merged.maxY = Math.max(merged.maxY, visibleBounds.y + visibleBounds.h);
-  }
-
-  const crop = computeCropRegion(merged, canvasW, canvasH);
+  const crop = computeCropRegion(contentBounds, canvasW, canvasH);
   return renderToDataUrlAsync(crop.w, crop.h, data.template, strokes, -crop.x, -crop.y, elements, "image/png", true, data);
 }
 

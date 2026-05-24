@@ -107,9 +107,9 @@
           :style="{ backgroundColor: c }"
           :title="`${c} (长按或右击删除)`"
           @click="onColorClick(c)"
-          @touchstart="onColorTouchStart(c)"
-          @touchend="onColorTouchEnd"
-          @touchmove="onColorTouchMove"
+          @touchstart.passive="onColorTouchStart(c)"
+          @touchend.passive="onColorTouchEnd"
+          @touchmove.passive="onColorTouchMove"
           @contextmenu.prevent="$emit('deleteColor', c)"
         >
           <span v-if="preset.color === c" class="sketch-float-color-dot" />
@@ -251,7 +251,7 @@ function onDragStart(e: MouseEvent | TouchEvent) {
   window.addEventListener("mousemove", onDragging);
   window.addEventListener("touchmove", onDragging, { passive: false });
   window.addEventListener("mouseup", onDragEnd);
-  window.addEventListener("touchend", onDragEnd);
+  window.addEventListener("touchend", onDragEnd, { passive: true });
 }
 
 function onDragging(e: MouseEvent | TouchEvent) {
