@@ -81,57 +81,68 @@ export default class SketchNotePlugin extends Plugin {
   }
 
   /**
-   * Set up MutationObserver to watch for sketch-note image blocks
-   * and inject edit buttons into their action bars.
-   * Follows the same pattern as siyuan-embed-excalidraw.
+   * 设置 MutationObserver 观察手写块图像元素
+   * 并将编辑按钮注入其动作条（action bar）中。
+   * 监听 childList 变化以及图片 data-src 和 src 属性变化，以应对图片延迟/懒加载。
    */
   private setupImageBlockObserver(target: Node): MutationObserver {
-    const processedElements = new WeakSet<HTMLElement>();
-
     const handleAddedNode = (node: Node) => {
       if (node.nodeType !== Node.ELEMENT_NODE) return;
       const element = node as HTMLElement;
 
-      // Check the node itself if it's an image block
+      // 检查节点本身是否为段落块（思源的图片包裹在 NodeParagraph 块中）
       if (element.matches?.('[data-type="NodeParagraph"]')) {
-        this.tryInjectEditButton(element, processedElements);
+        this.tryInjectEditButton(element);
       }
 
-      // Check descendants for image blocks
+      // 检查子代元素中是否有段落块
       element.querySelectorAll?.('[data-type="NodeParagraph"]')?.forEach((block) => {
-        this.tryInjectEditButton(block as HTMLElement, processedElements);
+        this.tryInjectEditButton(block as HTMLElement);
       });
     };
 
     const observer = new MutationObserver((mutations) => {
       for (const mutation of mutations) {
-        for (const node of mutation.addedNodes) {
-          handleAddedNode(node);
+        if (mutation.type === "childList") {
+          for (const node of mutation.addedNodes) {
+            handleAddedNode(node);
+          }
+        } else if (mutation.type === "attributes") {
+          const targetElement = mutation.target as HTMLElement;
+          // 当图片的源地址发生变化（例如懒加载触发或刷新），重新注入编辑按钮
+          if (targetElement.tagName === "IMG") {
+            const block = targetElement.closest('[data-type="NodeParagraph"]');
+            if (block) {
+              this.tryInjectEditButton(block as HTMLElement);
+            }
+          }
         }
       }
     });
 
-    observer.observe(target, { childList: true, subtree: true });
+    // 观察子树的节点添加、属性变更（针对图片源地址懒加载）
+    observer.observe(target, {
+      childList: true,
+      subtree: true,
+      attributes: true,
+      attributeFilter: ["data-src", "src"],
+    });
     return observer;
   }
 
   /**
-   * Check if an image block contains a sketch-note image,
-   * and if so, inject an edit button into its action bar.
+   * 检查段落块中是否包含手写图片，如果包含则在其操作条中注入“编辑手写块”按钮。
+   * 使用 DOM 存在性检查替代 WeakSet，更安全地应对思源编辑器的局部重绘。
    */
-  private tryInjectEditButton(
-    blockElement: HTMLElement,
-    processedElements: WeakSet<HTMLElement>
-  ): void {
-    if (processedElements.has(blockElement)) return;
+  private tryInjectEditButton(blockElement: HTMLElement): void {
+    // 避免重复注入：如果动作栏中已经存在编辑按钮，则直接返回
+    if (blockElement.querySelector(".sketch-note-edit-btn")) return;
 
     const imgElement = blockElement.querySelector("img") as HTMLImageElement | null;
     if (!imgElement) return;
 
-    const dataSrc = imgElement.getAttribute("data-src") || "";
+    const dataSrc = imgElement.getAttribute("data-src") || imgElement.getAttribute("src") || "";
     if (!SKETCH_IMAGE_PATTERN.test(dataSrc)) return;
-
-    processedElements.add(blockElement);
 
     const blockId = extractBlockIdFromAsset(dataSrc);
     if (!blockId) return;
@@ -152,7 +163,7 @@ export default class SketchNotePlugin extends Plugin {
   }
 
   /**
-   * Handle right-click menu on images — add "Edit Sketch" for sketch-note images.
+   * 处理右键菜单——为手写图增加“编辑手写块”选项。
    */
   private handleOpenMenuImage(detail: any): void {
     const selectedElement = detail?.element as HTMLElement | undefined;
@@ -161,7 +172,7 @@ export default class SketchNotePlugin extends Plugin {
     const imgElement = selectedElement.querySelector("img") as HTMLImageElement | null;
     if (!imgElement) return;
 
-    const dataSrc = imgElement.getAttribute("data-src") || imgElement.dataset?.src || "";
+    const dataSrc = imgElement.getAttribute("data-src") || imgElement.dataset?.src || imgElement.getAttribute("src") || "";
     if (!SKETCH_IMAGE_PATTERN.test(dataSrc)) return;
 
     const blockId = extractBlockIdFromAsset(dataSrc);
@@ -176,25 +187,25 @@ export default class SketchNotePlugin extends Plugin {
   }
 
   /**
-   * Get the current document's root ID.
+   * 获取当前文档根 ID。
    */
   private getCurrentDocId(): string | null {
     const editor = getActiveEditor();
-    // @ts-ignore - runtime protyle access
+    // @ts-ignore - 运行时 protyle 存取
     return editor?.protyle?.block?.rootID || null;
   }
 
   /**
-   * Insert a new sketch-note image block into the current document.
-   * 1. Upload a placeholder PNG to assets
-   * 2. Insert as standard markdown image via /api/block/appendBlock
-   * 3. Save empty sketch data to plugin storage
-   * 4. Open the editor
+   * 在当前文档中插入一个新的手写块。
+   * 1. 尝试通过选区/光标定位聚焦块的 ID，以在其下方精准插入。
+   * 2. 创建并上传空的占位 PNG。
+   * 3. 根据定位调用 /api/block/insertBlock（在光标下插入）或 /api/block/appendBlock（降级追加到文档末尾）。
+   * 4. 保存空白手写数据并打开手写编辑器。
    */
   private async insertSketchBlock() {
     const docId = this.getCurrentDocId();
     if (!docId) {
-      console.error("[Sketch Note] Cannot get current document. Please open a document first.");
+      console.error("[Sketch Note] 无法获取当前文档。请先打开一个文档。");
       return;
     }
 
@@ -202,29 +213,99 @@ export default class SketchNotePlugin extends Plugin {
     const fileName = sketchAssetFileName(blockId);
 
     try {
-      // 1. Create and upload placeholder PNG
+      // 1. 创建并上传占位图片
       const placeholderBlob = createPlaceholderPng("blank");
       await uploadPngToAssets(placeholderBlob, fileName);
 
-      // 2. Insert standard markdown image via API
+      // 2. 尝试通过高精度的“三重保障机制”获取当前编辑区内光标聚焦块的 ID
+      let focusedBlockId: string | null = null;
+      const editor = getActiveEditor();
+      
+      if (editor?.protyle) {
+        let range: Range | null = null;
+        const selection = window.getSelection();
+        if (selection && selection.rangeCount > 0) {
+          range = selection.getRangeAt(0);
+        }
+        
+        // 【第一重保障】：如果常规选区为空，或选区超出了当前编辑区的 DOM 容器范围，
+        // 则尝试读取思源 protyle 对象在失去焦点前暂存的 range 缓存
+        // @ts-ignore - 访问思源未公开的 protyle 运行时属性
+        const protyleRange = editor.protyle.range || editor.protyle.toolbar?.range;
+        if (!range || range.startContainer === document.body || !editor.protyle.wysiwyg?.element?.contains(range.startContainer)) {
+          if (protyleRange) {
+            range = protyleRange;
+          }
+        }
+
+        // 根据确定的 range 向上寻祖，找到带有 [data-node-id] 属性的最近块级容器
+        if (range) {
+          let node: Node | null = range.startContainer;
+          while (node && node !== document.body) {
+            if (node.nodeType === Node.ELEMENT_NODE) {
+              const element = node as HTMLElement;
+              const id = element.getAttribute("data-node-id");
+              if (id) {
+                focusedBlockId = id;
+                break;
+              }
+            }
+            node = node.parentNode;
+          }
+        }
+
+        // 【第二重保障】：若 range 查找落空，直接搜寻当前编辑器 DOM 中具有聚焦标记 .protyle-wysiwyg--focus 的块
+        if (!focusedBlockId && editor.protyle.wysiwyg?.element) {
+          const focusElement = editor.protyle.wysiwyg.element.querySelector(".protyle-wysiwyg--focus");
+          if (focusElement) {
+            focusedBlockId = focusElement.getAttribute("data-node-id");
+          }
+        }
+
+        // 【第三重保障】：作为保底，若存在处于 active 状态的子元素，则试图从该活动元素向上回溯块 ID
+        if (!focusedBlockId && editor.protyle.wysiwyg?.element) {
+          const activeEl = document.activeElement;
+          if (activeEl && editor.protyle.wysiwyg.element.contains(activeEl)) {
+            const block = activeEl.closest("[data-node-id]");
+            if (block) {
+              focusedBlockId = block.getAttribute("data-node-id");
+            }
+          }
+        }
+      }
+
+      // 3. 构建插入 markdown 数据并通过思源 API 插入
       const data = `![](${`assets/${fileName}`})`;
-      const result = await fetchSyncPost("/api/block/appendBlock", {
-        dataType: "markdown",
-        data,
-        parentID: docId,
-      });
+      let result;
+
+      if (focusedBlockId) {
+        // 在光标聚焦块的后方精准插入
+        result = await fetchSyncPost("/api/block/insertBlock", {
+          dataType: "markdown",
+          data,
+          previousID: focusedBlockId,
+        });
+      } else {
+        // 无焦点时降级追加至文档末尾
+        result = await fetchSyncPost("/api/block/appendBlock", {
+          dataType: "markdown",
+          data,
+          parentID: docId,
+        });
+      }
+
       if (result.code !== 0) {
-        console.error("[Sketch Note] Failed to insert image block:", result.msg);
+        console.error("[Sketch Note] 插入图片块失败:", result.msg);
         return;
       }
 
-      // 3. Save empty sketch data
+      // 4. 保存初始空手写数据
       await this.saveData(storageKey(blockId), createEmptySketchData("blank"));
 
-      // 4. Open editor
+      // 5. 打开手写编辑器
       await openSketchEditor(blockId);
     } catch (e) {
-      console.error("[Sketch Note] Failed to insert sketch block:", e);
+      console.error("[Sketch Note] 插入手写块失败:", e);
     }
   }
 }
