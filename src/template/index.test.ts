@@ -9,6 +9,10 @@ describe("template registry", () => {
       "ruled",
       "dotted",
       "cornell",
+      "meeting",
+      "todo",
+      "weekly",
+      "monthly",
     ]);
   });
 
