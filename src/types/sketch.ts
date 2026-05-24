@@ -1,6 +1,7 @@
 import type { Bounds, SketchElement } from "@/elements/model";
 import type { SketchInputSettings } from "@/editor/inputMode";
 import type { OcrIndex } from "@/search/ocrIndex";
+import type { CustomBackgroundTemplate } from "@/template/customBackground";
 
 export interface StrokePoint {
   x: number;
@@ -31,6 +32,7 @@ export interface SketchData {
   ocrIndex?: OcrIndex;
   toolPresets?: ToolPresetCollection;
   inputSettings?: SketchInputSettings;
+  customBackgrounds?: CustomBackgroundTemplate[];
   recentColors?: string[];
   elements?: SketchElement[];
   strokes: Stroke[];

@@ -9,6 +9,8 @@ import { migrateStrokesToElements, withStrokeBounds } from "@/elements/model";
 import type { SketchElement } from "@/elements/model";
 import { splitElementsForRender } from "@/elements/renderOrder";
 import { getSketchPages } from "@/pages/model";
+import { getCustomBackgroundSource } from "@/template/customBackground";
+import type { CustomBackgroundTemplate } from "@/template/customBackground";
 import {
   filterStrokePointsByDistance,
   getPressureWidth,
@@ -36,6 +38,7 @@ export interface EngineState {
   pageMode: SketchData["pageMode"];
   pages: SketchPage[];
   activePageId: string | undefined;
+  customBackgrounds: CustomBackgroundTemplate[];
   templateId: string;
   isDirty: boolean;
 }
@@ -63,6 +66,7 @@ export function createEngineState(
     pageMode: "infinite",
     pages: getSketchPages({ canvasWidth, canvasHeight, pageMode: "infinite" }),
     activePageId: undefined,
+    customBackgrounds: [],
     templateId,
     isDirty: false,
   };
@@ -82,6 +86,7 @@ export function restoreEngineState(data: SketchData): EngineState {
     pageMode: data.pageMode ?? "infinite",
     pages: getSketchPages(data),
     activePageId: data.activePageId,
+    customBackgrounds: data.customBackgrounds ?? [],
     templateId: data.template,
     isDirty: false,
   };
@@ -138,8 +143,20 @@ export function setupBackgroundCanvas(
   canvas.style.height = `${state.canvasHeight}px`;
   const ctx = canvas.getContext("2d")!;
   ctx.scale(dpr, dpr);
-  const template = getTemplate(state.templateId);
-  template.render(ctx, state.canvasWidth, state.canvasHeight);
+  const customBackground = getCustomBackgroundSource({
+    template: state.templateId,
+    customBackgrounds: state.customBackgrounds,
+  });
+  if (customBackground) {
+    const image = new Image();
+    image.onload = () => {
+      ctx.drawImage(image, 0, 0, state.canvasWidth, state.canvasHeight);
+    };
+    image.src = customBackground;
+  } else {
+    const template = getTemplate(state.templateId);
+    template.render(ctx, state.canvasWidth, state.canvasHeight);
+  }
 }
 
 export function setupStrokeCanvas(
@@ -291,6 +308,7 @@ export function serializeState(state: EngineState): SketchData {
     pageMode: state.pageMode,
     pages: state.pageMode === "paged" ? state.pages : undefined,
     activePageId: state.activePageId,
+    customBackgrounds: state.customBackgrounds,
     toolPresets: state.toolPresets,
     elements: [
       ...migrateStrokesToElements(strokes),

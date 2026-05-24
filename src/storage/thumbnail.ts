@@ -5,6 +5,7 @@ import type { SketchData, Stroke } from "@/types/sketch";
 import type { SketchElement } from "@/elements/model";
 import { splitElementsForRender } from "@/elements/renderOrder";
 import { getPressureWidth, getSmoothedSegments } from "@/engine/strokeSmoothing";
+import { getCustomBackgroundSource } from "@/template/customBackground";
 
 const PADDING = 40;
 const MIN_WIDTH = 200;
@@ -144,7 +145,7 @@ function thumbnailCanvasWithElements(
 
 export async function thumbnailSketchDataAsync(data: SketchData): Promise<string> {
   const imageElements = (data.elements ?? []).filter((element) => element.type === "image");
-  if (imageElements.length === 0) {
+  if (imageElements.length === 0 && !getCustomBackgroundSource(data)) {
     return thumbnailSketchData(data);
   }
 
@@ -156,6 +157,9 @@ export async function thumbnailSketchDataAsync(data: SketchData): Promise<string
     0,
     0,
     data.elements ?? [],
+    "image/png",
+    true,
+    data,
   );
 }
 
@@ -174,6 +178,7 @@ export async function renderSketchPdfPageImages(
     elements,
     "image/jpeg",
     plan.includeBackground,
+    data,
   )));
 }
 
@@ -192,6 +197,7 @@ export async function renderSketchPngPageImage(
     data.elements ?? [],
     "image/png",
     includeBackground,
+    data,
   );
 }
 
@@ -238,6 +244,7 @@ async function renderToDataUrlAsync(
   elements: SketchElement[] = [],
   type = "image/png",
   includeBackground = true,
+  data?: SketchData,
 ): Promise<string> {
   const canvas = document.createElement("canvas");
   canvas.width = width;
@@ -245,8 +252,14 @@ async function renderToDataUrlAsync(
   const ctx = canvas.getContext("2d")!;
 
   if (includeBackground) {
-    const template = getTemplate(templateId);
-    template.render(ctx, width, height);
+    const customBackground = data ? getCustomBackgroundSource(data) : null;
+    if (customBackground) {
+      const image = await loadImage(customBackground);
+      ctx.drawImage(image, 0, 0, width, height);
+    } else {
+      const template = getTemplate(templateId);
+      template.render(ctx, width, height);
+    }
   } else {
     ctx.clearRect(0, 0, width, height);
   }

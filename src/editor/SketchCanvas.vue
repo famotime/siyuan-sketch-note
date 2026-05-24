@@ -711,6 +711,7 @@ async function restoreData(data: SketchData) {
   state = restoreEngineState(data);
   state.tool = props.tool === "eraser" ? "eraser" : "pen";
   state.toolPresets = data.toolPresets ?? props.toolPresets;
+  state.customBackgrounds = data.customBackgrounds ?? [];
   await preloadElementImages(state.elements);
   setupBackgroundCanvas(bgCanvasRef.value, state);
   setupStrokeCanvas(strokeCanvasRef.value, state);

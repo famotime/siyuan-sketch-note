@@ -79,12 +79,23 @@
           class="sketch-btn sketch-btn--action"
           @click="triggerJsonImport"
         >⇧ {{ t("importJson") }}</button>
+        <button
+          class="sketch-btn sketch-btn--action"
+          @click="triggerBackgroundImport"
+        >▧ {{ t("importBackground") }}</button>
         <input
           ref="jsonInputRef"
           class="sketch-file-input"
           type="file"
           accept="application/json,.json"
           @change="onJsonSelected"
+        >
+        <input
+          ref="backgroundInputRef"
+          class="sketch-file-input"
+          type="file"
+          accept="image/*"
+          @change="onBackgroundSelected"
         >
       </div>
 
@@ -286,6 +297,7 @@ import { SaveQueue } from "@/storage/saveQueue";
 import { createSaveStatusLabel } from "@/storage/saveStatus";
 import type { SaveStatus } from "@/storage/saveStatus";
 import { normalizeInputSettings } from "./inputMode";
+import { createCustomBackgroundTemplate } from "@/template/customBackground";
 import {
   addRecentColor,
   normalizeRecentColors,
@@ -311,17 +323,22 @@ const visible = ref(false);
 const canvasRef = ref<InstanceType<typeof SketchCanvas>>();
 const imageInputRef = ref<HTMLInputElement>();
 const jsonInputRef = ref<HTMLInputElement>();
+const backgroundInputRef = ref<HTMLInputElement>();
 const activeTool = ref<EditorTool>("pen");
 const lassoMode = ref<"freehand" | "box">("freehand");
 const activeColor = ref(PRESET_COLORS[0]);
 const toolPresets = ref(normalizeToolPresets(props.initialData?.toolPresets));
 const inputSettings = ref(normalizeInputSettings(props.initialData?.inputSettings));
+const customBackgrounds = ref(props.initialData?.customBackgrounds ?? []);
 const recentColors = ref(normalizeRecentColors(props.initialData?.recentColors));
 const canUndo = ref(false);
 const canRedo = ref(false);
 const pageState = ref({ current: 1, total: 1 });
 const currentTemplate = ref(props.initialData?.template ?? "blank");
-const templates = getAllTemplates();
+const templates = computed(() => [
+  ...getAllTemplates(),
+  ...customBackgrounds.value,
+]);
 const loadedData = ref<SketchData | null>(props.initialData);
 const saveStatus = ref<SaveStatus>("idle");
 const lastSavedAt = ref<number | null>(null);
@@ -418,6 +435,7 @@ async function runSave(): Promise<boolean> {
   data.template = currentTemplate.value;
   data.toolPresets = toolPresets.value;
   data.inputSettings = inputSettings.value;
+  data.customBackgrounds = customBackgrounds.value;
   data.recentColors = recentColors.value;
   delete data.recovery;
 
@@ -483,6 +501,7 @@ function exportJson() {
   data.template = currentTemplate.value;
   data.toolPresets = toolPresets.value;
   data.inputSettings = inputSettings.value;
+  data.customBackgrounds = customBackgrounds.value;
   data.recentColors = recentColors.value;
   const blob = exportSketchJson(data);
   downloadBlob(blob, createExportJsonFileName(props.blockId));
@@ -490,6 +509,10 @@ function exportJson() {
 
 function triggerJsonImport() {
   jsonInputRef.value?.click();
+}
+
+function triggerBackgroundImport() {
+  backgroundInputRef.value?.click();
 }
 
 function deleteCurrentPage() {
@@ -512,6 +535,7 @@ async function onJsonSelected(event: Event) {
     currentTemplate.value = imported.template;
     toolPresets.value = importedPresets;
     inputSettings.value = normalizeInputSettings(imported.inputSettings);
+    customBackgrounds.value = imported.customBackgrounds ?? [];
     recentColors.value = normalizeRecentColors(imported.recentColors);
     loadedData.value = imported;
     await canvasRef.value.restoreData(imported);
@@ -520,6 +544,28 @@ async function onJsonSelected(event: Event) {
     console.error("[Sketch Note] JSON restore failed:", error);
     showMessage(t("importJsonFailed"), 5000, "error");
   }
+}
+
+async function onBackgroundSelected(event: Event) {
+  const input = event.target as HTMLInputElement;
+  const file = input.files?.[0];
+  input.value = "";
+  if (!file || !canvasRef.value) return;
+
+  const dataUrl = await readFileAsDataUrl(file);
+  const background = createCustomBackgroundTemplate(`bg-${Date.now()}`, dataUrl);
+  customBackgrounds.value = [
+    ...customBackgrounds.value.filter((item) => item.id !== background.id),
+    background,
+  ];
+  currentTemplate.value = background.id;
+  loadedData.value = {
+    ...(canvasRef.value.getData()),
+    template: background.id,
+    customBackgrounds: customBackgrounds.value,
+  };
+  await canvasRef.value.restoreData(loadedData.value);
+  onStroke();
 }
 
 function insertTextElement() {
