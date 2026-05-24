@@ -169,8 +169,8 @@ export default class SketchNotePlugin extends Plugin {
 
     window.siyuan.menus.menu.addItem({
       id: "edit-sketch-note",
+      icon: "iconEdit",
       label: this.i18n?.editSketch ?? "Edit Sketch",
-      iconHTML: ICON_SVG,
       click: () => openSketchEditor(blockId),
     });
   }
