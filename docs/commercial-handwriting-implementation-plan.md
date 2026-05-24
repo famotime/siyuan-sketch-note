@@ -183,6 +183,28 @@
 - [ ] 运行 `pnpm test` 和 `pnpm build`。
 - [ ] 提交：`refactor: 优化手写编辑器工具栏体验`。
 
+## Batch 7.1: 发布阻断整改
+
+**Files:**
+- Create: `src/release/preflight.test.ts`
+- Modify: `plugin.json`
+- Modify: `LICENSE`
+- Modify: `src/index.ts`
+- Modify: `vite.config.ts`
+- Modify: `icon.png`
+- Modify: `package.zip`
+- Modify: `docs/plugin-release-preflight.md`
+
+- [x] 为发布元数据、图标大小、LICENSE、快捷键和打包冗余目录新增失败测试。
+- [x] 修复 `plugin.json.url`、`author`、`frontends`、`backends` 和空 `funding.custom`。
+- [x] 更新 LICENSE 年份和版权人。
+- [x] 将插件命令快捷键改为 SiYuan 原生 Unicode 修饰键格式。
+- [x] 移除打包内冗余 `i18n/` 静态目录。
+- [x] 生成 160x160 且小于 20 KB 的 `icon.png`。
+- [x] 重新构建 `package.zip`。
+- [x] 运行 `pnpm test`、`pnpm build` 和 SiYuan 插件发布预检。
+- [x] 提交：`fix: 修复插件发布预检阻断项`。
+
 ## Batch 9: 真实 OCR 与搜索闭环
 
 **Files:**

@@ -57,7 +57,7 @@ export default class SketchNotePlugin extends Plugin {
     // Register command
     this.addCommand({
       langKey: "insertSketch",
-      hotkey: "Ctrl+Shift+S",
+      hotkey: "⌃⇧S",
       callback: () => this.insertSketchBlock(),
     });
 

@@ -1,11 +1,11 @@
 {
   "name": "siyuan-sketch-note",
-  "author": "sketch-note",
-  "url": "",
+  "author": "famotime",
+  "url": "https://github.com/famotime/siyuan-sketch-note",
   "version": "0.1.0",
   "minAppVersion": "2.10.14",
-  "backends": ["all"],
-  "frontends": ["all"],
+  "backends": ["windows", "linux", "darwin", "docker"],
+  "frontends": ["desktop", "browser-desktop", "desktop-window"],
   "displayName": {
     "default": "Sketch Note",
     "zh_CN": "闲笔"
@@ -16,9 +16,6 @@
   },
   "readme": {
     "default": "README.md"
-  },
-  "funding": {
-    "custom": []
   },
   "keywords": ["sketch", "handwriting", "canvas", "drawing", "手写", "绘图"]
 }
