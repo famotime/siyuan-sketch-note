@@ -84,6 +84,9 @@
     <button class="sketch-btn sketch-btn--toggle" :class="{ 'sketch-btn--toggle-on': stylusOnly }" @click="$emit('toggleStylusOnly')">
       {{ stylusOnly ? "ON" : "OFF" }} {{ t("stylusOnly") }}
     </button>
+    <button class="sketch-btn sketch-btn--toggle" :class="{ 'sketch-btn--toggle-on': enablePressure }" @click="$emit('togglePressure')">
+      {{ enablePressure ? "ON" : "OFF" }} {{ t("enablePressure") }}
+    </button>
     <button v-if="false" class="sketch-btn sketch-btn--toggle" :class="{ 'sketch-btn--toggle-on': exportIncludeBackground }" @click="$emit('toggleExportBackground')">
       {{ exportIncludeBackground ? "ON" : "OFF" }} {{ t("exportBackground") }}
     </button>
@@ -115,6 +118,7 @@ const props = defineProps<{
   searchResultCount: number;
   statusLabel: string;
   stylusOnly: boolean;
+  enablePressure: boolean;
   templateId: string;
   templates: Template[];
   t: (key: string) => string;
@@ -143,6 +147,7 @@ const emit = defineEmits<{
   (e: "toggleAutoSave"): void;
   (e: "toggleExportBackground"): void;
   (e: "toggleStylusOnly"): void;
+  (e: "togglePressure"): void;
   (e: "update:templateId", value: string): void;
 }>();
 

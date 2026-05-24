@@ -14,6 +14,7 @@
         :searchResultCount="searchResults.length"
         :statusLabel="statusLabel"
         :stylusOnly="inputSettings.stylusOnly"
+        :enablePressure="inputSettings.enablePressure ?? true"
         :t="t"
         :templates="templates"
         @addPage="canvasRef?.addPage()"
@@ -38,6 +39,7 @@
         @toggleAutoSave="toggleAutoSave"
         @toggleExportBackground="exportIncludeBackground = !exportIncludeBackground"
         @toggleStylusOnly="toggleStylusOnly"
+        @togglePressure="togglePressure"
       />
       <ToolBar
         :activeTool="activeTool"
@@ -336,6 +338,15 @@ function toggleStylusOnly() {
   inputSettings.value = {
     ...inputSettings.value,
     stylusOnly: !inputSettings.value.stylusOnly,
+  };
+  markDirty();
+  if (autoSave.value) scheduleAutoSave();
+}
+
+function togglePressure() {
+  inputSettings.value = {
+    ...inputSettings.value,
+    enablePressure: inputSettings.value.enablePressure === undefined ? false : !inputSettings.value.enablePressure,
   };
   markDirty();
   if (autoSave.value) scheduleAutoSave();

@@ -29,6 +29,7 @@ describe("editor input mode", () => {
   it("normalizes missing saved input settings", () => {
     expect(normalizeInputSettings()).toEqual({
       stylusOnly: false,
+      enablePressure: true,
     });
   });
 });

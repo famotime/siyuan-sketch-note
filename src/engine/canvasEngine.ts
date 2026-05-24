@@ -41,6 +41,7 @@ export interface EngineState {
   customBackgrounds: CustomBackgroundTemplate[];
   templateId: string;
   isDirty: boolean;
+  enablePressure: boolean;
 }
 
 export interface EngineSnapshot {
@@ -69,6 +70,7 @@ export function createEngineState(
     customBackgrounds: [],
     templateId,
     isDirty: false,
+    enablePressure: true,
   };
 }
 
@@ -89,6 +91,7 @@ export function restoreEngineState(data: SketchData): EngineState {
     customBackgrounds: data.customBackgrounds ?? [],
     templateId: data.template,
     isDirty: false,
+    enablePressure: data.inputSettings?.enablePressure ?? true,
   };
 }
 
@@ -204,9 +207,10 @@ export function handlePointerDown(
   const x = e.clientX - rect.left;
   const y = e.clientY - rect.top;
   const preset = state.toolPresets[state.tool];
+  const rawPressure = state.enablePressure ? (e.pressure || 0.5) : 0.5;
   state.currentStroke = {
     id: newId(),
-    points: [{ x, y, pressure: e.pressure || 0.5, timestamp: e.timeStamp }],
+    points: [{ x, y, pressure: rawPressure, timestamp: e.timeStamp }],
     color: state.tool === "eraser" ? "#000000" : preset.color,
     width: preset.width,
     opacity: preset.opacity,
@@ -224,7 +228,8 @@ export function handlePointerMove(
   const x = e.clientX - rect.left;
   const y = e.clientY - rect.top;
   const lastPoint = state.currentStroke.points[state.currentStroke.points.length - 1];
-  const nextPoint = { x, y, pressure: e.pressure || 0.5, timestamp: e.timeStamp };
+  const rawPressure = state.enablePressure ? (e.pressure || 0.5) : 0.5;
+  const nextPoint = { x, y, pressure: rawPressure, timestamp: e.timeStamp };
   if (Math.hypot(lastPoint.x - x, lastPoint.y - y) < MIN_POINT_DISTANCE) {
     return false;
   }
@@ -385,16 +390,25 @@ function renderStroke(ctx: CanvasRenderingContext2D, stroke: Stroke): void {
     ctx.globalCompositeOperation = "source-over";
     ctx.strokeStyle = color;
   }
-  ctx.lineWidth = getPressureWidth(width, points[0].pressure);
   ctx.lineJoin = "round";
   ctx.lineCap = "round";
-  ctx.beginPath();
-  ctx.moveTo(points[0].x, points[0].y);
+
+  const firstPressure = points[0].pressure;
+  const allSame = points.every((p) => p.pressure === firstPressure);
+
   if (isShape) {
+    ctx.lineWidth = getPressureWidth(width, firstPressure);
+    ctx.beginPath();
+    ctx.moveTo(points[0].x, points[0].y);
     for (let i = 1; i < points.length; i++) {
       ctx.lineTo(points[i].x, points[i].y);
     }
-  } else {
+    ctx.stroke();
+  } else if (allSame) {
+    // 整体一次性流畅渲染，可有效消除半透明荧光笔重叠导致的斑点痕迹，性能极佳
+    ctx.lineWidth = getPressureWidth(width, firstPressure);
+    ctx.beginPath();
+    ctx.moveTo(points[0].x, points[0].y);
     for (const segment of getSmoothedSegments(points)) {
       ctx.quadraticCurveTo(
         segment.control.x,
@@ -403,8 +417,27 @@ function renderStroke(ctx: CanvasRenderingContext2D, stroke: Stroke): void {
         segment.end.y,
       );
     }
+    ctx.stroke();
+  } else {
+    // 分段绘制平滑的压感曲线，以在重绘时忠实保留动态压感粗细变化
+    const segments = getSmoothedSegments(points);
+    let currentX = points[0].x;
+    let currentY = points[0].y;
+    for (const segment of segments) {
+      ctx.lineWidth = getPressureWidth(width, segment.control.pressure);
+      ctx.beginPath();
+      ctx.moveTo(currentX, currentY);
+      ctx.quadraticCurveTo(
+        segment.control.x,
+        segment.control.y,
+        segment.end.x,
+        segment.end.y,
+      );
+      ctx.stroke();
+      currentX = segment.end.x;
+      currentY = segment.end.y;
+    }
   }
-  ctx.stroke();
   ctx.restore();
 }
 

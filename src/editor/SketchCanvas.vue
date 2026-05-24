@@ -224,6 +224,9 @@ watch(() => props.tool, (t) => {
 watch(() => props.toolPresets, (presets) => {
   if (state) state.toolPresets = presets;
 }, { deep: true });
+watch(() => props.inputSettings?.enablePressure, (val) => {
+  if (state) state.enablePressure = val ?? true;
+}, { immediate: true });
 watch(() => props.templateId, (tpl) => {
   if (state && bgCanvasRef.value && strokeCanvasRef.value) {
     state.templateId = tpl;
