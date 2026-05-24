@@ -22,6 +22,14 @@ describe("editor shortcuts", () => {
     expect(resolveEditorShortcut(keyEvent({ key: "5" }))).toEqual({ type: "tool", tool: "ruler" });
     expect(resolveEditorShortcut(keyEvent({ key: "6" }))).toEqual({ type: "tool", tool: "arrow" });
     expect(resolveEditorShortcut(keyEvent({ key: "7" }))).toEqual({ type: "tool", tool: "triangle" });
+    expect(resolveEditorShortcut(keyEvent({ key: "8" }))).toEqual({ type: "tool", tool: "line" });
+    expect(resolveEditorShortcut(keyEvent({ key: "9" }))).toEqual({ type: "tool", tool: "rectangle" });
+    expect(resolveEditorShortcut(keyEvent({ key: "0" }))).toEqual({ type: "tool", tool: "ellipse" });
+  });
+
+  it("maps letter keys to insert tools", () => {
+    expect(resolveEditorShortcut(keyEvent({ key: "t" }))).toEqual({ type: "tool", tool: "text" });
+    expect(resolveEditorShortcut(keyEvent({ key: "i" }))).toEqual({ type: "tool", tool: "image" });
   });
 
   it("ignores shortcuts while typing in text fields", () => {

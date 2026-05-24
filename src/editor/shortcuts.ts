@@ -14,6 +14,14 @@ const numberToolMap: Record<string, EditorTool> = {
   "5": "ruler",
   "6": "arrow",
   "7": "triangle",
+  "8": "line",
+  "9": "rectangle",
+  "0": "ellipse",
+};
+
+const letterToolMap: Record<string, EditorTool> = {
+  i: "image",
+  t: "text",
 };
 
 export function resolveEditorShortcut(event: KeyboardEvent): EditorShortcut | null {
@@ -33,6 +41,9 @@ export function resolveEditorShortcut(event: KeyboardEvent): EditorShortcut | nu
   }
   if (!hasCommandModifier && !event.altKey && !event.shiftKey && numberToolMap[event.key]) {
     return { type: "tool", tool: numberToolMap[event.key] };
+  }
+  if (!hasCommandModifier && !event.altKey && !event.shiftKey && letterToolMap[key]) {
+    return { type: "tool", tool: letterToolMap[key] };
   }
 
   return null;
