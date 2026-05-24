@@ -5,7 +5,7 @@ import type { SketchData, Stroke } from "@/types/sketch";
 import type { SketchElement } from "@/elements/model";
 import { splitElementsForRender } from "@/elements/renderOrder";
 import { getPressureWidth, getSmoothedSegments } from "@/engine/strokeSmoothing";
-import { getCustomBackgroundSource } from "@/template/customBackground";
+import { getCustomBackgroundDrawRect, getCustomBackgroundSource, getCustomBackgroundTemplate } from "@/template/customBackground";
 
 const PADDING = 40;
 const MIN_WIDTH = 200;
@@ -252,10 +252,27 @@ async function renderToDataUrlAsync(
   const ctx = canvas.getContext("2d")!;
 
   if (includeBackground) {
-    const customBackground = data ? getCustomBackgroundSource(data) : null;
+    const customBackground = data ? getCustomBackgroundTemplate(data) : null;
     if (customBackground) {
-      const image = await loadImage(customBackground);
-      ctx.drawImage(image, 0, 0, width, height);
+      const image = await loadImage(customBackground.src);
+      const rect = getCustomBackgroundDrawRect({
+        imageWidth: image.naturalWidth,
+        imageHeight: image.naturalHeight,
+        targetWidth: width,
+        targetHeight: height,
+        fit: customBackground.fit,
+      });
+      ctx.drawImage(
+        image,
+        rect.sx,
+        rect.sy,
+        rect.sw,
+        rect.sh,
+        rect.dx,
+        rect.dy,
+        rect.dw,
+        rect.dh,
+      );
     } else {
       const template = getTemplate(templateId);
       template.render(ctx, width, height);

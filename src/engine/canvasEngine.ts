@@ -9,7 +9,7 @@ import { migrateStrokesToElements, withStrokeBounds } from "@/elements/model";
 import type { SketchElement } from "@/elements/model";
 import { splitElementsForRender } from "@/elements/renderOrder";
 import { getSketchPages } from "@/pages/model";
-import { getCustomBackgroundSource } from "@/template/customBackground";
+import { getCustomBackgroundDrawRect, getCustomBackgroundTemplate } from "@/template/customBackground";
 import type { CustomBackgroundTemplate } from "@/template/customBackground";
 import {
   filterStrokePointsByDistance,
@@ -143,16 +143,33 @@ export function setupBackgroundCanvas(
   canvas.style.height = `${state.canvasHeight}px`;
   const ctx = canvas.getContext("2d")!;
   ctx.scale(dpr, dpr);
-  const customBackground = getCustomBackgroundSource({
+  const customBackground = getCustomBackgroundTemplate({
     template: state.templateId,
     customBackgrounds: state.customBackgrounds,
   });
   if (customBackground) {
     const image = new Image();
     image.onload = () => {
-      ctx.drawImage(image, 0, 0, state.canvasWidth, state.canvasHeight);
+      const rect = getCustomBackgroundDrawRect({
+        imageWidth: image.naturalWidth,
+        imageHeight: image.naturalHeight,
+        targetWidth: state.canvasWidth,
+        targetHeight: state.canvasHeight,
+        fit: customBackground.fit,
+      });
+      ctx.drawImage(
+        image,
+        rect.sx,
+        rect.sy,
+        rect.sw,
+        rect.sh,
+        rect.dx,
+        rect.dy,
+        rect.dw,
+        rect.dh,
+      );
     };
-    image.src = customBackground;
+    image.src = customBackground.src;
   } else {
     const template = getTemplate(state.templateId);
     template.render(ctx, state.canvasWidth, state.canvasHeight);
