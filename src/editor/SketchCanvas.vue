@@ -36,6 +36,8 @@ import {
   fullRedrawStrokeCanvas,
   resizeCanvases,
   serializeState,
+  preloadElementImages,
+  preloadImage,
 } from "@/engine/canvasEngine";
 import type { EngineState } from "@/engine/canvasEngine";
 import {
@@ -43,6 +45,7 @@ import {
   createLineStroke,
   createRectangleStroke,
 } from "@/elements/shapes";
+import { createImageElement } from "@/elements/image";
 import { createTextElement } from "@/elements/text";
 import { isShapeEditorTool } from "./tools";
 import type { EditorTool } from "./tools";
@@ -68,11 +71,12 @@ let state: EngineState;
 let shapeStart: StrokePoint | null = null;
 const rulerY = ref(220);
 
-onMounted(() => {
+onMounted(async () => {
   if (!bgCanvasRef.value || !strokeCanvasRef.value) return;
   state = props.initialData
     ? restoreEngineState(props.initialData)
     : createEngineState("blank");
+  await preloadElementImages(state.elements);
   setupBackgroundCanvas(bgCanvasRef.value, state);
   setupStrokeCanvas(strokeCanvasRef.value, state);
   updateUndoRedoState();
@@ -174,8 +178,21 @@ function insertText() {
   fullRedrawStrokeCanvas(getCanvas(), state);
   updateUndoRedoState();
 }
+async function insertImage(src: string) {
+  await preloadImage(src);
+  const element = createImageElement(`image-${Date.now()}`, {
+    x: state.canvasWidth / 2 - 160,
+    y: 140,
+    src,
+  });
+  state.undoStack.push([...state.strokes]);
+  state.redoStack = [];
+  state.elements = [...state.elements, element];
+  fullRedrawStrokeCanvas(getCanvas(), state);
+  updateUndoRedoState();
+}
 
-defineExpose({ doUndo, doRedo, doClear, getData, getState, insertText });
+defineExpose({ doUndo, doRedo, doClear, getData, getState, insertText, insertImage });
 </script>
 
 <style scoped>

@@ -1,6 +1,7 @@
 import { getTemplate } from "@/template";
 import type { SketchData, Stroke } from "@/types/sketch";
 import type { SketchElement } from "@/elements/model";
+import { splitElementsForRender } from "@/elements/renderOrder";
 import { getPressureWidth, getSmoothedSegments } from "@/engine/strokeSmoothing";
 
 const PADDING = 40;
@@ -139,6 +140,23 @@ function thumbnailCanvasWithElements(
   );
 }
 
+export async function thumbnailSketchDataAsync(data: SketchData): Promise<string> {
+  const imageElements = (data.elements ?? []).filter((element) => element.type === "image");
+  if (imageElements.length === 0) {
+    return thumbnailSketchData(data);
+  }
+
+  return renderToDataUrlAsync(
+    Math.max(MIN_WIDTH, data.canvasWidth || 800),
+    Math.max(MIN_HEIGHT, data.canvasHeight || 400),
+    data.template,
+    data.strokes,
+    0,
+    0,
+    data.elements ?? [],
+  );
+}
+
 /**
  * Render the final PNG: template background + translated strokes.
  */
@@ -159,19 +177,55 @@ function renderToDataUrl(
   const template = getTemplate(templateId);
   template.render(ctx, width, height);
 
+  const layers = splitElementsForRender(elements);
+  renderNonStrokeElements(ctx, layers.background);
   if (strokes.length > 0) {
     ctx.save();
     ctx.translate(tx, ty);
     compositeStrokes(ctx, strokes);
     ctx.restore();
   }
-  renderNonStrokeElements(ctx, elements);
+  renderNonStrokeElements(ctx, layers.foreground);
+
+  return canvas.toDataURL("image/png");
+}
+
+async function renderToDataUrlAsync(
+  width: number,
+  height: number,
+  templateId: string,
+  strokes: Stroke[],
+  tx = 0,
+  ty = 0,
+  elements: SketchElement[] = [],
+): Promise<string> {
+  const canvas = document.createElement("canvas");
+  canvas.width = width;
+  canvas.height = height;
+  const ctx = canvas.getContext("2d")!;
+
+  const template = getTemplate(templateId);
+  template.render(ctx, width, height);
+
+  const layers = splitElementsForRender(elements);
+  await renderNonStrokeElementsAsync(ctx, layers.background);
+  if (strokes.length > 0) {
+    ctx.save();
+    ctx.translate(tx, ty);
+    compositeStrokes(ctx, strokes);
+    ctx.restore();
+  }
+  await renderNonStrokeElementsAsync(ctx, layers.foreground);
 
   return canvas.toDataURL("image/png");
 }
 
 function renderNonStrokeElements(ctx: CanvasRenderingContext2D, elements: SketchElement[]): void {
   for (const element of elements) {
+    if (element.type === "image") {
+      renderImagePlaceholder(ctx, element);
+      continue;
+    }
     if (element.type !== "text") continue;
     ctx.save();
     ctx.fillStyle = element.style.color;
@@ -180,6 +234,58 @@ function renderNonStrokeElements(ctx: CanvasRenderingContext2D, elements: Sketch
     ctx.fillText(element.text, element.bounds.x, element.bounds.y, element.bounds.width);
     ctx.restore();
   }
+}
+
+async function renderNonStrokeElementsAsync(ctx: CanvasRenderingContext2D, elements: SketchElement[]): Promise<void> {
+  for (const element of elements) {
+    if (element.type === "image") {
+      const image = await loadImage(element.src);
+      ctx.drawImage(
+        image,
+        element.bounds.x,
+        element.bounds.y,
+        element.bounds.width,
+        element.bounds.height,
+      );
+      continue;
+    }
+    if (element.type !== "text") continue;
+    ctx.save();
+    ctx.fillStyle = element.style.color;
+    ctx.font = `${element.style.fontSize}px ${element.style.fontFamily}`;
+    ctx.textBaseline = "top";
+    ctx.fillText(element.text, element.bounds.x, element.bounds.y, element.bounds.width);
+    ctx.restore();
+  }
+}
+
+function renderImagePlaceholder(ctx: CanvasRenderingContext2D, element: Extract<SketchElement, { type: "image" }>): void {
+  ctx.save();
+  ctx.fillStyle = "#f4f4f4";
+  ctx.strokeStyle = "#c8c8c8";
+  ctx.lineWidth = 1;
+  ctx.fillRect(element.bounds.x, element.bounds.y, element.bounds.width, element.bounds.height);
+  ctx.strokeRect(element.bounds.x, element.bounds.y, element.bounds.width, element.bounds.height);
+  ctx.fillStyle = "#888";
+  ctx.font = "14px sans-serif";
+  ctx.textBaseline = "middle";
+  ctx.textAlign = "center";
+  ctx.fillText(
+    element.alt || "Image",
+    element.bounds.x + element.bounds.width / 2,
+    element.bounds.y + element.bounds.height / 2,
+    element.bounds.width - 16,
+  );
+  ctx.restore();
+}
+
+function loadImage(src: string): Promise<HTMLImageElement> {
+  return new Promise((resolve, reject) => {
+    const image = new Image();
+    image.onload = () => resolve(image);
+    image.onerror = () => reject(new Error("Failed to load image element"));
+    image.src = src;
+  });
 }
 
 function renderStrokeToCtx(ctx: CanvasRenderingContext2D, stroke: Stroke): void {

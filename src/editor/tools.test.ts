@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   getDrawingToolForEditorTool,
+  isInsertElementEditorTool,
   isShapeEditorTool,
   isStrokeEditorTool,
 } from "./tools";
@@ -21,9 +22,16 @@ describe("editor tools", () => {
     expect(isShapeEditorTool("pen")).toBe(false);
   });
 
+  it("identifies element insertion tools", () => {
+    expect(isInsertElementEditorTool("text")).toBe(true);
+    expect(isInsertElementEditorTool("image")).toBe(true);
+    expect(isInsertElementEditorTool("pen")).toBe(false);
+  });
+
   it("maps non-stroke editor tools to pen for the drawing engine", () => {
     expect(getDrawingToolForEditorTool("rectangle")).toBe("pen");
     expect(getDrawingToolForEditorTool("ruler")).toBe("pen");
+    expect(getDrawingToolForEditorTool("image")).toBe("pen");
     expect(getDrawingToolForEditorTool("eraser")).toBe("eraser");
   });
 });

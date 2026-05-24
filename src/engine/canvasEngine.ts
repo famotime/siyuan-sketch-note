@@ -7,6 +7,7 @@ import { getTemplate } from "@/template";
 import { normalizeToolPresets } from "@/tools/presets";
 import { migrateStrokesToElements } from "@/elements/model";
 import type { SketchElement } from "@/elements/model";
+import { splitElementsForRender } from "@/elements/renderOrder";
 import {
   filterStrokePointsByDistance,
   getPressureWidth,
@@ -15,6 +16,7 @@ import {
 
 let idCounter = 0;
 const MIN_POINT_DISTANCE = 1.5;
+const imageCache = new Map<string, HTMLImageElement>();
 function newId(): string {
   return `s${Date.now()}-${++idCounter}`;
 }
@@ -69,6 +71,29 @@ export function restoreEngineState(data: SketchData): EngineState {
   };
 }
 
+export async function preloadElementImages(elements: SketchElement[]): Promise<void> {
+  const imageSources = elements
+    .filter((element) => element.type === "image")
+    .map((element) => element.src);
+
+  await Promise.all(imageSources.map((src) => preloadImage(src)));
+}
+
+export function preloadImage(src: string): Promise<void> {
+  const cached = imageCache.get(src);
+  if (cached?.complete) return Promise.resolve();
+
+  return new Promise((resolve, reject) => {
+    const image = new Image();
+    image.onload = () => {
+      imageCache.set(src, image);
+      resolve();
+    };
+    image.onerror = () => reject(new Error("Failed to load image element"));
+    image.src = src;
+  });
+}
+
 export function setupBackgroundCanvas(
   canvas: HTMLCanvasElement,
   state: EngineState
@@ -95,10 +120,12 @@ export function setupStrokeCanvas(
   canvas.style.height = `${state.canvasHeight}px`;
   const ctx = canvas.getContext("2d")!;
   ctx.scale(dpr, dpr);
+  const layers = splitElementsForRender(state.elements);
+  renderNonStrokeElements(ctx, layers.background);
   for (const stroke of state.strokes) {
     renderStroke(ctx, stroke);
   }
-  renderNonStrokeElements(ctx, state.elements);
+  renderNonStrokeElements(ctx, layers.foreground);
 }
 
 export function handlePointerDown(
@@ -196,10 +223,12 @@ export function fullRedrawStrokeCanvas(
   ctx.setTransform(1, 0, 0, 1, 0, 0);
   ctx.clearRect(0, 0, canvas.width, canvas.height);
   ctx.restore();
+  const layers = splitElementsForRender(state.elements);
+  renderNonStrokeElements(ctx, layers.background);
   for (const stroke of state.strokes) {
     renderStroke(ctx, stroke);
   }
-  renderNonStrokeElements(ctx, state.elements);
+  renderNonStrokeElements(ctx, layers.foreground);
 }
 
 export function resizeCanvases(
@@ -228,6 +257,10 @@ export function serializeState(state: EngineState): SketchData {
 
 function renderNonStrokeElements(ctx: CanvasRenderingContext2D, elements: SketchElement[]): void {
   for (const element of elements) {
+    if (element.type === "image") {
+      renderImageElement(ctx, element);
+      continue;
+    }
     if (element.type !== "text") continue;
     ctx.save();
     ctx.fillStyle = element.style.color;
@@ -236,6 +269,28 @@ function renderNonStrokeElements(ctx: CanvasRenderingContext2D, elements: Sketch
     ctx.fillText(element.text, element.bounds.x, element.bounds.y, element.bounds.width);
     ctx.restore();
   }
+}
+
+function renderImageElement(ctx: CanvasRenderingContext2D, element: Extract<SketchElement, { type: "image" }>): void {
+  const image = imageCache.get(element.src);
+  if (image?.complete) {
+    ctx.drawImage(
+      image,
+      element.bounds.x,
+      element.bounds.y,
+      element.bounds.width,
+      element.bounds.height,
+    );
+    return;
+  }
+
+  ctx.save();
+  ctx.fillStyle = "#f4f4f4";
+  ctx.strokeStyle = "#c8c8c8";
+  ctx.lineWidth = 1;
+  ctx.fillRect(element.bounds.x, element.bounds.y, element.bounds.width, element.bounds.height);
+  ctx.strokeRect(element.bounds.x, element.bounds.y, element.bounds.width, element.bounds.height);
+  ctx.restore();
 }
 
 function renderStroke(ctx: CanvasRenderingContext2D, stroke: Stroke): void {

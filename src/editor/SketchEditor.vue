@@ -79,6 +79,18 @@
           :class="{ 'sketch-btn--tool-active': activeTool === 'text' }"
           @click="insertTextElement"
         >T {{ t("text") }}</button>
+        <button
+          class="sketch-btn sketch-btn--tool"
+          :class="{ 'sketch-btn--tool-active': activeTool === 'image' }"
+          @click="triggerImageImport"
+        >▧ {{ t("image") }}</button>
+        <input
+          ref="imageInputRef"
+          class="sketch-file-input"
+          type="file"
+          accept="image/*"
+          @change="onImageSelected"
+        >
         <div class="sketch-tool-options">
           <label class="sketch-range">
             <span>{{ t("width") }}</span>
@@ -132,7 +144,7 @@ import { ref, computed, onMounted, onUnmounted } from "vue";
 import type { SketchData, ToolPreset } from "@/types/sketch";
 import { PRESET_COLORS } from "@/types/sketch";
 import { getAllTemplates } from "@/template";
-import { thumbnailSketchData } from "@/storage/thumbnail";
+import { thumbnailSketchDataAsync } from "@/storage/thumbnail";
 import { showMessage } from "siyuan";
 import { sketchAssetFileName, uploadDataUrlToAssets } from "@/utils/uploadPng";
 import { normalizeToolPresets, updateToolPreset } from "@/tools/presets";
@@ -158,6 +170,7 @@ function t(key: string): string { return props.i18n[key] ?? key; }
 const colors = PRESET_COLORS;
 const visible = ref(false);
 const canvasRef = ref<InstanceType<typeof SketchCanvas>>();
+const imageInputRef = ref<HTMLInputElement>();
 const activeTool = ref<EditorTool>("pen");
 const activeColor = ref(PRESET_COLORS[0]);
 const toolPresets = ref(normalizeToolPresets(props.initialData?.toolPresets));
@@ -250,7 +263,7 @@ async function runSave(): Promise<boolean> {
 
   let pngDataUrl: string;
   try {
-    pngDataUrl = thumbnailSketchData(data);
+    pngDataUrl = await thumbnailSketchDataAsync(data);
   } catch (e) {
     console.error("[Sketch Note] Thumbnail generation failed:", e);
     pngDataUrl = createFallbackThumbnail();
@@ -276,11 +289,11 @@ async function manualSave() {
   await doSave();
 }
 
-function exportPng() {
+async function exportPng() {
   if (!canvasRef.value) return;
   const data = canvasRef.value.getData();
   data.template = currentTemplate.value;
-  const pngDataUrl = thumbnailSketchData(data);
+  const pngDataUrl = await thumbnailSketchDataAsync(data);
   const blob = dataUrlToBlob(pngDataUrl);
   downloadBlob(blob, createExportPngFileName(props.blockId));
 }
@@ -289,6 +302,30 @@ function insertTextElement() {
   activeTool.value = "text";
   canvasRef.value?.insertText();
   onStroke();
+}
+
+function triggerImageImport() {
+  activeTool.value = "image";
+  imageInputRef.value?.click();
+}
+
+async function onImageSelected(event: Event) {
+  const input = event.target as HTMLInputElement;
+  const file = input.files?.[0];
+  input.value = "";
+  if (!file) return;
+  const dataUrl = await readFileAsDataUrl(file);
+  await canvasRef.value?.insertImage(dataUrl);
+  onStroke();
+}
+
+function readFileAsDataUrl(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result));
+    reader.onerror = () => reject(reader.error);
+    reader.readAsDataURL(file);
+  });
 }
 
 function createFallbackThumbnail(): string {
@@ -381,6 +418,9 @@ function onHeightChanged(_h: number) {}
   align-items: center;
   gap: 8px;
   min-width: 0;
+}
+.sketch-file-input {
+  display: none;
 }
 .sketch-range {
   display: inline-flex;
