@@ -201,12 +201,12 @@ import { createExportPngFileName, dataUrlToBlob, downloadBlob } from "@/export/p
 import { createExportPdfFileName, createPdfExportPlanFromSketch, exportPdf as exportPdfBlob } from "@/export/pdf";
 import { createExportJsonFileName, exportSketchJson, importSketchJson } from "@/export/json";
 import { SaveQueue } from "@/storage/saveQueue";
+import { createSaveStatusLabel } from "@/storage/saveStatus";
+import type { SaveStatus } from "@/storage/saveStatus";
 import { getFirstImageFileFromClipboard } from "./clipboard";
 import { getDrawingToolForEditorTool } from "./tools";
 import type { EditorTool } from "./tools";
 import SketchCanvas from "./SketchCanvas.vue";
-
-type SaveStatus = "idle" | "saving" | "saved" | "error" | "dirty";
 
 const props = defineProps<{
   blockId: string;
@@ -233,20 +233,13 @@ const currentTemplate = ref(props.initialData?.template ?? "blank");
 const templates = getAllTemplates();
 const loadedData = ref<SketchData | null>(props.initialData);
 const saveStatus = ref<SaveStatus>("idle");
+const lastSavedAt = ref<number | null>(null);
 const autoSave = ref(true);
 
 let autoSaveTimer: ReturnType<typeof setTimeout> | null = null;
 const saveQueue = new SaveQueue();
 
-const statusLabel = computed(() => {
-  switch (saveStatus.value) {
-    case "saving":  return t("statusSaving");
-    case "saved":   return t("statusSaved");
-    case "error":   return t("statusError");
-    case "dirty":   return t("statusDirty");
-    default:        return "";
-  }
-});
+const statusLabel = computed(() => createSaveStatusLabel(saveStatus.value, t, lastSavedAt.value));
 
 const activePreset = computed(() => toolPresets.value[getDrawingToolForEditorTool(activeTool.value)]);
 
@@ -330,6 +323,7 @@ async function runSave(): Promise<boolean> {
     await uploadDataUrlToAssets(pngDataUrl, fileName);
     await props.saveData(`sketch:${props.blockId}`, data);
     saveStatus.value = "saved";
+    lastSavedAt.value = Date.now();
     canvasRef.value.getState().isDirty = false;
     return true;
   } catch (e) {
