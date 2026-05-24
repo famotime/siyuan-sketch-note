@@ -1,4 +1,5 @@
 import type { SketchData, SketchPage, Stroke } from "@/types/sketch";
+import type { SketchElement } from "@/elements/model";
 import { CANVAS_INITIAL_HEIGHT, CANVAS_LOGICAL_WIDTH } from "@/types/sketch";
 
 export const DEFAULT_SKETCH_PAGE_HEIGHT = 1000;
@@ -110,6 +111,7 @@ export function insertSketchPageAfter(data: SketchData, pageId: string): SketchD
     activePageId: nextPage.id,
     canvasHeight: getCanvasHeightFromPages(nextPages),
     strokes: shiftStrokesAtOrAfter(data.strokes, nextPage.y, nextPage.height),
+    elements: shiftElementsAtOrAfter(data.elements ?? [], nextPage.y, nextPage.height),
   };
 }
 
@@ -131,12 +133,24 @@ export function duplicateSketchPage(
       bounds: stroke.bounds ? { ...stroke.bounds } : undefined,
     }, target.height),
   );
+  const copiedElements = getElementsInPage(data.elements ?? [], target).map((element) =>
+    shiftElement({
+      ...element,
+      id: createCopyId(element.id),
+      bounds: { ...element.bounds },
+      transform: { ...element.transform },
+    }, target.height),
+  );
 
   return {
     ...inserted,
     strokes: [
       ...inserted.strokes,
       ...copiedStrokes,
+    ],
+    elements: [
+      ...(inserted.elements ?? []),
+      ...copiedElements,
     ],
   };
 }
@@ -145,7 +159,7 @@ export function removeSketchPage(data: SketchData, pageId: string): SketchData {
   const pages = getSketchPages({ ...data, pageMode: "paged" }, inferPageHeight(data));
   const target = pages.find((page) => page.id === pageId);
   if (!target) return data;
-  if (pageHasContent(target, data.strokes)) {
+  if (pageHasContent(target, data.strokes, data.elements ?? [])) {
     throw new Error("Cannot remove a page that contains content");
   }
   if (pages.length <= 1) return data;
@@ -162,6 +176,7 @@ export function removeSketchPage(data: SketchData, pageId: string): SketchData {
     activePageId: nextActivePageId,
     canvasHeight: getCanvasHeightFromPages(nextPages),
     strokes: shiftStrokesAtOrAfter(data.strokes, target.y + target.height, -target.height),
+    elements: shiftElementsAtOrAfter(data.elements ?? [], target.y + target.height, -target.height),
   };
 }
 
@@ -204,7 +219,7 @@ export function createPageOverviewItems(data: SketchData): PageOverviewItem[] {
     id: page.id,
     pageNumber: page.index + 1,
     isActive: page.id === activePageId,
-    hasContent: pageHasContent(page, data.strokes),
+    hasContent: pageHasContent(page, data.strokes, data.elements ?? []),
     y: page.y,
     height: page.height,
   }));
@@ -253,17 +268,23 @@ function getCanvasHeightFromPages(pages: SketchPage[]): number {
   return pages.reduce((height, page) => Math.max(height, page.y + page.height), 0);
 }
 
-function pageHasContent(page: SketchPage, strokes: Stroke[]): boolean {
+function pageHasContent(page: SketchPage, strokes: Stroke[], elements: SketchElement[] = []): boolean {
   return strokes.some((stroke) =>
     stroke.points.some((point) =>
       point.y >= page.y && point.y <= page.y + page.height,
     ),
-  );
+  ) || elements.some((element) => boundsIntersectPage(element.bounds.y, element.bounds.height, page));
 }
 
 function getStrokesInPage(strokes: Stroke[], page: SketchPage): Stroke[] {
   return strokes.filter((stroke) =>
     stroke.points.some((point) => point.y >= page.y && point.y <= page.y + page.height),
+  );
+}
+
+function getElementsInPage(elements: SketchElement[], page: SketchPage): SketchElement[] {
+  return elements.filter((element) =>
+    boundsIntersectPage(element.bounds.y, element.bounds.height, page),
   );
 }
 
@@ -288,4 +309,25 @@ function shiftStroke(stroke: Stroke, dy: number): Stroke {
         }
       : undefined,
   };
+}
+
+function shiftElementsAtOrAfter(elements: SketchElement[], y: number, dy: number): SketchElement[] {
+  return elements.map((element) => {
+    if (element.bounds.y < y) return element;
+    return shiftElement(element, dy);
+  });
+}
+
+function shiftElement(element: SketchElement, dy: number): SketchElement {
+  return {
+    ...element,
+    bounds: {
+      ...element.bounds,
+      y: element.bounds.y + dy,
+    },
+  };
+}
+
+function boundsIntersectPage(y: number, height: number, page: SketchPage): boolean {
+  return y < page.y + page.height && y + height > page.y;
 }

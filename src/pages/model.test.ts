@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { createTextElement } from "@/elements/text";
 import type { Stroke } from "@/types/sketch";
 import {
   addSketchPage,
@@ -160,6 +161,20 @@ describe("page model", () => {
     ]);
   });
 
+  it("marks pages with text or image elements as containing content", () => {
+    const data = addSketchPage(createPagedSketchData({
+      template: "blank",
+      canvasWidth: 800,
+      pageHeight: 1000,
+    }));
+    data.elements = [
+      createTextElement("text-1", { x: 80, y: 1120, text: "note" }),
+    ];
+
+    expect(createPageOverviewItems(data).map((page) => page.hasContent)).toEqual([false, true]);
+    expect(() => removeSketchPage(data, "page-2")).toThrow("contains content");
+  });
+
   it("inserts a blank page after the active page and shifts following page content", () => {
     const data = addSketchPage(addSketchPage(createPagedSketchData({
       template: "blank",
@@ -180,6 +195,21 @@ describe("page model", () => {
       { id: "page-3", index: 3, y: 3000 },
     ]);
     expect(next.strokes[0].points.map((point) => point.y)).toEqual([3120, 3160]);
+  });
+
+  it("shifts following elements when inserting a page", () => {
+    const data = addSketchPage(addSketchPage(createPagedSketchData({
+      template: "blank",
+      canvasWidth: 800,
+      pageHeight: 1000,
+    })));
+    data.elements = [
+      createTextElement("text-1", { x: 80, y: 2120, text: "third page" }),
+    ];
+
+    const next = insertSketchPageAfter(data, "page-1");
+
+    expect(next.elements?.[0].bounds.y).toBe(3120);
   });
 
   it("duplicates a page with its strokes shifted into the inserted copy", () => {
@@ -212,6 +242,30 @@ describe("page model", () => {
     ]);
   });
 
+  it("duplicates text and image elements from the target page into the inserted copy", () => {
+    const data = addSketchPage(createPagedSketchData({
+      template: "blank",
+      canvasWidth: 800,
+      pageHeight: 1000,
+    }));
+    data.elements = [
+      createTextElement("text-1", { x: 80, y: 120, text: "first page" }),
+      createTextElement("text-2", { x: 80, y: 1120, text: "second page" }),
+    ];
+
+    const next = duplicateSketchPage(data, "page-1", (id) => `copy-${id}`);
+
+    expect(next.elements?.map((element) => ({
+      id: element.id,
+      y: element.bounds.y,
+      text: element.type === "text" ? element.text : undefined,
+    }))).toEqual([
+      { id: "text-1", y: 120, text: "first page" },
+      { id: "text-2", y: 2120, text: "second page" },
+      { id: "copy-text-1", y: 1120, text: "first page" },
+    ]);
+  });
+
   it("removes an empty middle page and shifts following content upward", () => {
     const data = addSketchPage(addSketchPage(createPagedSketchData({
       template: "blank",
@@ -228,5 +282,20 @@ describe("page model", () => {
       { id: "page-3", y: 1000 },
     ]);
     expect(next.strokes[0].points.map((point) => point.y)).toEqual([1120, 1160]);
+  });
+
+  it("shifts following elements upward when removing an empty page", () => {
+    const data = addSketchPage(addSketchPage(createPagedSketchData({
+      template: "blank",
+      canvasWidth: 800,
+      pageHeight: 1000,
+    })));
+    data.elements = [
+      createTextElement("text-1", { x: 80, y: 2120, text: "third page" }),
+    ];
+
+    const next = removeSketchPage(data, "page-2");
+
+    expect(next.elements?.[0].bounds.y).toBe(1120);
   });
 });

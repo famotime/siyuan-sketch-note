@@ -723,12 +723,7 @@ async function restoreData(data: SketchData) {
 function addPage() {
   const next = addSketchPage(serializeState(state));
   pushHistorySnapshot(state);
-  state.pageMode = next.pageMode;
-  state.pages = next.pages ?? getSketchPages(next);
-  state.activePageId = next.activePageId;
-  state.canvasHeight = next.canvasHeight;
-  state.isDirty = true;
-  resizeCanvases(bgCanvasRef.value!, strokeCanvasRef.value!, state);
+  restorePageState(next);
   updateUndoRedoState();
   emitPageState();
   emit("stroke");
@@ -770,6 +765,7 @@ function restorePageState(data: SketchData) {
   state.activePageId = data.activePageId;
   state.canvasHeight = data.canvasHeight;
   state.strokes = data.strokes;
+  state.elements = data.elements ?? [];
   state.isDirty = true;
   resizeCanvases(bgCanvasRef.value!, strokeCanvasRef.value!, state);
 }
