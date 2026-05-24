@@ -1,45 +1,90 @@
 <template>
   <div class="sketch-editor__row sketch-editor__row--tools">
-    <div class="sketch-colors" :aria-label="t('colorPalette')">
+    <div class="sketch-toolbar-group">
+      <!-- ✏ 画笔 -->
       <button
-        v-for="c in colors"
-        :key="c"
-        class="sketch-color"
-        :class="{ 'sketch-color--active': activeTool !== 'eraser' && activePreset.color === c }"
-        :style="{ backgroundColor: c }"
-        :title="c"
-        @click="$emit('selectColor', c)"
-      />
-      <label class="sketch-color-picker" :title="t('addColor')">
-        +
-        <input type="color" :value="activePreset.color" @input="$emit('selectCustomColor', ($event.target as HTMLInputElement).value)">
-      </label>
+        class="sketch-btn sketch-btn--tool sketch-btn--icon-tool"
+        :class="{ 'sketch-btn--tool-active': activeTool === 'pen' }"
+        :title="t('pen')"
+        :aria-label="t('pen')"
+        @click="$emit('selectTool', 'pen')"
+      >
+        <span class="sketch-btn__icon" aria-hidden="true">✏</span>
+        <span class="sketch-btn__label">{{ t("pen") }}</span>
+      </button>
+
+      <!-- ▰ 荧光笔 -->
+      <button
+        class="sketch-btn sketch-btn--tool sketch-btn--icon-tool"
+        :class="{ 'sketch-btn--tool-active': activeTool === 'highlighter' }"
+        :title="t('highlighter')"
+        :aria-label="t('highlighter')"
+        @click="$emit('selectTool', 'highlighter')"
+      >
+        <span class="sketch-btn__icon" aria-hidden="true">▰</span>
+        <span class="sketch-btn__label">{{ t("highlighter") }}</span>
+      </button>
+
+      <!-- ⌫ 橡皮擦 -->
+      <button
+        class="sketch-btn sketch-btn--tool sketch-btn--icon-tool"
+        :class="{ 'sketch-btn--tool-active': activeTool === 'eraser' }"
+        :title="t('eraser')"
+        :aria-label="t('eraser')"
+        @click="$emit('selectTool', 'eraser')"
+      >
+        <span class="sketch-btn__icon" aria-hidden="true">⌫</span>
+        <span class="sketch-btn__label">{{ t("eraser") }}</span>
+      </button>
+
+      <!-- ◇ 套索（选区合一） -->
+      <button
+        class="sketch-btn sketch-btn--tool sketch-btn--icon-tool"
+        :class="{ 'sketch-btn--tool-active': activeTool === 'lasso' }"
+        :title="t('lasso')"
+        :aria-label="t('lasso')"
+        @click="$emit('selectTool', 'lasso')"
+      >
+        <span class="sketch-btn__icon" aria-hidden="true">◇</span>
+        <span class="sketch-btn__label">{{ t("lasso") }}</span>
+      </button>
+
+      <!-- 图形（图形合一主按钮） -->
+      <button
+        class="sketch-btn sketch-btn--tool sketch-btn--icon-tool"
+        :class="{ 'sketch-btn--tool-active': isShapeActive }"
+        :title="t('shape') || '图形'"
+        :aria-label="t('shape') || '图形'"
+        @click="$emit('selectTool', lastShapeTool)"
+      >
+        <span class="sketch-btn__icon" aria-hidden="true">{{ currentShapeIcon }}</span>
+        <span class="sketch-btn__label">{{ t(lastShapeTool) }}</span>
+      </button>
+
+      <!-- T 文本 -->
+      <button
+        class="sketch-btn sketch-btn--tool sketch-btn--icon-tool"
+        :title="t('text')"
+        :aria-label="t('text')"
+        @click="$emit('selectTool', 'text')"
+      >
+        <span class="sketch-btn__icon" aria-hidden="true">T</span>
+        <span class="sketch-btn__label">{{ t("text") }}</span>
+      </button>
+
+      <!-- ▧ 图片 -->
+      <button
+        class="sketch-btn sketch-btn--tool sketch-btn--icon-tool"
+        :title="t('image')"
+        :aria-label="t('image')"
+        @click="$emit('selectTool', 'image')"
+      >
+        <span class="sketch-btn__icon" aria-hidden="true">▧</span>
+        <span class="sketch-btn__label">{{ t("image") }}</span>
+      </button>
     </div>
-    <span class="sketch-sep" />
-    <button
-      v-for="button in toolButtons"
-      :key="button.tool"
-      class="sketch-btn sketch-btn--tool sketch-btn--icon-tool"
-      :class="{ 'sketch-btn--tool-active': activeTool === button.tool }"
-      :title="t(button.labelKey)"
-      :aria-label="t(button.labelKey)"
-      @click="$emit('selectTool', button.tool)"
-    >
-      <span class="sketch-btn__icon" aria-hidden="true">{{ button.icon }}</span>
-      <span class="sketch-btn__label">{{ t(button.labelKey) }}</span>
-    </button>
-    <ToolOptionsPopover
-      :lassoMode="lassoMode"
-      :preset="activePreset"
-      :t="t"
-      :visibility="toolOptionsVisibility"
-      @update:lassoMode="$emit('update:lassoMode', $event)"
-      @updatePreset="$emit('updatePreset', $event)"
-    />
-    <span class="sketch-sep" />
-    <button class="sketch-btn sketch-btn--action" :disabled="activeTool !== 'lasso'" @click="$emit('recolorSelection')">🎨 {{ t("recolor") }}</button>
-    <button class="sketch-btn sketch-btn--action" :disabled="activeTool !== 'lasso'" @click="$emit('duplicateSelection')">⧉ {{ t("duplicateSelection") }}</button>
-    <button class="sketch-btn sketch-btn--action" :disabled="activeTool !== 'lasso'" @click="$emit('deleteSelection')">⌫ {{ t("deleteSelection") }}</button>
+
+    <!-- 撤销、重做与清空 -->
     <span class="sketch-sep" />
     <button class="sketch-btn sketch-btn--action" :disabled="!canUndo" @click="$emit('undo')">↩ {{ t("undo") }}</button>
     <button class="sketch-btn sketch-btn--action" :disabled="!canRedo" @click="$emit('redo')">↪ {{ t("redo") }}</button>
@@ -49,35 +94,44 @@
 
 <script setup lang="ts">
 import { computed } from "vue";
-import type { ToolPreset } from "@/types/sketch";
-import type { EditorTool } from "./tools";
-import { createEditorToolButtons, getToolOptionsVisibility } from "./toolbarModel";
-import ToolOptionsPopover from "./ToolOptionsPopover.vue";
+import type { EditorTool, ShapeEditorTool } from "./tools";
+import { isShapeEditorTool } from "./tools";
 
 const props = defineProps<{
-  activePreset: ToolPreset;
   activeTool: EditorTool;
+  lastShapeTool: ShapeEditorTool;
   canRedo: boolean;
   canUndo: boolean;
-  colors: readonly string[];
-  lassoMode: "freehand" | "box";
   t: (key: string) => string;
 }>();
 
 defineEmits<{
   (e: "clear"): void;
-  (e: "deleteSelection"): void;
-  (e: "duplicateSelection"): void;
-  (e: "recolorSelection"): void;
   (e: "redo"): void;
-  (e: "selectColor", color: string): void;
-  (e: "selectCustomColor", color: string): void;
   (e: "selectTool", tool: EditorTool): void;
   (e: "undo"): void;
-  (e: "update:lassoMode", value: "freehand" | "box"): void;
-  (e: "updatePreset", patch: Partial<Omit<ToolPreset, "tool">>): void;
 }>();
 
-const toolButtons = createEditorToolButtons();
-const toolOptionsVisibility = computed(() => getToolOptionsVisibility(props.activeTool));
+// ── 形状工具激活状态 ──
+const isShapeActive = computed(() => isShapeEditorTool(props.activeTool));
+
+// ── 根据上次选择的图形映射图形图标 ──
+const currentShapeIcon = computed(() => {
+  const icons: Record<ShapeEditorTool, string> = {
+    line: "／",
+    arrow: "→",
+    rectangle: "□",
+    ellipse: "○",
+    triangle: "△",
+  };
+  return icons[props.lastShapeTool] ?? "／";
+});
 </script>
+
+<style scoped>
+.sketch-toolbar-group {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+</style>

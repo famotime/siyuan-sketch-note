@@ -40,23 +40,15 @@
         @toggleStylusOnly="toggleStylusOnly"
       />
       <ToolBar
-        v-model:lassoMode="lassoMode"
-        :activePreset="activePreset"
         :activeTool="activeTool"
+        :lastShapeTool="lastShapeTool"
         :canRedo="canRedo"
         :canUndo="canUndo"
-        :colors="colors"
         :t="t"
         @clear="canvasRef?.doClear()"
-        @deleteSelection="canvasRef?.deleteLassoSelection()"
-        @duplicateSelection="canvasRef?.duplicateLassoSelection()"
-        @recolorSelection="canvasRef?.recolorLasso(activePreset.color)"
         @redo="canvasRef?.doRedo()"
-        @selectColor="selectColor"
-        @selectCustomColor="selectCustomColor"
         @selectTool="selectTool"
         @undo="canvasRef?.doUndo()"
-        @updatePreset="updateActivePreset"
       />
       <input
         ref="imageInputRef"
@@ -97,6 +89,22 @@
         @stroke="onStroke"
       />
     </div>
+    <FloatingToolbar
+      v-model:lassoMode="lassoMode"
+      :activeTool="activeTool"
+      :colors="colors"
+      :preset="activePreset"
+      :t="t"
+      @selectColor="selectColor"
+      @selectCustomColor="selectCustomColor"
+      @selectTool="selectTool"
+      @updatePreset="updateActivePreset"
+      @deleteSelection="canvasRef?.deleteLassoSelection()"
+      @duplicateSelection="canvasRef?.duplicateLassoSelection()"
+      @recolorSelection="canvasRef?.recolorLasso(activePreset.color)"
+      @deleteColor="deleteColor"
+      @resetDefaultColors="resetDefaultColors"
+    />
   </div>
 </template>
 
@@ -122,11 +130,12 @@ import type { PageOverviewItem } from "@/pages/model";
 import {
   addRecentColor,
   normalizeRecentColors,
+  appendRecentColor,
 } from "@/tools/palette";
 import { getFirstImageFileFromClipboard } from "./clipboard";
 import { resolveEditorShortcut } from "./shortcuts";
-import { getDrawingToolForEditorTool } from "./tools";
-import type { EditorTool } from "./tools";
+import { getDrawingToolForEditorTool, isShapeEditorTool } from "./tools";
+import type { EditorTool, ShapeEditorTool } from "./tools";
 import type { OcrProvider } from "@/search/ocrProvider";
 import { createNoopOcrProvider } from "@/search/ocrProvider";
 import { createPageAwareOcrIndex, searchOcrIndex } from "@/search/ocrIndex";
@@ -134,6 +143,7 @@ import type { OcrSearchResult } from "@/search/ocrIndex";
 import EditorTopBar from "./EditorTopBar.vue";
 import SketchCanvas from "./SketchCanvas.vue";
 import ToolBar from "./ToolBar.vue";
+import FloatingToolbar from "./FloatingToolbar.vue";
 
 const props = defineProps<{
   blockId: string;
@@ -154,6 +164,7 @@ const jsonInputRef = ref<HTMLInputElement>();
 const backgroundInputRef = ref<HTMLInputElement>();
 const activeTool = ref<EditorTool>("pen");
 const lassoMode = ref<"freehand" | "box">("freehand");
+const lastShapeTool = ref<ShapeEditorTool>("line");
 const activeColor = ref(PRESET_COLORS[0]);
 const toolPresets = ref(normalizeToolPresets(props.initialData?.toolPresets));
 const inputSettings = ref(normalizeInputSettings(props.initialData?.inputSettings));
@@ -213,11 +224,38 @@ function selectColor(c: string) {
     activeTool.value = "pen";
   }
   updateActivePreset({ color: c });
-  recentColors.value = addRecentColor(recentColors.value, c);
+  // 普通切换颜色不再改变 recentColors 列表的顺序，仅更新选中状态以维持位置恒定
 }
 
 function selectCustomColor(c: string) {
-  selectColor(c);
+  activeColor.value = c;
+  if (activeTool.value === "eraser") {
+    activeTool.value = "pen";
+  }
+  updateActivePreset({ color: c });
+  // 自定义颜色选择时，将其从后端追加，推动现有颜色往前滚
+  recentColors.value = appendRecentColor(recentColors.value, c);
+}
+
+function deleteColor(color: string) {
+  recentColors.value = recentColors.value.filter((c) => c !== color);
+  showMessage(t("colorDeleted") || "已删除该颜色", 3000, "info");
+  
+  if (activePreset.value.color === color) {
+    const fallback = recentColors.value[0] ?? PRESET_COLORS[0];
+    selectColor(fallback);
+  }
+  markDirty();
+  if (autoSave.value) scheduleAutoSave();
+}
+
+function resetDefaultColors() {
+  recentColors.value = normalizeRecentColors(PRESET_COLORS);
+  showMessage(t("colorReset") || "已恢复默认颜色设置", 3000, "info");
+  
+  selectColor(PRESET_COLORS[0]);
+  markDirty();
+  if (autoSave.value) scheduleAutoSave();
 }
 
 function selectTool(tool: EditorTool) {
@@ -228,6 +266,9 @@ function selectTool(tool: EditorTool) {
   if (tool === "image") {
     triggerImageImport();
     return;
+  }
+  if (isShapeEditorTool(tool)) {
+    lastShapeTool.value = tool;
   }
   activeTool.value = tool;
 }
@@ -584,7 +625,7 @@ function onKeyDown(event: KeyboardEvent) {
       canvasRef.value?.doRedo();
       break;
     case "tool":
-      activeTool.value = shortcut.tool;
+      selectTool(shortcut.tool);
       break;
   }
 }

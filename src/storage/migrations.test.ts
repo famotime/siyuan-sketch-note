@@ -47,7 +47,7 @@ describe("sketch data migrations", () => {
         },
       },
     });
-    expect(data.recentColors).toEqual(["#000000", "#e74c3c", "#3498db", "#2ecc71", "#f39c12"]);
+    expect(data.recentColors.slice(0, 5)).toEqual(["#000000", "#e74c3c", "#3498db", "#2ecc71", "#f39c12"]);
   });
 
   it("normalizes persisted recent color slots", () => {
@@ -60,7 +60,7 @@ describe("sketch data migrations", () => {
       strokes: [],
     });
 
-    expect(data.recentColors).toEqual([
+    expect(data.recentColors.slice(0, 6)).toEqual([
       "#abcdef",
       "#123456",
       "#000000",

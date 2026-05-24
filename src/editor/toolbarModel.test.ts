@@ -14,10 +14,6 @@ describe("editor toolbar model", () => {
       "eraser",
       "lasso",
       "line",
-      "arrow",
-      "rectangle",
-      "ellipse",
-      "triangle",
       "text",
       "image",
     ]);

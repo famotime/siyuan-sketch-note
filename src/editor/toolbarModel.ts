@@ -20,10 +20,6 @@ export function createEditorToolButtons(): EditorToolButton[] {
     { icon: "⌫", labelKey: "eraser", tool: "eraser" },
     { icon: "◇", labelKey: "lasso", tool: "lasso" },
     { icon: "／", labelKey: "line", tool: "line" },
-    { icon: "→", labelKey: "arrow", tool: "arrow" },
-    { icon: "□", labelKey: "rectangle", tool: "rectangle" },
-    { icon: "○", labelKey: "ellipse", tool: "ellipse" },
-    { icon: "△", labelKey: "triangle", tool: "triangle" },
     { icon: "T", labelKey: "text", tool: "text" },
     { icon: "▧", labelKey: "image", tool: "image" },
   ];
