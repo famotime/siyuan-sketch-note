@@ -139,6 +139,7 @@ describe("ocr index", () => {
       blockId: "block-1",
       text: "Second page note",
       bounds: { x: 20, y: 1120, width: 180, height: 32 },
+      localBounds: { x: 20, y: 120, width: 180, height: 32 },
       confidence: 0.88,
       pageId: "page-2",
       pageNumber: 2,

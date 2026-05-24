@@ -6,6 +6,7 @@ export interface OcrLine {
   text: string;
   confidence: number;
   bounds: Bounds;
+  localBounds?: Bounds;
   pageId?: string;
   pageNumber?: number;
 }
@@ -21,6 +22,7 @@ export interface OcrSearchResult {
   blockId: string;
   text: string;
   bounds: Bounds;
+  localBounds?: Bounds;
   confidence: number;
   pageId?: string;
   pageNumber?: number;
@@ -71,6 +73,7 @@ export function searchOcrIndex(index: OcrIndex, query: string): OcrSearchResult[
       blockId: index.blockId,
       text: line.text,
       bounds: line.bounds,
+      localBounds: line.localBounds,
       confidence: line.confidence,
       pageId: line.pageId,
       pageNumber: line.pageNumber,
@@ -85,12 +88,17 @@ function normalizeText(value: string): string {
   return value.trim().replace(/\s+/g, " ").toLocaleLowerCase();
 }
 
-function findPageForBounds(bounds: Bounds, pages: SketchPage[]): Pick<OcrLine, "pageId" | "pageNumber"> {
+function findPageForBounds(bounds: Bounds, pages: SketchPage[]): Pick<OcrLine, "localBounds" | "pageId" | "pageNumber"> {
   const centerY = bounds.y + bounds.height / 2;
   const page = pages.find((item) => centerY >= item.y && centerY <= item.y + item.height);
   if (!page) return {};
 
   return {
+    localBounds: {
+      ...bounds,
+      x: bounds.x - page.x,
+      y: bounds.y - page.y,
+    },
     pageId: page.id,
     pageNumber: page.index + 1,
   };
