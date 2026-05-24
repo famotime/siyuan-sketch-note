@@ -255,11 +255,11 @@ import { ref, computed, onMounted, onUnmounted } from "vue";
 import type { SketchData, ToolPreset } from "@/types/sketch";
 import { PRESET_COLORS } from "@/types/sketch";
 import { getAllTemplates } from "@/template";
-import { renderSketchPdfPageImages, thumbnailSketchDataAsync } from "@/storage/thumbnail";
+import { renderSketchPdfPageImages, renderSketchPngPageImage, thumbnailSketchDataAsync } from "@/storage/thumbnail";
 import { showMessage } from "siyuan";
 import { sketchAssetFileName, uploadDataUrlToAssets } from "@/utils/uploadPng";
 import { normalizeToolPresets, updateToolPreset } from "@/tools/presets";
-import { createExportPngFileName, dataUrlToBlob, downloadBlob } from "@/export/png";
+import { createCurrentPagePngExportPlan, createExportPngFileName, dataUrlToBlob, downloadBlob } from "@/export/png";
 import { createExportPdfFileName, createPdfExportPlanFromSketch, exportPdf as exportPdfBlob } from "@/export/pdf";
 import { createExportJsonFileName, exportSketchJson, importSketchJson } from "@/export/json";
 import { SaveQueue } from "@/storage/saveQueue";
@@ -422,9 +422,10 @@ async function exportPng() {
   const data = canvasRef.value.getData();
   data.template = currentTemplate.value;
   data.recentColors = recentColors.value;
-  const pngDataUrl = await thumbnailSketchDataAsync(data);
+  const plan = createCurrentPagePngExportPlan(props.blockId, data);
+  const pngDataUrl = await renderSketchPngPageImage(data, plan);
   const blob = dataUrlToBlob(pngDataUrl);
-  downloadBlob(blob, createExportPngFileName(props.blockId));
+  downloadBlob(blob, createExportPngFileName(props.blockId, new Date(), plan.pageNumber));
 }
 
 async function exportPdf() {

@@ -1,5 +1,6 @@
 import { getTemplate } from "@/template";
 import type { PdfExportPlan } from "@/export/pdf";
+import type { PngExportPlan } from "@/export/png";
 import type { SketchData, Stroke } from "@/types/sketch";
 import type { SketchElement } from "@/elements/model";
 import { splitElementsForRender } from "@/elements/renderOrder";
@@ -173,6 +174,22 @@ export async function renderSketchPdfPageImages(
     elements,
     "image/jpeg",
   )));
+}
+
+export async function renderSketchPngPageImage(
+  data: SketchData,
+  plan: PngExportPlan,
+): Promise<string> {
+  return renderToDataUrlAsync(
+    plan.width,
+    plan.height,
+    data.template,
+    data.strokes,
+    -plan.sourceX,
+    -plan.sourceY,
+    data.elements ?? [],
+    "image/png",
+  );
 }
 
 /**
