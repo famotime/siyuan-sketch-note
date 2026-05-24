@@ -1,6 +1,8 @@
 import type { EditorTool } from "./tools";
 
 export type EditorShortcut =
+  | { type: "deleteSelection" }
+  | { type: "duplicateSelection" }
   | { type: "save" }
   | { type: "undo" }
   | { type: "redo" }
@@ -33,6 +35,9 @@ export function resolveEditorShortcut(event: KeyboardEvent): EditorShortcut | nu
   if (hasCommandModifier && key === "s") {
     return { type: "save" };
   }
+  if (hasCommandModifier && key === "d") {
+    return { type: "duplicateSelection" };
+  }
   if (hasCommandModifier && key === "z") {
     return event.shiftKey ? { type: "redo" } : { type: "undo" };
   }
@@ -44,6 +49,9 @@ export function resolveEditorShortcut(event: KeyboardEvent): EditorShortcut | nu
   }
   if (!hasCommandModifier && !event.altKey && !event.shiftKey && letterToolMap[key]) {
     return { type: "tool", tool: letterToolMap[key] };
+  }
+  if (!hasCommandModifier && !event.altKey && !event.shiftKey && (key === "delete" || key === "backspace")) {
+    return { type: "deleteSelection" };
   }
 
   return null;

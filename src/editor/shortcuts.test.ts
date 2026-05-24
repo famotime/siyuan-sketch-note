@@ -14,6 +14,13 @@ describe("editor shortcuts", () => {
     expect(resolveEditorShortcut(keyEvent({ key: "y", ctrlKey: true }))).toEqual({ type: "redo" });
   });
 
+  it("maps selection edit shortcuts", () => {
+    expect(resolveEditorShortcut(keyEvent({ key: "Delete" }))).toEqual({ type: "deleteSelection" });
+    expect(resolveEditorShortcut(keyEvent({ key: "Backspace" }))).toEqual({ type: "deleteSelection" });
+    expect(resolveEditorShortcut(keyEvent({ key: "d", ctrlKey: true }))).toEqual({ type: "duplicateSelection" });
+    expect(resolveEditorShortcut(keyEvent({ key: "D", metaKey: true }))).toEqual({ type: "duplicateSelection" });
+  });
+
   it("maps number keys to high-frequency editor tools", () => {
     expect(resolveEditorShortcut(keyEvent({ key: "1" }))).toEqual({ type: "tool", tool: "pen" });
     expect(resolveEditorShortcut(keyEvent({ key: "2" }))).toEqual({ type: "tool", tool: "highlighter" });
@@ -36,5 +43,6 @@ describe("editor shortcuts", () => {
     const input = { tagName: "INPUT", isContentEditable: false } as EventTarget;
     expect(resolveEditorShortcut(keyEvent({ key: "1", target: input }))).toBeNull();
     expect(resolveEditorShortcut(keyEvent({ key: "s", ctrlKey: true, target: input }))).toBeNull();
+    expect(resolveEditorShortcut(keyEvent({ key: "Delete", target: input }))).toBeNull();
   });
 });

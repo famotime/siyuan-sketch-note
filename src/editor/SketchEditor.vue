@@ -670,6 +670,16 @@ function onKeyDown(event: KeyboardEvent) {
   event.stopPropagation();
 
   switch (shortcut.type) {
+    case "deleteSelection":
+      if (activeTool.value === "lasso") {
+        canvasRef.value?.deleteLassoSelection();
+      }
+      break;
+    case "duplicateSelection":
+      if (activeTool.value === "lasso") {
+        canvasRef.value?.duplicateLassoSelection();
+      }
+      break;
     case "save":
       manualSave();
       break;
