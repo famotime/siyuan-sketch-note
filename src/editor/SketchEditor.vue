@@ -178,6 +178,11 @@
         <button
           class="sketch-btn sketch-btn--action"
           :disabled="activeTool !== 'lasso'"
+          @click="canvasRef?.duplicateLassoSelection()"
+        >⧉ {{ t("duplicateSelection") }}</button>
+        <button
+          class="sketch-btn sketch-btn--action"
+          :disabled="activeTool !== 'lasso'"
           @click="canvasRef?.deleteLassoSelection()"
         >⌫ {{ t("deleteSelection") }}</button>
         <span class="sketch-sep" />

@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import type { SketchElement } from "./model";
 import {
+  duplicateLassoSelection,
+  duplicateStrokeSelection,
   recolorStrokeSelection,
   recolorLassoSelection,
   removeLassoSelection,
@@ -22,6 +24,7 @@ const elements: SketchElement[] = [
         { x: 10, y: 10, pressure: 0.5, timestamp: 1 },
         { x: 30, y: 30, pressure: 0.5, timestamp: 2 },
       ],
+      bounds: { x: 8, y: 8, width: 24, height: 24 },
     },
     bounds: { x: 8, y: 8, width: 24, height: 24 },
     transform: { x: 0, y: 0, scaleX: 1, scaleY: 1, rotation: 0 },
@@ -82,6 +85,7 @@ describe("lasso edit operations", () => {
       { x: 15, y: 17, pressure: 0.5, timestamp: 1 },
       { x: 35, y: 37, pressure: 0.5, timestamp: 2 },
     ]);
+    expect(next[0].bounds).toEqual({ x: 13, y: 15, width: 24, height: 24 });
   });
 
   it("removes selected strokes", () => {
@@ -92,5 +96,31 @@ describe("lasso edit operations", () => {
     const next = recolorStrokeSelection([elements[0].stroke], ["stroke-1"], "#3498db");
 
     expect(next[0].color).toBe("#3498db");
+  });
+
+  it("duplicates selected elements with new ids and an offset", () => {
+    const next = duplicateLassoSelection(elements, ["text-1"], 12, 16, (id) => `copy-${id}`);
+
+    expect(next).toHaveLength(3);
+    expect(next[2]).toMatchObject({
+      id: "copy-text-1",
+      type: "text",
+      bounds: { x: 112, y: 136, width: 160, height: 48 },
+    });
+    expect(elements).toHaveLength(2);
+  });
+
+  it("duplicates selected strokes with new ids and shifted points", () => {
+    const next = duplicateStrokeSelection([elements[0].stroke], ["stroke-1"], 12, 16, (id) => `copy-${id}`);
+
+    expect(next).toHaveLength(2);
+    expect(next[1]).toMatchObject({
+      id: "copy-stroke-1",
+      points: [
+        { x: 22, y: 26, pressure: 0.5, timestamp: 1 },
+        { x: 42, y: 46, pressure: 0.5, timestamp: 2 },
+      ],
+      bounds: { x: 20, y: 24, width: 24, height: 24 },
+    });
   });
 });

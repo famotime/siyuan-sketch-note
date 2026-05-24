@@ -34,6 +34,7 @@
   "redo": "重做",
   "clear": "清除",
   "recolor": "改色",
+  "duplicateSelection": "复制选区",
   "deleteSelection": "删除选区",
   "save": "保存",
   "exportPng": "导出 PNG",

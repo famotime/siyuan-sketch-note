@@ -62,6 +62,8 @@ import {
 import { findElementsInLasso } from "@/elements/lasso";
 import type { Point as LassoPoint } from "@/elements/lasso";
 import {
+  duplicateLassoSelection as duplicateLassoElements,
+  duplicateStrokeSelection,
   recolorLassoSelection,
   recolorStrokeSelection,
   removeLassoSelection,
@@ -124,6 +126,7 @@ const ruler = ref<RulerState>(createRulerState({
 let rulerMove: {
   lastPoint: StrokePoint;
 } | null = null;
+const LASSO_DUPLICATE_OFFSET = 24;
 
 const rulerStyle = computed(() => ({
   left: `${ruler.value.x}px`,
@@ -544,6 +547,34 @@ function recolorLasso(color: string) {
   updateUndoRedoState();
   emit("stroke");
 }
+function duplicateLassoSelection() {
+  if (selectedLassoIds.length === 0) return;
+  const copiedIds = selectedLassoIds.map((id) => `copy-${Date.now()}-${id}`);
+  const idByOriginal = new Map(selectedLassoIds.map((id, index) => [id, copiedIds[index]]));
+  const createCopyId = (id: string) => idByOriginal.get(id) ?? `copy-${Date.now()}-${id}`;
+
+  pushHistorySnapshot(state);
+  state.elements = duplicateLassoElements(
+    state.elements,
+    selectedLassoIds,
+    LASSO_DUPLICATE_OFFSET,
+    LASSO_DUPLICATE_OFFSET,
+    createCopyId,
+  );
+  state.strokes = duplicateStrokeSelection(
+    state.strokes,
+    selectedLassoIds,
+    LASSO_DUPLICATE_OFFSET,
+    LASSO_DUPLICATE_OFFSET,
+    createCopyId,
+  );
+  selectedLassoIds = copiedIds;
+  state.isDirty = true;
+  fullRedrawStrokeCanvas(getCanvas(), state);
+  drawLassoSelectionOutline();
+  updateUndoRedoState();
+  emit("stroke");
+}
 function rotateRulerBy(delta: number) {
   ruler.value = rotateRuler(ruler.value, ruler.value.angle + delta);
 }
@@ -582,6 +613,7 @@ defineExpose({
   insertImage,
   restoreData,
   deleteLassoSelection,
+  duplicateLassoSelection,
   recolorLasso,
   rotateRulerBy,
 });
