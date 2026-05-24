@@ -671,58 +671,123 @@ function onHeightChanged(_h: number) {}
 .sketch-editor {
   position: fixed; inset: 0; z-index: 999;
   background: var(--b3-theme-background);
-  display: flex; flex-direction: column;
+  overflow: hidden;
 }
 
-/* ── Header ── */
+/* ── 凌空悬浮的磨砂中控顶部卡片 ── */
 .sketch-editor__header {
-  background: var(--b3-theme-surface);
-  border-bottom: 1px solid var(--b3-border-color);
-  flex-shrink: 0;
-  padding: 6px 12px;
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  right: 12px;
+  z-index: 1000;
+  background: rgba(28, 28, 30, 0.88);
+  backdrop-filter: blur(14px) saturate(160%);
+  -webkit-backdrop-filter: blur(14px) saturate(160%);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 16px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.25), 0 2px 8px rgba(0, 0, 0, 0.12);
+  padding: 8px 16px;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
 }
+
 .sketch-editor__row {
-  display: flex; align-items: center; gap: 8px;
+  display: flex; align-items: center; gap: 10px;
   min-height: 36px;
   overflow-x: auto;
-  scrollbar-width: thin;
+  scrollbar-width: none;
 }
+.sketch-editor__row::-webkit-scrollbar {
+  display: none;
+}
+
 .sketch-editor__row--tools {
-  margin-top: 6px;
-  padding-top: 6px;
-  border-top: 1px solid var(--b3-border-color);
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
 }
 .sketch-editor__title {
-  font-weight: 500; font-size: 14px; color: var(--b3-theme-on-surface);
+  font-weight: 500; font-size: 14px; color: #fff;
   white-space: nowrap;
 }
 .sketch-spacer { flex: 1; }
 
-/* ── Shared button base ── */
+/* ── 统一的主工具栏按钮 ── */
 .sketch-btn {
   pointer-events: auto !important;
   box-sizing: border-box;
   display: inline-flex; align-items: center; justify-content: center;
-  padding: 5px 10px; border-radius: 6px;
-  border: 1px solid var(--b3-border-color);
-  background: var(--b3-theme-surface) !important;
-  color: var(--b3-theme-on-surface);
+  padding: 5px 12px; border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.08) !important;
+  background: rgba(255, 255, 255, 0.05) !important;
+  color: rgba(255, 255, 255, 0.8) !important;
   cursor: pointer; font-size: 13px;
   white-space: nowrap; user-select: none;
   -webkit-tap-highlight-color: transparent;
-  min-height: 30px;
+  min-height: 32px;
+  transition: all 0.2s cubic-bezier(0.25, 0.8, 0.25, 1);
 }
-.sketch-btn:active { opacity: 0.8; }
-.sketch-btn:disabled { opacity: 0.35; cursor: not-allowed; }
+.sketch-btn:hover {
+  background: rgba(255, 255, 255, 0.15) !important;
+  border-color: rgba(255, 255, 255, 0.18) !important;
+  color: #fff !important;
+  transform: scale(1.03);
+}
+.sketch-btn:active {
+  transform: scale(0.96);
+}
+.sketch-btn:disabled {
+  opacity: 0.4;
+  transform: none !important;
+  cursor: not-allowed;
+}
 
 .sketch-btn--back   { font-size: 13px; }
-.sketch-btn--save   { background: var(--b3-theme-primary) !important; color: var(--b3-theme-on-primary); border-color: var(--b3-theme-primary); }
+.sketch-btn--save   {
+  background: var(--b3-theme-primary) !important;
+  border-color: transparent !important;
+  color: #fff !important;
+  font-weight: 500;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+}
+.sketch-btn--save:hover {
+  background: var(--b3-theme-primary) !important;
+  opacity: 0.92;
+  box-shadow: 0 4px 16px rgba(var(--b3-theme-primary-rgb), 0.3);
+}
 
-.sketch-btn--toggle { font-size: 12px; }
-.sketch-btn--toggle-on { border-color: var(--b3-theme-primary); color: var(--b3-theme-primary); }
+.sketch-btn--toggle {
+  color: rgba(255, 255, 255, 0.65) !important;
+}
+.sketch-btn--toggle-on {
+  background: rgba(255, 255, 255, 0.18) !important;
+  border-color: var(--b3-theme-primary) !important;
+  color: #fff !important;
+}
 
-.sketch-btn--tool { font-size: 13px; min-width: 44px; }
-.sketch-btn--tool-active { background: var(--b3-theme-primary-light) !important; border-color: var(--b3-theme-primary); }
+/* 主绘图工具按钮（极致精炼磨砂风） */
+.sketch-btn--tool {
+  font-size: 13px;
+  min-width: 44px;
+  background: transparent !important;
+  border: 1px solid transparent !important;
+  color: rgba(255, 255, 255, 0.65) !important;
+  border-radius: 8px;
+}
+.sketch-btn--tool:hover {
+  background: rgba(255, 255, 255, 0.08) !important;
+  color: #fff !important;
+  border-color: transparent !important;
+}
+.sketch-btn--tool-active {
+  background: var(--b3-theme-primary) !important;
+  color: #fff !important;
+  border-color: transparent !important;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.15);
+}
 .sketch-btn--icon-tool {
   gap: 4px;
   padding: 5px 8px;
@@ -739,7 +804,18 @@ function onHeightChanged(_h: number) {}
   font-size: 12px;
 }
 
-.sketch-btn--action { font-size: 13px; min-width: 52px; }
+.sketch-btn--action {
+  font-size: 13px;
+  min-width: 52px;
+  background: rgba(255, 255, 255, 0.04) !important;
+  border: 1px solid rgba(255, 255, 255, 0.06) !important;
+  color: rgba(255, 255, 255, 0.75) !important;
+}
+.sketch-btn--action:hover {
+  background: rgba(255, 255, 255, 0.12) !important;
+  border-color: rgba(255, 255, 255, 0.15) !important;
+  color: #fff !important;
+}
 
 .sketch-tool-options {
   display: flex;
@@ -900,8 +976,13 @@ function onHeightChanged(_h: number) {}
 
 /* ── Body ── */
 .sketch-editor__body {
-  flex: 1; overflow-y: auto; touch-action: none;
-  padding: 12px 0;
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  overflow: hidden;
+  /* 顶部留出 116px 空间，恰好容纳绝对悬浮的双层中控顶卡，保证书写区域初始不在遮挡下 */
+  padding: 116px 0 12px 0;
+  box-sizing: border-box;
 }
 
 @media (max-width: 760px) {

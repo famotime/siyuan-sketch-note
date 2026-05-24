@@ -172,36 +172,141 @@ function onClearSearch() {
 </script>
 
 <style scoped>
-.sketch-search {
-  display: inline-flex;
+.sketch-editor__row {
+  display: flex;
   align-items: center;
-  gap: 4px;
+  gap: 10px;
+  min-height: 44px;
+  width: 100%;
 }
-.sketch-search--open {
-  background: var(--b3-theme-background);
-  border: 1px solid var(--b3-border-color);
-  border-radius: 6px;
-  padding: 2px 6px;
-}
-.sketch-search__bar {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-}
-.sketch-search__input {
-  width: 160px;
-  padding: 3px 8px;
-  border: 1px solid var(--b3-border-color);
-  border-radius: 4px;
+
+/* ── 统一的悬浮顶栏按钮 ── */
+.sketch-btn {
+  background: rgba(255, 255, 255, 0.05) !important;
+  border: 1px solid rgba(255, 255, 255, 0.08) !important;
+  color: rgba(255, 255, 255, 0.8) !important;
+  border-radius: 8px;
+  padding: 5px 12px;
+  cursor: pointer;
   font-size: 13px;
-  background: var(--b3-theme-surface);
-  color: var(--b3-theme-on-surface);
+  min-height: 32px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s cubic-bezier(0.25, 0.8, 0.25, 1);
+  user-select: none;
+  box-sizing: border-box;
 }
-.sketch-search__count {
+.sketch-btn:hover {
+  background: rgba(255, 255, 255, 0.15) !important;
+  border-color: rgba(255, 255, 255, 0.18) !important;
+  color: #fff !important;
+  transform: scale(1.03);
+}
+.sketch-btn:active {
+  transform: scale(0.96);
+}
+
+.sketch-btn--back {
+  background: rgba(255, 255, 255, 0.08) !important;
+  border-color: rgba(255, 255, 255, 0.12) !important;
+  font-weight: 500;
+}
+
+/* ── Toggle 开关按钮样式 ── */
+.sketch-btn--toggle {
+  color: rgba(255, 255, 255, 0.65) !important;
+}
+.sketch-btn--toggle-on {
+  background: rgba(255, 255, 255, 0.18) !important;
+  border-color: var(--b3-theme-primary) !important;
+  color: #fff !important;
+  box-shadow: 0 0 8px rgba(var(--b3-theme-primary-rgb), 0.15);
+}
+
+/* ── 手动保存主按钮 ── */
+.sketch-btn--save {
+  background: var(--b3-theme-primary) !important;
+  border-color: transparent !important;
+  color: #fff !important;
+  font-weight: 500;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+}
+.sketch-btn--save:hover {
+  background: var(--b3-theme-primary) !important;
+  opacity: 0.92;
+  box-shadow: 0 4px 16px rgba(var(--b3-theme-primary-rgb), 0.3);
+  transform: scale(1.03);
+}
+.sketch-btn--save:active {
+  transform: scale(0.96);
+}
+.sketch-btn--save:disabled {
+  opacity: 0.4 !important;
+  transform: none !important;
+  cursor: not-allowed;
+}
+
+/* ── 下拉选择菜单 ── */
+.sketch-select {
+  background: rgba(255, 255, 255, 0.05) !important;
+  border: 1px solid rgba(255, 255, 255, 0.08) !important;
+  color: rgba(255, 255, 255, 0.8) !important;
+  border-radius: 8px;
+  padding: 4px 10px;
+  font-size: 13px;
+  min-height: 32px;
+  outline: none;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  box-sizing: border-box;
+}
+.sketch-select:hover {
+  background: rgba(255, 255, 255, 0.12) !important;
+  border-color: rgba(255, 255, 255, 0.18) !important;
+  color: #fff !important;
+}
+.sketch-select option {
+  background: #1c1c1e;
+  color: #fff;
+}
+
+/* ── 标题样式 ── */
+.sketch-editor__title {
+  font-weight: 600;
+  font-size: 14px;
+  color: #fff;
+  letter-spacing: 0.5px;
+  text-shadow: 0 2px 4px rgba(0,0,0,0.15);
+  margin-left: 4px;
+}
+
+/* ── 柔光霓虹色状态指示 ── */
+.sketch-status {
   font-size: 11px;
-  color: var(--b3-theme-on-surface-light);
-  white-space: nowrap;
-  min-width: 24px;
+  font-weight: 500;
+  min-width: 48px;
   text-align: center;
+  padding: 2px 8px;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+}
+.sketch-status--saved  { color: #2ecc71; border-color: rgba(46, 204, 113, 0.2); background: rgba(46, 204, 113, 0.05); }
+.sketch-status--saving { color: rgba(255, 255, 255, 0.5); }
+.sketch-status--error  { color: #e74c3c; border-color: rgba(231, 76, 60, 0.2); background: rgba(231, 76, 60, 0.05); }
+.sketch-status--dirty  { color: #f39c12; border-color: rgba(243, 156, 18, 0.2); background: rgba(243, 156, 18, 0.05); }
+
+/* 恢复损坏提示 */
+.sketch-recovery {
+  color: #f39c12;
+  font-size: 11px;
+  white-space: nowrap;
+  font-weight: 500;
+  text-shadow: 0 0 4px rgba(243, 156, 18, 0.2);
+}
+
+.sketch-spacer {
+  flex: 1;
 }
 </style>
