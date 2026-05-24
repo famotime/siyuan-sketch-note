@@ -1,5 +1,6 @@
 import type { SketchData } from "@/types/sketch";
 import { DEFAULT_SKETCH_DATA } from "@/types/sketch";
+import { migrateStrokesToElements } from "@/elements/model";
 
 export { thumbnailCanvas } from "./thumbnail";
 
@@ -33,7 +34,11 @@ export async function loadSketchData(
     return null;
   }
 
-  return raw as SketchData;
+  const data = raw as SketchData;
+  return {
+    ...data,
+    elements: data.elements ?? migrateStrokesToElements(data.strokes),
+  };
 }
 
 /**
@@ -55,6 +60,7 @@ export function createEmptySketchData(templateId: string): SketchData {
   return {
     ...DEFAULT_SKETCH_DATA,
     template: templateId,
+    elements: [],
     strokes: [],
   };
 }

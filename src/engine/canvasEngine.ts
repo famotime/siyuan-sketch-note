@@ -5,6 +5,7 @@ import {
 } from "@/types/sketch";
 import { getTemplate } from "@/template";
 import { normalizeToolPresets } from "@/tools/presets";
+import { migrateStrokesToElements } from "@/elements/model";
 import {
   filterStrokePointsByDistance,
   getPressureWidth,
@@ -211,6 +212,7 @@ export function serializeState(state: EngineState): SketchData {
     canvasWidth: state.canvasWidth,
     canvasHeight: state.canvasHeight,
     toolPresets: state.toolPresets,
+    elements: migrateStrokesToElements(state.strokes),
     strokes: state.strokes,
   };
 }

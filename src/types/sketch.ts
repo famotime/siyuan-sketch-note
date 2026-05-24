@@ -1,3 +1,5 @@
+import type { SketchElement } from "@/elements/model";
+
 export interface StrokePoint {
   x: number;
   y: number;
@@ -20,6 +22,7 @@ export interface SketchData {
   canvasWidth: number;
   canvasHeight: number;
   toolPresets?: ToolPresetCollection;
+  elements?: SketchElement[];
   strokes: Stroke[];
 }
 
