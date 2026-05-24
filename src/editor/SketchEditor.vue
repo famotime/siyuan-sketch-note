@@ -204,6 +204,7 @@ import { SaveQueue } from "@/storage/saveQueue";
 import { createSaveStatusLabel } from "@/storage/saveStatus";
 import type { SaveStatus } from "@/storage/saveStatus";
 import { getFirstImageFileFromClipboard } from "./clipboard";
+import { resolveEditorShortcut } from "./shortcuts";
 import { getDrawingToolForEditorTool } from "./tools";
 import type { EditorTool } from "./tools";
 import SketchCanvas from "./SketchCanvas.vue";
@@ -247,12 +248,14 @@ onMounted(() => {
   visible.value = true;
   document.body.style.overflow = "hidden";
   window.addEventListener("paste", onPaste);
+  window.addEventListener("keydown", onKeyDown);
 });
 
 onUnmounted(() => {
   document.body.style.overflow = "";
   if (autoSaveTimer) clearTimeout(autoSaveTimer);
   window.removeEventListener("paste", onPaste);
+  window.removeEventListener("keydown", onKeyDown);
 });
 
 // ─── Toolbar actions ───
@@ -424,6 +427,29 @@ async function onPaste(event: ClipboardEvent) {
   const dataUrl = await readFileAsDataUrl(file);
   await canvasRef.value?.insertImage(dataUrl);
   onStroke();
+}
+
+function onKeyDown(event: KeyboardEvent) {
+  const shortcut = resolveEditorShortcut(event);
+  if (!shortcut) return;
+
+  event.preventDefault();
+  event.stopPropagation();
+
+  switch (shortcut.type) {
+    case "save":
+      manualSave();
+      break;
+    case "undo":
+      canvasRef.value?.doUndo();
+      break;
+    case "redo":
+      canvasRef.value?.doRedo();
+      break;
+    case "tool":
+      activeTool.value = shortcut.tool;
+      break;
+  }
 }
 
 function readFileAsDataUrl(file: File): Promise<string> {
