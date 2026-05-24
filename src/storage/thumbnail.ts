@@ -1,33 +1,69 @@
-import { CANVAS_LOGICAL_WIDTH } from "@/types/sketch";
 import { getTemplate } from "@/template";
 import type { Stroke } from "@/types/sketch";
 
-const THUMBNAIL_WIDTH = CANVAS_LOGICAL_WIDTH;
+const PADDING = 40;
+const MIN_WIDTH = 200;
+const MIN_HEIGHT = 150;
 
 /**
- * Render strokes to a PNG data URL for thumbnail display.
- * Uses a separate offscreen canvas at logical resolution.
+ * Calculate the bounding box of all strokes, with padding.
+ * Returns null if there are no strokes.
+ */
+function strokesBounds(strokes: Stroke[]): { x: number; y: number; w: number; h: number } | null {
+  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+
+  for (const stroke of strokes) {
+    const halfW = stroke.width / 2;
+    for (const pt of stroke.points) {
+      minX = Math.min(minX, pt.x - halfW);
+      minY = Math.min(minY, pt.y - halfW);
+      maxX = Math.max(maxX, pt.x + halfW);
+      maxY = Math.max(maxY, pt.y + halfW);
+    }
+  }
+
+  if (minX === Infinity) return null;
+
+  return {
+    x: minX - PADDING,
+    y: minY - PADDING,
+    w: maxX - minX + PADDING * 2,
+    h: maxY - minY + PADDING * 2,
+  };
+}
+
+/**
+ * Render strokes to a PNG data URL.
+ * Canvas size is determined by the actual stroke bounding box + padding,
+ * rather than the full editing canvas size.
  */
 export function thumbnailCanvas(
   strokes: Stroke[],
   templateId: string,
-  canvasHeight: number
+  _canvasHeight: number
 ): string {
-  const width = THUMBNAIL_WIDTH;
-  const height = canvasHeight;
+  const bounds = strokesBounds(strokes);
+
+  const width = bounds ? Math.max(Math.ceil(bounds.w), MIN_WIDTH) : MIN_WIDTH;
+  const height = bounds ? Math.max(Math.ceil(bounds.h), MIN_HEIGHT) : MIN_HEIGHT;
 
   const canvas = document.createElement("canvas");
   canvas.width = width;
   canvas.height = height;
   const ctx = canvas.getContext("2d")!;
 
-  // Render template background
+  // Render template background at the output size
   const template = getTemplate(templateId);
   template.render(ctx, width, height);
 
-  // Render all strokes
-  for (const stroke of strokes) {
-    renderStrokeToCtx(ctx, stroke);
+  // Translate so that the stroke bounding box origin maps to (0, 0)
+  if (bounds) {
+    ctx.save();
+    ctx.translate(-bounds.x, -bounds.y);
+    for (const stroke of strokes) {
+      renderStrokeToCtx(ctx, stroke);
+    }
+    ctx.restore();
   }
 
   return canvas.toDataURL("image/png");

@@ -1,12 +1,11 @@
 import { thumbnailCanvas } from "@/storage/thumbnail";
-import { CANVAS_LOGICAL_WIDTH, CANVAS_INITIAL_HEIGHT } from "@/types/sketch";
 
 /**
  * Create a placeholder PNG blob for a sketch block.
  * Uses the template renderer to generate a blank canvas image.
  */
 export function createPlaceholderPng(templateId: string): Blob {
-  const dataUrl = thumbnailCanvas([], templateId, CANVAS_INITIAL_HEIGHT);
+  const dataUrl = thumbnailCanvas([], templateId, 0);
   const byteString = atob(dataUrl.split(",")[1]);
   const mimeString = dataUrl.split(",")[0].split(":")[1].split(";")[0];
   const ab = new ArrayBuffer(byteString.length);
