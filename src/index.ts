@@ -17,6 +17,8 @@ import {
 
 const SKETCH_IMAGE_PATTERN = /sketch-note-.+\.png$/;
 
+const ICON_SVG = `<svg width="24" height="24" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg"><g clip-path="url(#icon-06d555852696ccc)"><path d="M30.9995 8.99902L38.9995 16.999" stroke="#333" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/><path d="M7.99953 31.999L35.9994 4L43.9995 11.999L15.9995 39.999L5.99951 41.999L7.99953 31.999Z" stroke="#333" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/><path d="M30.9995 8.99902L38.9995 16.999" stroke="#333" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/><path d="M8.99951 31.999L15.9995 38.999" stroke="#333" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/><path d="M12.9995 34.999L34.9995 12.999" stroke="#333" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/></g><defs><clipPath id="icon-06d555852696ccc"><rect width="48" height="48" fill="#333"/></clipPath></defs></svg>`;
+
 export default class SketchNotePlugin extends Plugin {
   public isMobile = false;
   public isBrowser = false;
@@ -47,7 +49,7 @@ export default class SketchNotePlugin extends Plugin {
 
     // Add top bar button
     this.addTopBar({
-      icon: "iconPencil",
+      icon: ICON_SVG,
       title: this.i18n?.insertSketch ?? "Insert Sketch Block",
       callback: () => this.insertSketchBlock(),
     });
@@ -140,7 +142,7 @@ export default class SketchNotePlugin extends Plugin {
     const editBtn = document.createElement("span");
     editBtn.className = "b3-tooltips b3-tooltips__se sketch-note-edit-btn";
     editBtn.setAttribute("aria-label", this.i18n?.editSketch ?? "Edit Sketch");
-    editBtn.innerHTML = `<svg><use xlink:href="#iconPencil"></use></svg>`;
+    editBtn.innerHTML = ICON_SVG;
     editBtn.addEventListener("click", (e) => {
       e.preventDefault();
       e.stopPropagation();
@@ -168,6 +170,7 @@ export default class SketchNotePlugin extends Plugin {
     window.siyuan.menus.menu.addItem({
       id: "edit-sketch-note",
       label: this.i18n?.editSketch ?? "Edit Sketch",
+      iconHTML: ICON_SVG,
       click: () => openSketchEditor(blockId),
     });
   }
