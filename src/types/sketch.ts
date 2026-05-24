@@ -19,7 +19,6 @@ export interface SketchData {
   canvasWidth: number;
   canvasHeight: number;
   strokes: Stroke[];
-  thumbnail: string | null; // data:image/png;base64,...
 }
 
 export const DEFAULT_SKETCH_DATA: SketchData = {
@@ -28,7 +27,6 @@ export const DEFAULT_SKETCH_DATA: SketchData = {
   canvasWidth: 800,
   canvasHeight: 1200,
   strokes: [],
-  thumbnail: null,
 };
 
 export type SketchTool = "pen" | "eraser";

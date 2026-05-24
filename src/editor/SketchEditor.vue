@@ -39,6 +39,7 @@ import type { SketchData, SketchTool } from "@/types/sketch";
 import { PRESET_COLORS } from "@/types/sketch";
 import { getAllTemplates } from "@/template";
 import { thumbnailCanvas } from "@/storage/thumbnail";
+import { sketchAssetFileName, uploadDataUrlToAssets } from "@/utils/uploadPng";
 import SketchCanvas from "./SketchCanvas.vue";
 import SketchToolbar from "./SketchToolbar.vue";
 
@@ -71,10 +72,17 @@ onMounted(() => {
 async function doSave() {
   if (!canvasRef.value) return;
   const data = canvasRef.value.getData();
-  data.thumbnail = thumbnailCanvas(data.strokes, data.template, data.canvasHeight);
   data.template = currentTemplate.value;
+
+  // Generate PNG and upload to assets
+  const pngDataUrl = thumbnailCanvas(data.strokes, data.template, data.canvasHeight);
+  const fileName = sketchAssetFileName(props.blockId);
+  await uploadDataUrlToAssets(pngDataUrl, fileName);
+
+  // Save stroke data to plugin storage
   const key = `sketch:${props.blockId}`;
   await props.saveData(key, data);
+
   document.body.style.overflow = "";
   emit("close");
 }

@@ -219,7 +219,6 @@ export function serializeState(state: EngineState): SketchData {
     canvasWidth: state.canvasWidth,
     canvasHeight: state.canvasHeight,
     strokes: state.strokes,
-    thumbnail: null,
   };
 }
 

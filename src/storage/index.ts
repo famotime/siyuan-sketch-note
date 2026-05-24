@@ -50,6 +50,5 @@ export function createEmptySketchData(templateId: string): SketchData {
     ...DEFAULT_SKETCH_DATA,
     template: templateId,
     strokes: [],
-    thumbnail: null,
   };
 }
