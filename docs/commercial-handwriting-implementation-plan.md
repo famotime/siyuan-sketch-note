@@ -153,15 +153,16 @@
 **Files:**
 - Create: `docs/commercial-handwriting-completion-audit.md`
 - Create: `docs/manual-verification-checklist.md`
+- Create: `docs/plugin-release-preflight.md`
 - Modify: `docs/commercial-handwriting-implementation-plan.md`
 
 - [x] 根据当前代码证据补充完成度审计。
 - [x] 将 Batch 0-6 checkbox 与审计状态对齐。
 - [x] 建立手动验证清单：插入手写块、保存、重开、缩略图、分页、导出、JSON 恢复、移动端触控笔。
-- [ ] 执行 SiYuan 插件发布预检，记录 `plugin.json`、README、图标、预览图、`package.zip` 内容和版本。
+- [x] 执行 SiYuan 插件发布预检，记录 `plugin.json`、README、图标、预览图、`package.zip` 内容和版本。
 - [x] 明确当前不纳入提交的本地资产变更：`icon.png`、`package.zip`。
 - [x] 运行 `pnpm test` 和 `pnpm build`。
-- [ ] 提交：`docs: 对齐商业手写开发计划状态`。
+- [x] 提交：`docs: 对齐商业手写开发计划状态`。
 
 ## Batch 8: 专业编辑器 UI 产品化
 
