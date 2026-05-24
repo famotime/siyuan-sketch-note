@@ -150,6 +150,7 @@ import { sketchAssetFileName, uploadDataUrlToAssets } from "@/utils/uploadPng";
 import { normalizeToolPresets, updateToolPreset } from "@/tools/presets";
 import { createExportPngFileName, dataUrlToBlob, downloadBlob } from "@/export/png";
 import { SaveQueue } from "@/storage/saveQueue";
+import { getFirstImageFileFromClipboard } from "./clipboard";
 import { getDrawingToolForEditorTool } from "./tools";
 import type { EditorTool } from "./tools";
 import SketchCanvas from "./SketchCanvas.vue";
@@ -200,11 +201,13 @@ const activePreset = computed(() => toolPresets.value[getDrawingToolForEditorToo
 onMounted(() => {
   visible.value = true;
   document.body.style.overflow = "hidden";
+  window.addEventListener("paste", onPaste);
 });
 
 onUnmounted(() => {
   document.body.style.overflow = "";
   if (autoSaveTimer) clearTimeout(autoSaveTimer);
+  window.removeEventListener("paste", onPaste);
 });
 
 // ─── Toolbar actions ───
@@ -314,6 +317,19 @@ async function onImageSelected(event: Event) {
   const file = input.files?.[0];
   input.value = "";
   if (!file) return;
+  const dataUrl = await readFileAsDataUrl(file);
+  await canvasRef.value?.insertImage(dataUrl);
+  onStroke();
+}
+
+async function onPaste(event: ClipboardEvent) {
+  const file = event.clipboardData
+    ? getFirstImageFileFromClipboard(event.clipboardData.items)
+    : null;
+  if (!file) return;
+
+  event.preventDefault();
+  activeTool.value = "image";
   const dataUrl = await readFileAsDataUrl(file);
   await canvasRef.value?.insertImage(dataUrl);
   onStroke();

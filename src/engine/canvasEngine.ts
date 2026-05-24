@@ -25,14 +25,19 @@ export interface EngineState {
   strokes: Stroke[];
   elements: SketchElement[];
   currentStroke: Stroke | null;
-  undoStack: Stroke[][];
-  redoStack: Stroke[][];
+  undoStack: EngineSnapshot[];
+  redoStack: EngineSnapshot[];
   tool: SketchTool;
   toolPresets: ToolPresetCollection;
   canvasWidth: number;
   canvasHeight: number;
   templateId: string;
   isDirty: boolean;
+}
+
+export interface EngineSnapshot {
+  strokes: Stroke[];
+  elements: SketchElement[];
 }
 
 export function createEngineState(
@@ -92,6 +97,23 @@ export function preloadImage(src: string): Promise<void> {
     image.onerror = () => reject(new Error("Failed to load image element"));
     image.src = src;
   });
+}
+
+export function pushHistorySnapshot(state: EngineState): void {
+  state.undoStack.push(createSnapshot(state));
+  state.redoStack = [];
+}
+
+function createSnapshot(state: EngineState): EngineSnapshot {
+  return {
+    strokes: [...state.strokes],
+    elements: state.elements.map((element) => ({ ...element, bounds: { ...element.bounds } })),
+  };
+}
+
+function restoreSnapshot(state: EngineState, snapshot: EngineSnapshot): void {
+  state.strokes = [...snapshot.strokes];
+  state.elements = snapshot.elements.map((element) => ({ ...element, bounds: { ...element.bounds } }));
 }
 
 export function setupBackgroundCanvas(
@@ -182,8 +204,7 @@ export function handlePointerMove(
 export function handlePointerUp(state: EngineState): boolean {
   if (!state.currentStroke) return false;
   state.currentStroke.points = filterStrokePointsByDistance(state.currentStroke.points, MIN_POINT_DISTANCE);
-  state.undoStack.push([...state.strokes]);
-  state.redoStack = [];
+  pushHistorySnapshot(state);
   state.strokes.push(state.currentStroke);
   state.currentStroke = null;
   state.isDirty = true;
@@ -192,25 +213,25 @@ export function handlePointerUp(state: EngineState): boolean {
 
 export function undo(state: EngineState): boolean {
   if (state.undoStack.length === 0) return false;
-  state.redoStack.push([...state.strokes]);
-  state.strokes = state.undoStack.pop()!;
+  state.redoStack.push(createSnapshot(state));
+  restoreSnapshot(state, state.undoStack.pop()!);
   state.isDirty = true;
   return true;
 }
 
 export function redo(state: EngineState): boolean {
   if (state.redoStack.length === 0) return false;
-  state.undoStack.push([...state.strokes]);
-  state.strokes = state.redoStack.pop()!;
+  state.undoStack.push(createSnapshot(state));
+  restoreSnapshot(state, state.redoStack.pop()!);
   state.isDirty = true;
   return true;
 }
 
 export function clearAll(state: EngineState): void {
-  if (state.strokes.length === 0) return;
-  state.undoStack.push([...state.strokes]);
-  state.redoStack = [];
+  if (state.strokes.length === 0 && state.elements.length === 0) return;
+  pushHistorySnapshot(state);
   state.strokes = [];
+  state.elements = [];
   state.isDirty = true;
 }
 

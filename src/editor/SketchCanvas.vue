@@ -38,6 +38,7 @@ import {
   serializeState,
   preloadElementImages,
   preloadImage,
+  pushHistorySnapshot,
 } from "@/engine/canvasEngine";
 import type { EngineState } from "@/engine/canvasEngine";
 import {
@@ -47,6 +48,12 @@ import {
 } from "@/elements/shapes";
 import { createImageElement } from "@/elements/image";
 import { createTextElement } from "@/elements/text";
+import {
+  hitTestElement,
+  isInResizeCorner,
+  moveElement,
+  resizeElementFromCorner,
+} from "@/elements/transform";
 import { isShapeEditorTool } from "./tools";
 import type { EditorTool } from "./tools";
 
@@ -69,6 +76,12 @@ const bgCanvasRef = ref<HTMLCanvasElement>();
 const strokeCanvasRef = ref<HTMLCanvasElement>();
 let state: EngineState;
 let shapeStart: StrokePoint | null = null;
+let imageTransform: {
+  elementId: string;
+  lastPoint: StrokePoint;
+  mode: "move" | "resize";
+} | null = null;
+let selectedElementId: string | null = null;
 const rulerY = ref(220);
 
 onMounted(async () => {
@@ -110,6 +123,26 @@ function eventPoint(e: PointerEvent): StrokePoint {
 function onPointerDown(e: PointerEvent) {
   e.preventDefault();
   (e.target as HTMLElement).setPointerCapture(e.pointerId);
+  if (props.tool === "image") {
+    const point = eventPoint(e);
+    const element = hitTestElement(
+      state.elements.filter((item) => item.type === "image"),
+      point.x,
+      point.y,
+    );
+    selectedElementId = element?.id ?? null;
+    if (element) {
+      imageTransform = {
+        elementId: element.id,
+        lastPoint: point,
+        mode: isInResizeCorner(element, point.x, point.y) ? "resize" : "move",
+      };
+      pushHistorySnapshot(state);
+    }
+    fullRedrawStrokeCanvas(getCanvas(), state);
+    drawSelectionOutline();
+    return;
+  }
   if (isShapeEditorTool(props.tool)) {
     shapeStart = eventPoint(e);
     return;
@@ -122,6 +155,22 @@ function onPointerDown(e: PointerEvent) {
 
 function onPointerMove(e: PointerEvent) {
   e.preventDefault();
+  if (imageTransform) {
+    const point = eventPoint(e);
+    const dx = point.x - imageTransform.lastPoint.x;
+    const dy = point.y - imageTransform.lastPoint.y;
+    state.elements = state.elements.map((element) => {
+      if (element.id !== imageTransform?.elementId) return element;
+      return imageTransform.mode === "move"
+        ? moveElement(element, dx, dy)
+        : resizeElementFromCorner(element, "se", dx, dy);
+    });
+    imageTransform.lastPoint = point;
+    state.isDirty = true;
+    fullRedrawStrokeCanvas(getCanvas(), state);
+    drawSelectionOutline();
+    return;
+  }
   if (shapeStart) return;
   const prevHeight = state.canvasHeight;
   const heightChanged = enginePointerMove(state, e, getCanvas());
@@ -132,6 +181,12 @@ function onPointerMove(e: PointerEvent) {
 }
 
 function onPointerUp(e: PointerEvent) {
+  if (imageTransform) {
+    imageTransform = null;
+    updateUndoRedoState();
+    emit("stroke");
+    return;
+  }
   if (shapeStart && isShapeEditorTool(props.tool)) {
     const preset = props.toolPresets.pen;
     const end = eventPoint(e);
@@ -140,8 +195,7 @@ function onPointerUp(e: PointerEvent) {
       : props.tool === "rectangle"
         ? createRectangleStroke(`shape-${Date.now()}`, shapeStart, end, preset)
         : createEllipseStroke(`shape-${Date.now()}`, shapeStart, end, preset);
-    state.undoStack.push([...state.strokes]);
-    state.redoStack = [];
+    pushHistorySnapshot(state);
     state.strokes.push(stroke);
     shapeStart = null;
     fullRedrawStrokeCanvas(getCanvas(), state);
@@ -161,6 +215,27 @@ function updateUndoRedoState() {
   emit("update:canRedo", state.redoStack.length > 0);
 }
 
+function drawSelectionOutline() {
+  if (!selectedElementId) return;
+  const element = state.elements.find((item) => item.id === selectedElementId);
+  if (!element) return;
+  const ctx = getCanvas().getContext("2d")!;
+  ctx.save();
+  ctx.strokeStyle = "#2f80ed";
+  ctx.lineWidth = 1;
+  ctx.setLineDash([6, 4]);
+  ctx.strokeRect(element.bounds.x, element.bounds.y, element.bounds.width, element.bounds.height);
+  ctx.setLineDash([]);
+  ctx.fillStyle = "#2f80ed";
+  ctx.fillRect(
+    element.bounds.x + element.bounds.width - 10,
+    element.bounds.y + element.bounds.height - 10,
+    10,
+    10,
+  );
+  ctx.restore();
+}
+
 function doUndo() { engineUndo(state); fullRedrawStrokeCanvas(getCanvas(), state); updateUndoRedoState(); emit("stroke"); }
 function doRedo() { engineRedo(state); fullRedrawStrokeCanvas(getCanvas(), state); updateUndoRedoState(); emit("stroke"); }
 function doClear() { engineClear(state); fullRedrawStrokeCanvas(getCanvas(), state); updateUndoRedoState(); emit("stroke"); }
@@ -172,8 +247,7 @@ function insertText() {
     y: 120,
     text: "Text",
   });
-  state.undoStack.push([...state.strokes]);
-  state.redoStack = [];
+  pushHistorySnapshot(state);
   state.elements = [...state.elements, element];
   fullRedrawStrokeCanvas(getCanvas(), state);
   updateUndoRedoState();
@@ -185,8 +259,7 @@ async function insertImage(src: string) {
     y: 140,
     src,
   });
-  state.undoStack.push([...state.strokes]);
-  state.redoStack = [];
+  pushHistorySnapshot(state);
   state.elements = [...state.elements, element];
   fullRedrawStrokeCanvas(getCanvas(), state);
   updateUndoRedoState();
