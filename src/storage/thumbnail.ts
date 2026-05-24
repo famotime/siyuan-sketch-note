@@ -314,6 +314,10 @@ export async function renderSketchPngPageImage(
 
 /**
  * Render the final PNG: template background + translated strokes.
+ *
+ * When compositeStrokesSeparately is true, strokes are first composited on a
+ * transparent offscreen canvas (so eraser's destination-out only affects strokes,
+ * not the template background), then the result is drawn onto the template.
  */
 function renderToDataUrl(
   width: number,
@@ -323,6 +327,7 @@ function renderToDataUrl(
   tx = 0,
   ty = 0,
   elements: SketchElement[] = [],
+  compositeStrokesSeparately = true,
 ): string {
   const canvas = document.createElement("canvas");
   canvas.width = width;
@@ -336,10 +341,22 @@ function renderToDataUrl(
   const layers = splitElementsForRender(translatedElements);
   renderNonStrokeElements(ctx, layers.background);
   if (strokes.length > 0) {
-    ctx.save();
-    ctx.translate(tx, ty);
-    compositeStrokes(ctx, strokes);
-    ctx.restore();
+    if (compositeStrokesSeparately) {
+      const strokeCanvas = document.createElement("canvas");
+      strokeCanvas.width = width;
+      strokeCanvas.height = height;
+      const strokeCtx = strokeCanvas.getContext("2d")!;
+      strokeCtx.save();
+      strokeCtx.translate(tx, ty);
+      compositeStrokes(strokeCtx, strokes);
+      strokeCtx.restore();
+      ctx.drawImage(strokeCanvas, 0, 0);
+    } else {
+      ctx.save();
+      ctx.translate(tx, ty);
+      compositeStrokes(ctx, strokes);
+      ctx.restore();
+    }
   }
   renderNonStrokeElements(ctx, layers.foreground);
 
@@ -357,6 +374,7 @@ async function renderToDataUrlAsync(
   type = "image/png",
   includeBackground = true,
   data?: SketchData,
+  compositeStrokesSeparately = true,
 ): Promise<string> {
   const canvas = document.createElement("canvas");
   canvas.width = width;
@@ -397,10 +415,22 @@ async function renderToDataUrlAsync(
   const layers = splitElementsForRender(translatedElements);
   await renderNonStrokeElementsAsync(ctx, layers.background);
   if (strokes.length > 0) {
-    ctx.save();
-    ctx.translate(tx, ty);
-    compositeStrokes(ctx, strokes);
-    ctx.restore();
+    if (compositeStrokesSeparately) {
+      const strokeCanvas = document.createElement("canvas");
+      strokeCanvas.width = width;
+      strokeCanvas.height = height;
+      const strokeCtx = strokeCanvas.getContext("2d")!;
+      strokeCtx.save();
+      strokeCtx.translate(tx, ty);
+      compositeStrokes(strokeCtx, strokes);
+      strokeCtx.restore();
+      ctx.drawImage(strokeCanvas, 0, 0);
+    } else {
+      ctx.save();
+      ctx.translate(tx, ty);
+      compositeStrokes(ctx, strokes);
+      ctx.restore();
+    }
   }
   await renderNonStrokeElementsAsync(ctx, layers.foreground);
 
