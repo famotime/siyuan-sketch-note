@@ -89,6 +89,7 @@ import type { RulerState } from "@/tools/ruler";
 import {
   addSketchPage,
   createPageNavigator,
+  createPageOverviewItems,
   duplicateSketchPage,
   getSketchPages,
   removeSketchPage,
@@ -705,6 +706,7 @@ function doRedo() { selectedLassoIds = []; engineRedo(state); fullRedrawStrokeCa
 function doClear() { selectedLassoIds = []; engineClear(state); fullRedrawStrokeCanvas(getCanvas(), state); updateUndoRedoState(); emit("stroke"); }
 function getData(): SketchData { return serializeState(state); }
 function getState(): EngineState { return state; }
+function getPageOverviewItems() { return createPageOverviewItems(serializeState(state)); }
 async function restoreData(data: SketchData) {
   if (!bgCanvasRef.value || !strokeCanvasRef.value) return;
   clearInteractionState();
@@ -881,6 +883,7 @@ defineExpose({
   doClear,
   getData,
   getState,
+  getPageOverviewItems,
   insertText,
   insertImage,
   restoreData,

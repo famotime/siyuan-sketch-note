@@ -66,6 +66,7 @@
   "statusError": "保存失败",
   "dataRecovered": "已恢复损坏数据",
   "page": "第",
+  "pageOverview": "页面总览",
   "addPage": "加页",
   "duplicatePage": "复制页",
   "deletePage": "删页",

@@ -32,6 +32,21 @@
             class="sketch-btn sketch-btn--page-label"
             @click="canvasRef?.goToPage(pageState.current - 1)"
           >{{ t("page") }} {{ pageState.current }} / {{ pageState.total }}</button>
+          <div class="sketch-page-overview" :aria-label="t('pageOverview')">
+            <button
+              v-for="page in pageOverview"
+              :key="page.id"
+              class="sketch-page-overview__item"
+              :class="{
+                'sketch-page-overview__item--active': page.isActive,
+                'sketch-page-overview__item--filled': page.hasContent,
+              }"
+              :title="`${t('page')} ${page.pageNumber}`"
+              @click="canvasRef?.goToPage(page.pageNumber - 1)"
+            >
+              {{ page.pageNumber }}
+            </button>
+          </div>
           <button
             class="sketch-btn sketch-btn--page"
             :disabled="pageState.current >= pageState.total"
@@ -284,7 +299,7 @@
         @update:canUndo="canUndo = $event"
         @update:canRedo="canRedo = $event"
         @heightChanged="onHeightChanged"
-        @pagesChanged="pageState = $event"
+        @pagesChanged="onPagesChanged"
         @stroke="onStroke"
       />
     </div>
@@ -309,6 +324,7 @@ import type { SaveStatus } from "@/storage/saveStatus";
 import { normalizeInputSettings } from "./inputMode";
 import { createCustomBackgroundTemplate, getCustomBackgroundTemplate, updateCustomBackgroundFit } from "@/template/customBackground";
 import type { CustomBackgroundTemplate } from "@/template/customBackground";
+import type { PageOverviewItem } from "@/pages/model";
 import {
   addRecentColor,
   normalizeRecentColors,
@@ -345,6 +361,7 @@ const recentColors = ref(normalizeRecentColors(props.initialData?.recentColors))
 const canUndo = ref(false);
 const canRedo = ref(false);
 const pageState = ref({ current: 1, total: 1 });
+const pageOverview = ref<PageOverviewItem[]>([]);
 const currentTemplate = ref(props.initialData?.template ?? "blank");
 const templates = computed(() => [
   ...getAllTemplates(),
@@ -427,6 +444,7 @@ function markDirty() {
 }
 
 function onStroke() {
+  syncPageOverview();
   markDirty();
   if (autoSave.value) scheduleAutoSave();
 }
@@ -549,9 +567,19 @@ async function onBackgroundFitChange(value: string) {
 
 function deleteCurrentPage() {
   const removed = canvasRef.value?.deleteCurrentPage();
+  syncPageOverview();
   if (!removed) {
     showMessage(t("deletePageFailed"), 4000, "error");
   }
+}
+
+function onPagesChanged(pages: { current: number; total: number }) {
+  pageState.value = pages;
+  syncPageOverview();
+}
+
+function syncPageOverview() {
+  pageOverview.value = canvasRef.value?.getPageOverviewItems() ?? [];
 }
 
 async function onJsonSelected(event: Event) {
@@ -858,6 +886,35 @@ function onHeightChanged(_h: number) {}
   display: inline-flex;
   align-items: center;
   gap: 4px;
+}
+.sketch-page-overview {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  max-width: 180px;
+  overflow-x: auto;
+  padding: 0 2px;
+}
+.sketch-page-overview__item {
+  width: 24px;
+  height: 28px;
+  flex: 0 0 24px;
+  border: 1px solid var(--b3-border-color);
+  border-radius: 4px;
+  background: var(--b3-theme-surface);
+  color: var(--b3-theme-on-surface);
+  cursor: pointer;
+  font-size: 11px;
+  line-height: 1;
+}
+.sketch-page-overview__item--filled {
+  border-bottom-width: 3px;
+  border-bottom-color: var(--b3-theme-primary);
+}
+.sketch-page-overview__item--active {
+  background: var(--b3-theme-primary-light);
+  border-color: var(--b3-theme-primary);
+  font-weight: 700;
 }
 .sketch-btn--page {
   min-width: 28px;

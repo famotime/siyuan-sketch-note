@@ -18,6 +18,15 @@ export interface PageNavigator {
   goToPrevious: () => SketchData;
 }
 
+export interface PageOverviewItem {
+  id: string;
+  pageNumber: number;
+  isActive: boolean;
+  hasContent: boolean;
+  y: number;
+  height: number;
+}
+
 export function getSketchPages(
   data: Pick<SketchData, "activePageId" | "canvasHeight" | "canvasWidth" | "pageMode" | "pages">,
   fallbackPageHeight = DEFAULT_SKETCH_PAGE_HEIGHT,
@@ -185,6 +194,20 @@ export function createPageNavigator(data: SketchData): PageNavigator {
       return { ...data, activePageId: pages[previousIndex].id };
     },
   };
+}
+
+export function createPageOverviewItems(data: SketchData): PageOverviewItem[] {
+  const pages = getSketchPages(data);
+  const activePageId = data.activePageId ?? pages[0]?.id;
+
+  return pages.map((page) => ({
+    id: page.id,
+    pageNumber: page.index + 1,
+    isActive: page.id === activePageId,
+    hasContent: pageHasContent(page, data.strokes),
+    y: page.y,
+    height: page.height,
+  }));
 }
 
 function createPage(id: string, index: number, width: number, height: number): SketchPage {

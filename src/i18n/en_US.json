@@ -66,6 +66,7 @@
   "statusError": "Error",
   "dataRecovered": "Recovered damaged data",
   "page": "Page",
+  "pageOverview": "Page Overview",
   "addPage": "Add Page",
   "duplicatePage": "Duplicate Page",
   "deletePage": "Delete Page",

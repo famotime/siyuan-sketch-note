@@ -3,6 +3,7 @@ import type { Stroke } from "@/types/sketch";
 import {
   addSketchPage,
   createPageNavigator,
+  createPageOverviewItems,
   createPagedSketchData,
   duplicateSketchPage,
   getSketchPages,
@@ -117,6 +118,46 @@ describe("page model", () => {
     expect(createPageNavigator(data).goToIndex(99).activePageId).toBe("page-3");
     expect(createPageNavigator(data).goToPrevious().activePageId).toBe("page-2");
     expect(createPageNavigator(data).goToNext().activePageId).toBe("page-3");
+  });
+
+  it("creates page overview items with current and content state", () => {
+    const data = addSketchPage(addSketchPage(createPagedSketchData({
+      template: "blank",
+      canvasWidth: 800,
+      pageHeight: 1000,
+    })));
+    data.activePageId = "page-2";
+    data.strokes = [
+      stroke("first-page", 120),
+      stroke("third-page", 2120),
+    ];
+
+    expect(createPageOverviewItems(data)).toEqual([
+      {
+        id: "page-1",
+        pageNumber: 1,
+        isActive: false,
+        hasContent: true,
+        y: 0,
+        height: 1000,
+      },
+      {
+        id: "page-2",
+        pageNumber: 2,
+        isActive: true,
+        hasContent: false,
+        y: 1000,
+        height: 1000,
+      },
+      {
+        id: "page-3",
+        pageNumber: 3,
+        isActive: false,
+        hasContent: true,
+        y: 2000,
+        height: 1000,
+      },
+    ]);
   });
 
   it("inserts a blank page after the active page and shifts following page content", () => {
