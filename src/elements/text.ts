@@ -58,7 +58,11 @@ export function createTextElement(id: string, input: CreateTextElementInput): Te
 
 export function updateTextElement(
   element: TextElement,
-  patch: Partial<Pick<TextElement, "text" | "bounds">> & { fontSize?: number; color?: string },
+  patch: Partial<Pick<TextElement, "text" | "bounds">> & {
+    color?: string;
+    fontFamily?: string;
+    fontSize?: number;
+  },
 ): TextElement {
   return {
     ...element,
@@ -67,6 +71,7 @@ export function updateTextElement(
     style: {
       ...element.style,
       color: patch.color ?? element.style.color,
+      fontFamily: patch.fontFamily ?? element.style.fontFamily,
       fontSize: patch.fontSize ?? element.style.fontSize,
     },
   };

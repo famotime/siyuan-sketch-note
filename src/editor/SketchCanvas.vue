@@ -11,6 +11,7 @@
     <canvas
       ref="strokeCanvasRef"
       class="sketch-canvas sketch-canvas--stroke"
+      @dblclick="onCanvasDoubleClick"
       @pointerdown="onPointerDown"
       @pointermove="onPointerMove"
       @pointerup="onPointerUp"
@@ -47,7 +48,10 @@ import {
   createRectangleStroke,
 } from "@/elements/shapes";
 import { createImageElement } from "@/elements/image";
-import { createTextElement } from "@/elements/text";
+import {
+  createTextElement,
+  updateTextElement,
+} from "@/elements/text";
 import {
   hitTestElement,
   isInResizeCorner,
@@ -77,6 +81,11 @@ const strokeCanvasRef = ref<HTMLCanvasElement>();
 let state: EngineState;
 let shapeStart: StrokePoint | null = null;
 let imageTransform: {
+  elementId: string;
+  lastPoint: StrokePoint;
+  mode: "move" | "resize";
+} | null = null;
+let elementTransform: {
   elementId: string;
   lastPoint: StrokePoint;
   mode: "move" | "resize";
@@ -143,6 +152,26 @@ function onPointerDown(e: PointerEvent) {
     drawSelectionOutline();
     return;
   }
+  if (props.tool === "text") {
+    const point = eventPoint(e);
+    const element = hitTestElement(
+      state.elements.filter((item) => item.type === "text"),
+      point.x,
+      point.y,
+    );
+    selectedElementId = element?.id ?? null;
+    if (element) {
+      elementTransform = {
+        elementId: element.id,
+        lastPoint: point,
+        mode: isInResizeCorner(element, point.x, point.y) ? "resize" : "move",
+      };
+      pushHistorySnapshot(state);
+    }
+    fullRedrawStrokeCanvas(getCanvas(), state);
+    drawSelectionOutline();
+    return;
+  }
   if (isShapeEditorTool(props.tool)) {
     shapeStart = eventPoint(e);
     return;
@@ -171,6 +200,22 @@ function onPointerMove(e: PointerEvent) {
     drawSelectionOutline();
     return;
   }
+  if (elementTransform) {
+    const point = eventPoint(e);
+    const dx = point.x - elementTransform.lastPoint.x;
+    const dy = point.y - elementTransform.lastPoint.y;
+    state.elements = state.elements.map((element) => {
+      if (element.id !== elementTransform?.elementId) return element;
+      return elementTransform.mode === "move"
+        ? moveElement(element, dx, dy)
+        : resizeElementFromCorner(element, "se", dx, dy);
+    });
+    elementTransform.lastPoint = point;
+    state.isDirty = true;
+    fullRedrawStrokeCanvas(getCanvas(), state);
+    drawSelectionOutline();
+    return;
+  }
   if (shapeStart) return;
   const prevHeight = state.canvasHeight;
   const heightChanged = enginePointerMove(state, e, getCanvas());
@@ -183,6 +228,12 @@ function onPointerMove(e: PointerEvent) {
 function onPointerUp(e: PointerEvent) {
   if (imageTransform) {
     imageTransform = null;
+    updateUndoRedoState();
+    emit("stroke");
+    return;
+  }
+  if (elementTransform) {
+    elementTransform = null;
     updateUndoRedoState();
     emit("stroke");
     return;
@@ -236,16 +287,42 @@ function drawSelectionOutline() {
   ctx.restore();
 }
 
+function onCanvasDoubleClick(e: MouseEvent) {
+  if (props.tool !== "text") return;
+  const point = eventPoint(e as PointerEvent);
+  const element = hitTestElement(
+    state.elements.filter((item) => item.type === "text"),
+    point.x,
+    point.y,
+  );
+  if (!element || element.type !== "text") return;
+
+  const nextText = window.prompt("Text", element.text);
+  if (nextText == null) return;
+
+  pushHistorySnapshot(state);
+  selectedElementId = element.id;
+  state.elements = state.elements.map((item) =>
+    item.id === element.id ? updateTextElement(element, { text: nextText }) : item,
+  );
+  state.isDirty = true;
+  fullRedrawStrokeCanvas(getCanvas(), state);
+  drawSelectionOutline();
+  updateUndoRedoState();
+  emit("stroke");
+}
+
 function doUndo() { engineUndo(state); fullRedrawStrokeCanvas(getCanvas(), state); updateUndoRedoState(); emit("stroke"); }
 function doRedo() { engineRedo(state); fullRedrawStrokeCanvas(getCanvas(), state); updateUndoRedoState(); emit("stroke"); }
 function doClear() { engineClear(state); fullRedrawStrokeCanvas(getCanvas(), state); updateUndoRedoState(); emit("stroke"); }
 function getData(): SketchData { return serializeState(state); }
 function getState(): EngineState { return state; }
 function insertText() {
+  const text = window.prompt("Text", "Text") ?? "Text";
   const element = createTextElement(`text-${Date.now()}`, {
     x: state.canvasWidth / 2 - 110,
     y: 120,
-    text: "Text",
+    text,
   });
   pushHistorySnapshot(state);
   state.elements = [...state.elements, element];

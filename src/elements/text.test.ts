@@ -45,4 +45,22 @@ describe("text elements", () => {
     expect(element.text).toBe("Draft");
     expect(element.style.fontSize).toBe(18);
   });
+
+  it("updates text font family without mutating the original style", () => {
+    const element = createTextElement("text-1", {
+      x: 0,
+      y: 0,
+      text: "Title",
+      style: {
+        fontFamily: "serif",
+      },
+    });
+
+    const updated = updateTextElement(element, {
+      fontFamily: "monospace",
+    });
+
+    expect(updated.style.fontFamily).toBe("monospace");
+    expect(element.style.fontFamily).toBe("serif");
+  });
 });
