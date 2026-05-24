@@ -1,290 +1,78 @@
 <template>
   <div v-if="visible" class="sketch-editor">
     <div class="sketch-editor__header">
-      <!-- Row 1: navigation -->
-      <div class="sketch-editor__row">
-        <button class="sketch-btn sketch-btn--back" @click="goBack">← {{ t("back") }}</button>
-        <select class="sketch-select" v-model="currentTemplate">
-          <option v-for="tpl in templates" :key="tpl.id" :value="tpl.id">{{ t(tpl.nameKey) }}</option>
-        </select>
-        <select
-          v-if="activeCustomBackground"
-          class="sketch-select"
-          :value="activeCustomBackground.fit"
-          @change="onBackgroundFitChange(($event.target as HTMLSelectElement).value)"
-        >
-          <option value="cover">{{ t("backgroundFitCover") }}</option>
-          <option value="contain">{{ t("backgroundFitContain") }}</option>
-          <option value="stretch">{{ t("backgroundFitStretch") }}</option>
-        </select>
-        <span class="sketch-editor__title">{{ t("sketchNote") }}</span>
-        <span
-          v-if="loadedData?.recovery?.recovered"
-          class="sketch-recovery"
-        >{{ t("dataRecovered") }}</span>
-        <div class="sketch-pages">
-          <button
-            class="sketch-btn sketch-btn--page"
-            :disabled="pageState.current <= 1"
-            @click="canvasRef?.goToPreviousPage()"
-          >‹</button>
-          <button
-            class="sketch-btn sketch-btn--page-label"
-            @click="canvasRef?.goToPage(pageState.current - 1)"
-          >{{ t("page") }} {{ pageState.current }} / {{ pageState.total }}</button>
-          <div class="sketch-page-overview" :aria-label="t('pageOverview')">
-            <button
-              v-for="page in pageOverview"
-              :key="page.id"
-              class="sketch-page-overview__item"
-              :class="{
-                'sketch-page-overview__item--active': page.isActive,
-                'sketch-page-overview__item--filled': page.hasContent,
-              }"
-              :title="`${t('page')} ${page.pageNumber}`"
-              @click="canvasRef?.goToPage(page.pageNumber - 1)"
-            >
-              {{ page.pageNumber }}
-            </button>
-          </div>
-          <button
-            class="sketch-btn sketch-btn--page"
-            :disabled="pageState.current >= pageState.total"
-            @click="canvasRef?.goToNextPage()"
-          >›</button>
-          <button
-            class="sketch-btn sketch-btn--page-add"
-            @click="canvasRef?.addPage()"
-          >+ {{ t("addPage") }}</button>
-          <button
-            class="sketch-btn sketch-btn--page-add"
-            @click="canvasRef?.duplicateCurrentPage()"
-          >⧉ {{ t("duplicatePage") }}</button>
-          <button
-            class="sketch-btn sketch-btn--page-add"
-            :disabled="pageState.total <= 1"
-            @click="deleteCurrentPage"
-          >⌫ {{ t("deletePage") }}</button>
-        </div>
-        <span class="sketch-spacer" />
-        <button
-          class="sketch-btn sketch-btn--toggle"
-          :class="{ 'sketch-btn--toggle-on': autoSave }"
-          @click="toggleAutoSave"
-        >{{ autoSave ? "ON" : "OFF" }} {{ t("autoSave") }}</button>
-        <button
-          class="sketch-btn sketch-btn--toggle"
-          :class="{ 'sketch-btn--toggle-on': inputSettings.stylusOnly }"
-          @click="toggleStylusOnly"
-        >{{ inputSettings.stylusOnly ? "ON" : "OFF" }} {{ t("stylusOnly") }}</button>
-        <button
-          class="sketch-btn sketch-btn--toggle"
-          :class="{ 'sketch-btn--toggle-on': exportIncludeBackground }"
-          @click="exportIncludeBackground = !exportIncludeBackground"
-        >{{ exportIncludeBackground ? "ON" : "OFF" }} {{ t("exportBackground") }}</button>
-        <span class="sketch-status" :class="`sketch-status--${saveStatus}`">{{ statusLabel }}</span>
-        <button
-          class="sketch-btn sketch-btn--save"
-          :disabled="saveStatus === 'saving'"
-          @click="manualSave"
-        >{{ t("save") }}</button>
-        <button
-          class="sketch-btn sketch-btn--action"
-          @click="exportPng"
-        >⇩ {{ t("exportPng") }}</button>
-        <button
-          class="sketch-btn sketch-btn--action"
-          @click="exportPdf"
-        >⇩ {{ t("exportPdf") }}</button>
-        <button
-          class="sketch-btn sketch-btn--action"
-          @click="exportJson"
-        >⇩ {{ t("exportJson") }}</button>
-        <button
-          class="sketch-btn sketch-btn--action"
-          @click="triggerJsonImport"
-        >⇧ {{ t("importJson") }}</button>
-        <button
-          class="sketch-btn sketch-btn--action"
-          @click="triggerBackgroundImport"
-        >▧ {{ t("importBackground") }}</button>
-        <input
-          ref="jsonInputRef"
-          class="sketch-file-input"
-          type="file"
-          accept="application/json,.json"
-          @change="onJsonSelected"
-        >
-        <input
-          ref="backgroundInputRef"
-          class="sketch-file-input"
-          type="file"
-          accept="image/*"
-          @change="onBackgroundSelected"
-        >
-      </div>
-
-      <!-- Row 2: drawing tools -->
-      <div class="sketch-editor__row sketch-editor__row--tools">
-        <div class="sketch-colors">
-          <button
-            v-for="c in colors"
-            :key="c"
-            class="sketch-color"
-            :class="{ 'sketch-color--active': activeTool !== 'eraser' && activePreset.color === c }"
-            :style="{ backgroundColor: c }"
-            @click="selectColor(c)"
-          />
-          <label class="sketch-color-picker" :title="t('addColor')">
-            +
-            <input
-              type="color"
-              :value="activePreset.color"
-              @input="selectCustomColor(($event.target as HTMLInputElement).value)"
-            >
-          </label>
-        </div>
-        <span class="sketch-sep" />
-        <button
-          class="sketch-btn sketch-btn--tool"
-          :class="{ 'sketch-btn--tool-active': activeTool === 'pen' }"
-          @click="activeTool = 'pen'"
-        >✏️ {{ t("pen") }}</button>
-        <button
-          class="sketch-btn sketch-btn--tool"
-          :class="{ 'sketch-btn--tool-active': activeTool === 'highlighter' }"
-          @click="activeTool = 'highlighter'"
-        >▰ {{ t("highlighter") }}</button>
-        <button
-          class="sketch-btn sketch-btn--tool"
-          :class="{ 'sketch-btn--tool-active': activeTool === 'eraser' }"
-          @click="activeTool = 'eraser'"
-        >🧹 {{ t("eraser") }}</button>
-        <button
-          class="sketch-btn sketch-btn--tool"
-          :class="{ 'sketch-btn--tool-active': activeTool === 'lasso' }"
-          @click="activeTool = 'lasso'"
-        >◇ {{ t("lasso") }}</button>
-        <button
-          class="sketch-btn sketch-btn--tool"
-          :class="{ 'sketch-btn--tool-active': activeTool === 'line' }"
-          @click="activeTool = 'line'"
-        >／ {{ t("line") }}</button>
-        <button
-          class="sketch-btn sketch-btn--tool"
-          :class="{ 'sketch-btn--tool-active': activeTool === 'arrow' }"
-          @click="activeTool = 'arrow'"
-        >→ {{ t("arrow") }}</button>
-        <button
-          class="sketch-btn sketch-btn--tool"
-          :class="{ 'sketch-btn--tool-active': activeTool === 'rectangle' }"
-          @click="activeTool = 'rectangle'"
-        >□ {{ t("rectangle") }}</button>
-        <button
-          class="sketch-btn sketch-btn--tool"
-          :class="{ 'sketch-btn--tool-active': activeTool === 'ellipse' }"
-          @click="activeTool = 'ellipse'"
-        >○ {{ t("ellipse") }}</button>
-        <button
-          class="sketch-btn sketch-btn--tool"
-          :class="{ 'sketch-btn--tool-active': activeTool === 'triangle' }"
-          @click="activeTool = 'triangle'"
-        >△ {{ t("triangle") }}</button>
-        <button
-          class="sketch-btn sketch-btn--tool"
-          :class="{ 'sketch-btn--tool-active': activeTool === 'ruler' }"
-          @click="activeTool = 'ruler'"
-        >▤ {{ t("ruler") }}</button>
-        <button
-          class="sketch-btn sketch-btn--action"
-          :disabled="activeTool !== 'ruler'"
-          @click="canvasRef?.rotateRulerBy(-45)"
-        >↺ {{ t("rotateLeft") }}</button>
-        <button
-          class="sketch-btn sketch-btn--action"
-          :disabled="activeTool !== 'ruler'"
-          @click="canvasRef?.rotateRulerBy(45)"
-        >↻ {{ t("rotateRight") }}</button>
-        <button
-          class="sketch-btn sketch-btn--tool"
-          :class="{ 'sketch-btn--tool-active': activeTool === 'text' }"
-          @click="insertTextElement"
-        >T {{ t("text") }}</button>
-        <button
-          class="sketch-btn sketch-btn--tool"
-          :class="{ 'sketch-btn--tool-active': activeTool === 'image' }"
-          @click="triggerImageImport"
-        >▧ {{ t("image") }}</button>
-        <input
-          ref="imageInputRef"
-          class="sketch-file-input"
-          type="file"
-          accept="image/*"
-          @change="onImageSelected"
-        >
-        <div class="sketch-tool-options">
-          <label class="sketch-range">
-            <span>{{ t("width") }}</span>
-            <input
-              v-model.number="activePreset.width"
-              type="range"
-              min="1"
-              max="30"
-              @input="updateActivePreset({ width: activePreset.width })"
-            >
-            <output>{{ activePreset.width }}</output>
-          </label>
-          <label v-if="activeTool !== 'eraser'" class="sketch-range">
-            <span>{{ t("opacity") }}</span>
-            <input
-              v-model.number="activePreset.opacity"
-              type="range"
-              min="0.1"
-              max="1"
-              step="0.05"
-              @input="updateActivePreset({ opacity: activePreset.opacity })"
-            >
-            <output>{{ Math.round(activePreset.opacity * 100) }}%</output>
-          </label>
-          <label v-if="activeTool === 'eraser'" class="sketch-mode">
-            <span>{{ t("eraserMode") }}</span>
-            <select
-              :value="activePreset.mode"
-              @change="updateActivePreset({ mode: ($event.target as HTMLSelectElement).value as ToolPreset['mode'] })"
-            >
-              <option value="pixel">{{ t("eraserModePixel") }}</option>
-              <option value="stroke">{{ t("eraserModeStroke") }}</option>
-            </select>
-          </label>
-          <label v-if="activeTool === 'lasso'" class="sketch-mode">
-            <span>{{ t("lassoMode") }}</span>
-            <select v-model="lassoMode">
-              <option value="freehand">{{ t("lassoModeFreehand") }}</option>
-              <option value="box">{{ t("lassoModeBox") }}</option>
-            </select>
-          </label>
-        </div>
-        <span class="sketch-sep" />
-        <button
-          class="sketch-btn sketch-btn--action"
-          :disabled="activeTool !== 'lasso'"
-          @click="canvasRef?.recolorLasso(activePreset.color)"
-        >🎨 {{ t("recolor") }}</button>
-        <button
-          class="sketch-btn sketch-btn--action"
-          :disabled="activeTool !== 'lasso'"
-          @click="canvasRef?.duplicateLassoSelection()"
-        >⧉ {{ t("duplicateSelection") }}</button>
-        <button
-          class="sketch-btn sketch-btn--action"
-          :disabled="activeTool !== 'lasso'"
-          @click="canvasRef?.deleteLassoSelection()"
-        >⌫ {{ t("deleteSelection") }}</button>
-        <span class="sketch-sep" />
-        <button class="sketch-btn sketch-btn--action" :disabled="!canUndo" @click="canvasRef?.doUndo()">↩️ {{ t("undo") }}</button>
-        <button class="sketch-btn sketch-btn--action" :disabled="!canRedo" @click="canvasRef?.doRedo()">↪️ {{ t("redo") }}</button>
-        <button class="sketch-btn sketch-btn--action" @click="canvasRef?.doClear()">🗑️ {{ t("clear") }}</button>
-      </div>
+      <EditorTopBar
+        v-model:templateId="currentTemplate"
+        :autoSave="autoSave"
+        :backgroundFit="activeCustomBackground?.fit"
+        :exportIncludeBackground="exportIncludeBackground"
+        :pageOverview="pageOverview"
+        :pageState="pageState"
+        :recovered="Boolean(loadedData?.recovery?.recovered)"
+        :saveStatus="saveStatus"
+        :statusLabel="statusLabel"
+        :stylusOnly="inputSettings.stylusOnly"
+        :t="t"
+        :templates="templates"
+        @addPage="canvasRef?.addPage()"
+        @back="goBack"
+        @backgroundFitChange="onBackgroundFitChange"
+        @deletePage="deleteCurrentPage"
+        @duplicatePage="canvasRef?.duplicateCurrentPage()"
+        @exportJson="exportJson"
+        @exportPdf="exportPdf"
+        @exportPng="exportPng"
+        @goToPage="canvasRef?.goToPage($event)"
+        @importBackground="triggerBackgroundImport"
+        @importJson="triggerJsonImport"
+        @nextPage="canvasRef?.goToNextPage()"
+        @previousPage="canvasRef?.goToPreviousPage()"
+        @save="manualSave"
+        @toggleAutoSave="toggleAutoSave"
+        @toggleExportBackground="exportIncludeBackground = !exportIncludeBackground"
+        @toggleStylusOnly="toggleStylusOnly"
+      />
+      <ToolBar
+        v-model:lassoMode="lassoMode"
+        :activePreset="activePreset"
+        :activeTool="activeTool"
+        :canRedo="canRedo"
+        :canUndo="canUndo"
+        :colors="colors"
+        :t="t"
+        @clear="canvasRef?.doClear()"
+        @deleteSelection="canvasRef?.deleteLassoSelection()"
+        @duplicateSelection="canvasRef?.duplicateLassoSelection()"
+        @recolorSelection="canvasRef?.recolorLasso(activePreset.color)"
+        @redo="canvasRef?.doRedo()"
+        @rotateRuler="canvasRef?.rotateRulerBy($event)"
+        @selectColor="selectColor"
+        @selectCustomColor="selectCustomColor"
+        @selectTool="selectTool"
+        @undo="canvasRef?.doUndo()"
+        @updatePreset="updateActivePreset"
+      />
+      <input
+        ref="imageInputRef"
+        class="sketch-file-input"
+        type="file"
+        accept="image/*"
+        @change="onImageSelected"
+      >
+      <input
+        ref="jsonInputRef"
+        class="sketch-file-input"
+        type="file"
+        accept="application/json,.json"
+        @change="onJsonSelected"
+      >
+      <input
+        ref="backgroundInputRef"
+        class="sketch-file-input"
+        type="file"
+        accept="image/*"
+        @change="onBackgroundSelected"
+      >
     </div>
 
     <div class="sketch-editor__body">
@@ -333,7 +121,9 @@ import { getFirstImageFileFromClipboard } from "./clipboard";
 import { resolveEditorShortcut } from "./shortcuts";
 import { getDrawingToolForEditorTool } from "./tools";
 import type { EditorTool } from "./tools";
+import EditorTopBar from "./EditorTopBar.vue";
 import SketchCanvas from "./SketchCanvas.vue";
+import ToolBar from "./ToolBar.vue";
 
 const props = defineProps<{
   blockId: string;
@@ -412,6 +202,18 @@ function selectColor(c: string) {
 
 function selectCustomColor(c: string) {
   selectColor(c);
+}
+
+function selectTool(tool: EditorTool) {
+  if (tool === "text") {
+    insertTextElement();
+    return;
+  }
+  if (tool === "image") {
+    triggerImageImport();
+    return;
+  }
+  activeTool.value = tool;
 }
 
 function updateActivePreset(patch: Partial<Omit<ToolPreset, "tool">>) {
@@ -749,6 +551,8 @@ function onHeightChanged(_h: number) {}
 .sketch-editor__row {
   display: flex; align-items: center; gap: 8px;
   min-height: 36px;
+  overflow-x: auto;
+  scrollbar-width: thin;
 }
 .sketch-editor__row--tools {
   margin-top: 6px;
@@ -784,8 +588,23 @@ function onHeightChanged(_h: number) {}
 .sketch-btn--toggle { font-size: 12px; }
 .sketch-btn--toggle-on { border-color: var(--b3-theme-primary); color: var(--b3-theme-primary); }
 
-.sketch-btn--tool { font-size: 13px; min-width: 60px; }
+.sketch-btn--tool { font-size: 13px; min-width: 44px; }
 .sketch-btn--tool-active { background: var(--b3-theme-primary-light) !important; border-color: var(--b3-theme-primary); }
+.sketch-btn--icon-tool {
+  gap: 4px;
+  padding: 5px 8px;
+}
+.sketch-btn__icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 16px;
+  font-size: 15px;
+  line-height: 1;
+}
+.sketch-btn__label {
+  font-size: 12px;
+}
 
 .sketch-btn--action { font-size: 13px; min-width: 52px; }
 
@@ -794,6 +613,10 @@ function onHeightChanged(_h: number) {}
   align-items: center;
   gap: 8px;
   min-width: 0;
+  padding: 3px 6px;
+  border: 1px solid var(--b3-border-color);
+  border-radius: 6px;
+  background: var(--b3-theme-background);
 }
 .sketch-file-input {
   display: none;
@@ -946,5 +769,26 @@ function onHeightChanged(_h: number) {}
 .sketch-editor__body {
   flex: 1; overflow-y: auto; touch-action: none;
   padding: 12px 0;
+}
+
+@media (max-width: 760px) {
+  .sketch-btn--icon-tool {
+    min-width: 34px;
+    width: 34px;
+    padding-inline: 0;
+  }
+
+  .sketch-btn__label {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+  }
+
+  .sketch-tool-options {
+    flex: 0 0 auto;
+  }
 }
 </style>
