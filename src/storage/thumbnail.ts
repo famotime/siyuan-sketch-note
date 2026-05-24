@@ -1,5 +1,6 @@
 import { getTemplate } from "@/template";
 import type { Stroke } from "@/types/sketch";
+import { getPressureWidth, getSmoothedSegments } from "@/engine/strokeSmoothing";
 
 const PADDING = 40;
 const MIN_WIDTH = 200;
@@ -156,14 +157,19 @@ function renderStrokeToCtx(ctx: CanvasRenderingContext2D, stroke: Stroke): void 
     ctx.strokeStyle = color;
   }
 
-  ctx.lineWidth = width;
+  ctx.lineWidth = getPressureWidth(width, points[0].pressure);
   ctx.lineJoin = "round";
   ctx.lineCap = "round";
 
   ctx.beginPath();
   ctx.moveTo(points[0].x, points[0].y);
-  for (let i = 1; i < points.length; i++) {
-    ctx.lineTo(points[i].x, points[i].y);
+  for (const segment of getSmoothedSegments(points)) {
+    ctx.quadraticCurveTo(
+      segment.control.x,
+      segment.control.y,
+      segment.end.x,
+      segment.end.y,
+    );
   }
   ctx.stroke();
   ctx.restore();

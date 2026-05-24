@@ -5,8 +5,14 @@ import {
 } from "@/types/sketch";
 import { getTemplate } from "@/template";
 import { normalizeToolPresets } from "@/tools/presets";
+import {
+  filterStrokePointsByDistance,
+  getPressureWidth,
+  getSmoothedSegments,
+} from "./strokeSmoothing";
 
 let idCounter = 0;
+const MIN_POINT_DISTANCE = 1.5;
 function newId(): string {
   return `s${Date.now()}-${++idCounter}`;
 }
@@ -117,7 +123,12 @@ export function handlePointerMove(
   const rect = canvas.getBoundingClientRect();
   const x = e.clientX - rect.left;
   const y = e.clientY - rect.top;
-  state.currentStroke.points.push({ x, y, pressure: e.pressure || 0.5, timestamp: e.timeStamp });
+  const lastPoint = state.currentStroke.points[state.currentStroke.points.length - 1];
+  const nextPoint = { x, y, pressure: e.pressure || 0.5, timestamp: e.timeStamp };
+  if (Math.hypot(lastPoint.x - x, lastPoint.y - y) < MIN_POINT_DISTANCE) {
+    return false;
+  }
+  state.currentStroke.points.push(nextPoint);
 
   let heightChanged = false;
   if (y > state.canvasHeight - 100) {
@@ -130,29 +141,14 @@ export function handlePointerMove(
   if (pts.length >= 2) {
     const prev = pts[pts.length - 2];
     const curr = pts[pts.length - 1];
-    ctx.save();
-    if (state.currentStroke.tool === "eraser") {
-      ctx.globalCompositeOperation = "destination-out";
-      ctx.strokeStyle = "rgba(0,0,0,1)";
-    } else {
-      ctx.globalAlpha = state.currentStroke.opacity ?? 1;
-      ctx.globalCompositeOperation = "source-over";
-      ctx.strokeStyle = state.currentStroke.color;
-    }
-    ctx.lineWidth = state.currentStroke.width;
-    ctx.lineJoin = "round";
-    ctx.lineCap = "round";
-    ctx.beginPath();
-    ctx.moveTo(prev.x, prev.y);
-    ctx.lineTo(curr.x, curr.y);
-    ctx.stroke();
-    ctx.restore();
+    renderStrokeSegment(ctx, state.currentStroke, prev, curr);
   }
   return heightChanged;
 }
 
 export function handlePointerUp(state: EngineState): boolean {
   if (!state.currentStroke) return false;
+  state.currentStroke.points = filterStrokePointsByDistance(state.currentStroke.points, MIN_POINT_DISTANCE);
   state.undoStack.push([...state.strokes]);
   state.redoStack = [];
   state.strokes.push(state.currentStroke);
@@ -231,14 +227,44 @@ function renderStroke(ctx: CanvasRenderingContext2D, stroke: Stroke): void {
     ctx.globalCompositeOperation = "source-over";
     ctx.strokeStyle = color;
   }
-  ctx.lineWidth = width;
+  ctx.lineWidth = getPressureWidth(width, points[0].pressure);
   ctx.lineJoin = "round";
   ctx.lineCap = "round";
   ctx.beginPath();
   ctx.moveTo(points[0].x, points[0].y);
-  for (let i = 1; i < points.length; i++) {
-    ctx.lineTo(points[i].x, points[i].y);
+  for (const segment of getSmoothedSegments(points)) {
+    ctx.quadraticCurveTo(
+      segment.control.x,
+      segment.control.y,
+      segment.end.x,
+      segment.end.y,
+    );
   }
+  ctx.stroke();
+  ctx.restore();
+}
+
+function renderStrokeSegment(
+  ctx: CanvasRenderingContext2D,
+  stroke: Stroke,
+  prev: StrokePoint,
+  curr: StrokePoint,
+): void {
+  ctx.save();
+  if (stroke.tool === "eraser") {
+    ctx.globalCompositeOperation = "destination-out";
+    ctx.strokeStyle = "rgba(0,0,0,1)";
+  } else {
+    ctx.globalAlpha = stroke.opacity ?? 1;
+    ctx.globalCompositeOperation = "source-over";
+    ctx.strokeStyle = stroke.color;
+  }
+  ctx.lineWidth = getPressureWidth(stroke.width, curr.pressure);
+  ctx.lineJoin = "round";
+  ctx.lineCap = "round";
+  ctx.beginPath();
+  ctx.moveTo(prev.x, prev.y);
+  ctx.lineTo(curr.x, curr.y);
   ctx.stroke();
   ctx.restore();
 }
