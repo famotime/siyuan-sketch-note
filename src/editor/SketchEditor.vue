@@ -20,6 +20,10 @@
           :disabled="saveStatus === 'saving'"
           @click="manualSave"
         >{{ t("save") }}</button>
+        <button
+          class="sketch-btn sketch-btn--action"
+          @click="exportPng"
+        >⇩ {{ t("exportPng") }}</button>
       </div>
 
       <!-- Row 2: drawing tools -->
@@ -107,6 +111,7 @@ import { thumbnailCanvas } from "@/storage/thumbnail";
 import { showMessage } from "siyuan";
 import { sketchAssetFileName, uploadDataUrlToAssets } from "@/utils/uploadPng";
 import { normalizeToolPresets, updateToolPreset } from "@/tools/presets";
+import { createExportPngFileName, dataUrlToBlob, downloadBlob } from "@/export/png";
 import SketchCanvas from "./SketchCanvas.vue";
 
 type SaveStatus = "idle" | "saving" | "saved" | "error" | "dirty";
@@ -236,6 +241,14 @@ async function doSave(): Promise<boolean> {
 async function manualSave() {
   if (autoSaveTimer) { clearTimeout(autoSaveTimer); autoSaveTimer = null; }
   await doSave();
+}
+
+function exportPng() {
+  if (!canvasRef.value) return;
+  const data = canvasRef.value.getData();
+  const pngDataUrl = thumbnailCanvas(data.strokes, currentTemplate.value);
+  const blob = dataUrlToBlob(pngDataUrl);
+  downloadBlob(blob, createExportPngFileName(props.blockId));
 }
 
 function createFallbackThumbnail(): string {

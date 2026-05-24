@@ -17,6 +17,7 @@
   "redo": "重做",
   "clear": "清除",
   "save": "保存",
+  "exportPng": "导出 PNG",
   "back": "返回",
   "autoSave": "自动保存",
   "unsavedConfirm": "有未保存的更改，确定放弃并退出？",

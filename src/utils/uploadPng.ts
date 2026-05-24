@@ -1,4 +1,5 @@
 import { thumbnailCanvas } from "@/storage/thumbnail";
+import { dataUrlToBlob } from "@/export/png";
 
 /**
  * Create a placeholder PNG blob for a sketch block.
@@ -6,14 +7,7 @@ import { thumbnailCanvas } from "@/storage/thumbnail";
  */
 export function createPlaceholderPng(templateId: string): Blob {
   const dataUrl = thumbnailCanvas([], templateId);
-  const byteString = atob(dataUrl.split(",")[1]);
-  const mimeString = dataUrl.split(",")[0].split(":")[1].split(";")[0];
-  const ab = new ArrayBuffer(byteString.length);
-  const ia = new Uint8Array(ab);
-  for (let i = 0; i < byteString.length; i++) {
-    ia[i] = byteString.charCodeAt(i);
-  }
-  return new Blob([ab], { type: mimeString });
+  return dataUrlToBlob(dataUrl);
 }
 
 /**
@@ -42,14 +36,7 @@ export async function uploadPngToAssets(pngBlob: Blob, fileName: string): Promis
  * then upload it to assets, overwriting the existing file.
  */
 export async function uploadDataUrlToAssets(dataUrl: string, fileName: string): Promise<void> {
-  const byteString = atob(dataUrl.split(",")[1]);
-  const mimeString = dataUrl.split(",")[0].split(":")[1].split(";")[0];
-  const ab = new ArrayBuffer(byteString.length);
-  const ia = new Uint8Array(ab);
-  for (let i = 0; i < byteString.length; i++) {
-    ia[i] = byteString.charCodeAt(i);
-  }
-  const blob = new Blob([ab], { type: mimeString });
+  const blob = dataUrlToBlob(dataUrl);
   await uploadPngToAssets(blob, fileName);
 }
 

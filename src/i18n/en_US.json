@@ -17,6 +17,7 @@
   "redo": "Redo",
   "clear": "Clear",
   "save": "Save",
+  "exportPng": "Export PNG",
   "back": "Back",
   "autoSave": "Auto Save",
   "unsavedConfirm": "You have unsaved changes. Discard and exit?",
