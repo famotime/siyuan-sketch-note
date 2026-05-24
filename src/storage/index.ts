@@ -1,6 +1,6 @@
 import type { SketchData } from "@/types/sketch";
 import { DEFAULT_SKETCH_DATA } from "@/types/sketch";
-import { migrateStrokesToElements } from "@/elements/model";
+import { recoverSketchData } from "./migrations";
 
 export { thumbnailCanvas } from "./thumbnail";
 
@@ -22,23 +22,11 @@ export async function loadSketchData(
   const raw = await loadData(key);
   if (!raw) return null;
 
-  // Validate version
-  if (raw.version !== 1) {
-    console.warn(`[Sketch Note] Unknown data version: ${raw.version}`);
-    return null;
+  const recovery = recoverSketchData(raw);
+  if (recovery.recovered) {
+    console.warn(`[Sketch Note] Recovered corrupted data for block ${blockId}: ${recovery.reason}`);
   }
-
-  // Validate essential fields (data corruption guard)
-  if (!Array.isArray(raw.strokes)) {
-    console.warn(`[Sketch Note] Corrupted data for block ${blockId}: strokes is not an array`);
-    return null;
-  }
-
-  const data = raw as SketchData;
-  return {
-    ...data,
-    elements: data.elements ?? migrateStrokesToElements(data.strokes),
-  };
+  return recovery.data;
 }
 
 /**

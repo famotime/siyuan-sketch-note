@@ -21,9 +21,15 @@ export interface SketchData {
   template: string;         // template id: "blank" | "grid"
   canvasWidth: number;
   canvasHeight: number;
+  recovery?: SketchDataRecoveryInfo;
   toolPresets?: ToolPresetCollection;
   elements?: SketchElement[];
   strokes: Stroke[];
+}
+
+export interface SketchDataRecoveryInfo {
+  recovered: boolean;
+  reason: string;
 }
 
 export const DEFAULT_SKETCH_DATA: SketchData = {

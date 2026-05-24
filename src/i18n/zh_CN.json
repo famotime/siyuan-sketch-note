@@ -33,5 +33,6 @@
   "statusSaving": "保存中…",
   "statusSaved": "已保存",
   "statusDirty": "未保存",
-  "statusError": "保存失败"
+  "statusError": "保存失败",
+  "dataRecovered": "已恢复损坏数据"
 }

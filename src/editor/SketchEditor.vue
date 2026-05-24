@@ -8,6 +8,10 @@
           <option v-for="tpl in templates" :key="tpl.id" :value="tpl.id">{{ t(tpl.nameKey) }}</option>
         </select>
         <span class="sketch-editor__title">{{ t("sketchNote") }}</span>
+        <span
+          v-if="loadedData?.recovery?.recovered"
+          class="sketch-recovery"
+        >{{ t("dataRecovered") }}</span>
         <span class="sketch-spacer" />
         <button
           class="sketch-btn sketch-btn--toggle"
@@ -263,6 +267,7 @@ async function runSave(): Promise<boolean> {
   const data = canvasRef.value.getData();
   data.template = currentTemplate.value;
   data.toolPresets = toolPresets.value;
+  delete data.recovery;
 
   let pngDataUrl: string;
   try {
@@ -487,6 +492,11 @@ function onHeightChanged(_h: number) {}
 .sketch-status--saving { color: var(--b3-theme-on-surface-light); }
 .sketch-status--error  { color: #e74c3c; }
 .sketch-status--dirty  { color: #f39c12; }
+.sketch-recovery {
+  color: #d97706;
+  font-size: 12px;
+  white-space: nowrap;
+}
 
 /* ── Body ── */
 .sketch-editor__body {

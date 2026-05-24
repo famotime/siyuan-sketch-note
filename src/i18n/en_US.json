@@ -33,5 +33,6 @@
   "statusSaving": "Saving…",
   "statusSaved": "Saved",
   "statusDirty": "Unsaved",
-  "statusError": "Error"
+  "statusError": "Error",
+  "dataRecovered": "Recovered damaged data"
 }
