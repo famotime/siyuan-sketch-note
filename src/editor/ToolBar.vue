@@ -130,9 +130,106 @@ const currentShapeIcon = computed(() => {
 </script>
 
 <style scoped>
+.sketch-editor__row--tools {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+}
+
 .sketch-toolbar-group {
   display: flex;
   align-items: center;
   gap: 8px;
+}
+
+/* ── 统一的第二行极简磨砂工具按钮 ── */
+.sketch-btn--tool {
+  background: rgba(255, 255, 255, 0.05) !important;
+  border: 1px solid rgba(255, 255, 255, 0.08) !important;
+  color: rgba(255, 255, 255, 0.75) !important;
+  border-radius: 8px;
+  font-size: 13px;
+  min-height: 32px;
+  padding: 5px 12px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  transition: all 0.2s cubic-bezier(0.25, 0.8, 0.25, 1);
+  user-select: none;
+  box-sizing: border-box;
+}
+.sketch-btn--tool:hover {
+  background: rgba(255, 255, 255, 0.12) !important;
+  border-color: rgba(255, 255, 255, 0.15) !important;
+  color: #fff !important;
+  transform: scale(1.03);
+}
+.sketch-btn--tool:active {
+  transform: scale(0.95);
+}
+
+/* 选中激活状态：高亮微光 */
+.sketch-btn--tool-active {
+  background: var(--b3-theme-primary) !important;
+  color: #fff !important;
+  border-color: transparent !important;
+  box-shadow: 0 4px 12px rgba(var(--b3-theme-primary-rgb), 0.25);
+}
+
+/* 图标与动作按钮样式 */
+.sketch-btn__icon {
+  font-size: 14px;
+  line-height: 1;
+  display: inline-flex;
+  align-items: center;
+}
+
+.sketch-btn__label {
+  font-size: 12px;
+  font-weight: 500;
+}
+
+/* ── 撤销、重做、清除动作按钮 ── */
+.sketch-btn--action {
+  background: rgba(255, 255, 255, 0.04) !important;
+  border: 1px solid rgba(255, 255, 255, 0.06) !important;
+  color: rgba(255, 255, 255, 0.75) !important;
+  border-radius: 8px;
+  font-size: 12px;
+  padding: 5px 12px;
+  min-height: 32px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  transition: all 0.2s ease;
+  box-sizing: border-box;
+}
+.sketch-btn--action:hover {
+  background: rgba(255, 255, 255, 0.12) !important;
+  border-color: rgba(255, 255, 255, 0.15) !important;
+  color: #fff !important;
+  transform: scale(1.03);
+}
+.sketch-btn--action:active {
+  transform: scale(0.95);
+}
+.sketch-btn--action:disabled {
+  opacity: 0.35 !important;
+  transform: none !important;
+  cursor: not-allowed;
+  border-color: rgba(255, 255, 255, 0.03) !important;
+  background: rgba(255, 255, 255, 0.01) !important;
+}
+
+.sketch-sep {
+  width: 1px;
+  height: 20px;
+  background: rgba(255, 255, 255, 0.12);
+  margin: 0 4px;
+  flex-shrink: 0;
 }
 </style>

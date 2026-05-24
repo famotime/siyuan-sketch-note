@@ -285,12 +285,17 @@ function onClearSearch() {
 .sketch-status {
   font-size: 11px;
   font-weight: 500;
-  min-width: 48px;
+  width: 96px; /* 固定宽度，坚如磐石，彻底杜绝按钮移位跳动 */
+  height: 24px;
   text-align: center;
-  padding: 2px 8px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   border-radius: 6px;
   background: rgba(255, 255, 255, 0.04);
   border: 1px solid rgba(255, 255, 255, 0.05);
+  box-sizing: border-box;
+  flex-shrink: 0; /* 禁止弹性收缩 */
 }
 .sketch-status--saved  { color: #2ecc71; border-color: rgba(46, 204, 113, 0.2); background: rgba(46, 204, 113, 0.05); }
 .sketch-status--saving { color: rgba(255, 255, 255, 0.5); }
