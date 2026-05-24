@@ -1,4 +1,4 @@
-import { migrateStrokesToElements } from "@/elements/model";
+import { migrateStrokesToElements, withStrokeBounds } from "@/elements/model";
 import type { SketchData } from "@/types/sketch";
 import {
   CANVAS_INITIAL_HEIGHT,
@@ -16,13 +16,14 @@ export interface SketchDataRecovery {
 export function migrateSketchData(raw: unknown): SketchData {
   assertSketchDataShape(raw);
   const data = raw as SketchData;
+  const strokes = data.strokes.map(withStrokeBounds);
 
   return {
     ...data,
     canvasWidth: data.canvasWidth || CANVAS_LOGICAL_WIDTH,
     canvasHeight: data.canvasHeight || CANVAS_INITIAL_HEIGHT,
-    elements: data.elements ?? migrateStrokesToElements(data.strokes),
-    strokes: data.strokes,
+    elements: data.elements ?? migrateStrokesToElements(strokes),
+    strokes,
     template: data.template || DEFAULT_SKETCH_DATA.template,
     version: 1,
   };

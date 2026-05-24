@@ -1,4 +1,4 @@
-import type { SketchElement } from "@/elements/model";
+import type { Bounds, SketchElement } from "@/elements/model";
 import type { OcrIndex } from "@/search/ocrIndex";
 
 export interface StrokePoint {
@@ -15,6 +15,7 @@ export interface Stroke {
   width: number;       // base line width in px
   opacity?: number;    // 0~1, default 1 for old data
   tool: SketchTool;
+  bounds?: Bounds;     // precomputed bounds for large documents
 }
 
 export interface SketchData {

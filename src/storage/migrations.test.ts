@@ -28,10 +28,24 @@ describe("sketch data migrations", () => {
     });
 
     expect(data.elements).toHaveLength(1);
+    expect(data.strokes[0].bounds).toEqual({
+      x: 6,
+      y: 16,
+      width: 28,
+      height: 28,
+    });
     expect(data.elements?.[0]).toMatchObject({
       id: "stroke-1",
       type: "stroke",
-      stroke,
+      stroke: {
+        ...stroke,
+        bounds: {
+          x: 6,
+          y: 16,
+          width: 28,
+          height: 28,
+        },
+      },
     });
   });
 

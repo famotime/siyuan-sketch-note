@@ -5,7 +5,7 @@ import {
 } from "@/types/sketch";
 import { getTemplate } from "@/template";
 import { normalizeToolPresets } from "@/tools/presets";
-import { migrateStrokesToElements } from "@/elements/model";
+import { migrateStrokesToElements, withStrokeBounds } from "@/elements/model";
 import type { SketchElement } from "@/elements/model";
 import { splitElementsForRender } from "@/elements/renderOrder";
 import {
@@ -215,7 +215,7 @@ export function handlePointerUp(state: EngineState): boolean {
     return true;
   }
   pushHistorySnapshot(state);
-  state.strokes.push(state.currentStroke);
+  state.strokes.push(withStrokeBounds(state.currentStroke));
   state.currentStroke = null;
   state.isDirty = true;
   return true;
@@ -272,6 +272,7 @@ export function resizeCanvases(
 }
 
 export function serializeState(state: EngineState): SketchData {
+  const strokes = state.strokes.map(withStrokeBounds);
   return {
     version: 1,
     template: state.templateId,
@@ -279,10 +280,10 @@ export function serializeState(state: EngineState): SketchData {
     canvasHeight: state.canvasHeight,
     toolPresets: state.toolPresets,
     elements: [
-      ...migrateStrokesToElements(state.strokes),
+      ...migrateStrokesToElements(strokes),
       ...state.elements.filter((element) => element.type !== "stroke"),
     ],
-    strokes: state.strokes,
+    strokes,
   };
 }
 

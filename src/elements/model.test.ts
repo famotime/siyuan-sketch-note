@@ -33,7 +33,15 @@ describe("element model", () => {
     expect(elements).toEqual([{
       id: "stroke-1",
       type: "stroke",
-      stroke,
+      stroke: {
+        ...stroke,
+        bounds: {
+          x: 5,
+          y: 15,
+          width: 40,
+          height: 40,
+        },
+      },
       bounds: {
         x: 5,
         y: 15,

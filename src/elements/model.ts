@@ -60,19 +60,29 @@ export function calculateStrokeBounds(stroke: Stroke): Bounds {
   };
 }
 
+export function withStrokeBounds(stroke: Stroke): Stroke {
+  return {
+    ...stroke,
+    bounds: stroke.bounds ?? calculateStrokeBounds(stroke),
+  };
+}
+
 export function migrateStrokesToElements(strokes: Stroke[]): SketchElement[] {
-  return strokes.map((stroke, index) => ({
-    id: stroke.id,
-    type: "stroke",
-    stroke,
-    bounds: calculateStrokeBounds(stroke),
-    transform: {
-      x: 0,
-      y: 0,
-      scaleX: 1,
-      scaleY: 1,
-      rotation: 0,
-    },
-    zIndex: index,
-  }));
+  return strokes.map((stroke, index) => {
+    const boundedStroke = withStrokeBounds(stroke);
+    return {
+      id: boundedStroke.id,
+      type: "stroke",
+      stroke: boundedStroke,
+      bounds: boundedStroke.bounds!,
+      transform: {
+        x: 0,
+        y: 0,
+        scaleX: 1,
+        scaleY: 1,
+        rotation: 0,
+      },
+      zIndex: index,
+    };
+  });
 }

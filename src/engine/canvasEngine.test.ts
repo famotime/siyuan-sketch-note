@@ -3,6 +3,8 @@ import { createImageElement } from "@/elements/image";
 import { moveElement } from "@/elements/transform";
 import {
   createEngineState,
+  handlePointerDown,
+  handlePointerMove,
   handlePointerUp,
   pushHistorySnapshot,
   redo,
@@ -75,5 +77,47 @@ describe("canvas engine history", () => {
     expect(state.undoStack).toHaveLength(1);
     expect(state.currentStroke).toBeNull();
     expect(state.isDirty).toBe(true);
+  });
+
+  it("stores precomputed bounds on completed freehand strokes", () => {
+    const state = createEngineState("blank");
+    const canvas = {
+      getBoundingClientRect: () => ({ left: 0, top: 0 }),
+      getContext: () => ({
+        save() {},
+        restore() {},
+        beginPath() {},
+        moveTo() {},
+        lineTo() {},
+        stroke() {},
+        set lineWidth(_value: number) {},
+        set lineJoin(_value: string) {},
+        set lineCap(_value: string) {},
+        set globalAlpha(_value: number) {},
+        set globalCompositeOperation(_value: string) {},
+        set strokeStyle(_value: string) {},
+      }),
+    } as unknown as HTMLCanvasElement;
+
+    handlePointerDown(state, {
+      clientX: 10,
+      clientY: 20,
+      pressure: 0.5,
+      timeStamp: 1,
+    } as PointerEvent, canvas);
+    handlePointerMove(state, {
+      clientX: 40,
+      clientY: 50,
+      pressure: 0.5,
+      timeStamp: 2,
+    } as PointerEvent, canvas);
+    handlePointerUp(state);
+
+    expect(state.strokes[0].bounds).toEqual({
+      x: 8.5,
+      y: 18.5,
+      width: 33,
+      height: 33,
+    });
   });
 });

@@ -57,6 +57,12 @@ describe("shape elements", () => {
     expect(stroke.points[4].x).toBeLessThan(70);
     expect(stroke.points[4].y).toBeLessThan(10);
     expect(stroke.points[5].x).toBeCloseTo(70);
+    expect(stroke.bounds).toMatchObject({
+      x: expect.any(Number),
+      y: expect.any(Number),
+      width: expect.any(Number),
+      height: expect.any(Number),
+    });
     expect(stroke.color).toBe("#111111");
   });
 });

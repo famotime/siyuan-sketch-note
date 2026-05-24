@@ -1,4 +1,5 @@
 import type { Bounds, Transform } from "./model";
+import { withStrokeBounds } from "./model";
 import type { Stroke, StrokePoint, ToolPreset } from "@/types/sketch";
 
 export interface Point {
@@ -122,14 +123,14 @@ function createShapeStroke(
   points: Point[],
   preset: ToolPreset,
 ): Stroke {
-  return {
+  return withStrokeBounds({
     id,
     points: points.map((point, index) => strokePoint(point, index)),
     color: preset.color,
     width: preset.width,
     opacity: preset.opacity,
     tool: "pen",
-  };
+  });
 }
 
 export function createLineStroke(
