@@ -16,6 +16,8 @@
   "rectangle": "Rectangle",
   "ellipse": "Ellipse",
   "ruler": "Ruler",
+  "rotateLeft": "Rotate Left",
+  "rotateRight": "Rotate Right",
   "text": "Text",
   "image": "Image",
   "width": "Width",

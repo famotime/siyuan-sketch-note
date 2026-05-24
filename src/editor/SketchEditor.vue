@@ -88,6 +88,16 @@
           @click="activeTool = 'ruler'"
         >▤ {{ t("ruler") }}</button>
         <button
+          class="sketch-btn sketch-btn--action"
+          :disabled="activeTool !== 'ruler'"
+          @click="canvasRef?.rotateRulerBy(-45)"
+        >↺ {{ t("rotateLeft") }}</button>
+        <button
+          class="sketch-btn sketch-btn--action"
+          :disabled="activeTool !== 'ruler'"
+          @click="canvasRef?.rotateRulerBy(45)"
+        >↻ {{ t("rotateRight") }}</button>
+        <button
           class="sketch-btn sketch-btn--tool"
           :class="{ 'sketch-btn--tool-active': activeTool === 'text' }"
           @click="insertTextElement"

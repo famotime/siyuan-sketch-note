@@ -18,7 +18,23 @@ export function createRulerState(input: RulerState): RulerState {
 }
 
 export function snapRulerAngle(angle: number, increment = 45): number {
-  return Math.round(angle / increment) * increment;
+  const snapped = Math.round(angle / increment) * increment;
+  return ((snapped % 360) + 360) % 360;
+}
+
+export function moveRuler(ruler: RulerState, dx: number, dy: number): RulerState {
+  return {
+    ...ruler,
+    x: ruler.x + dx,
+    y: ruler.y + dy,
+  };
+}
+
+export function rotateRuler(ruler: RulerState, angle: number): RulerState {
+  return {
+    ...ruler,
+    angle: snapRulerAngle(angle),
+  };
 }
 
 export function projectPointToRuler(point: Point, ruler: RulerState): Point {
