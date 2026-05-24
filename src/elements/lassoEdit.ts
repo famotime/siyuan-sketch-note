@@ -3,6 +3,11 @@ import type { Stroke } from "@/types/sketch";
 import type { Bounds, SketchElement } from "./model";
 import { withStrokeBounds } from "./model";
 
+export interface ResizeAnchor {
+  x: number;
+  y: number;
+}
+
 function selectionSet(selectedIds: string[]): Set<string> {
   return new Set(selectedIds);
 }
@@ -26,6 +31,86 @@ function translateStroke(stroke: Stroke, dx: number, dy: number, id = stroke.id)
       y: point.y + dy,
     })),
     bounds: translateBounds(boundedStroke.bounds!, dx, dy),
+  };
+}
+
+function scaleValue(value: number, anchor: number, scale: number): number {
+  return anchor + (value - anchor) * scale;
+}
+
+function resizeBounds(bounds: Bounds, anchor: ResizeAnchor, scaleX: number, scaleY: number): Bounds {
+  return {
+    x: scaleValue(bounds.x, anchor.x, scaleX),
+    y: scaleValue(bounds.y, anchor.y, scaleY),
+    width: bounds.width * scaleX,
+    height: bounds.height * scaleY,
+  };
+}
+
+function resizeStroke(stroke: Stroke, anchor: ResizeAnchor, scaleX: number, scaleY: number): Stroke {
+  const boundedStroke = withStrokeBounds(stroke);
+  return {
+    ...boundedStroke,
+    points: boundedStroke.points.map((point) => ({
+      ...point,
+      x: scaleValue(point.x, anchor.x, scaleX),
+      y: scaleValue(point.y, anchor.y, scaleY),
+    })),
+    bounds: resizeBounds(boundedStroke.bounds!, anchor, scaleX, scaleY),
+  };
+}
+
+function resizeElement(
+  element: SketchElement,
+  anchor: ResizeAnchor,
+  scaleX: number,
+  scaleY: number,
+): SketchElement {
+  const base = {
+    ...element,
+    bounds: resizeBounds(element.bounds, anchor, scaleX, scaleY),
+    transform: {
+      ...element.transform,
+      scaleX: element.transform.scaleX * scaleX,
+      scaleY: element.transform.scaleY * scaleY,
+    },
+  };
+
+  if (element.type === "stroke") {
+    return {
+      ...base,
+      type: "stroke",
+      stroke: resizeStroke(element.stroke, anchor, scaleX, scaleY),
+    };
+  }
+
+  if (element.type === "shape") {
+    return {
+      ...base,
+      type: "shape",
+      start: {
+        x: scaleValue(element.start.x, anchor.x, scaleX),
+        y: scaleValue(element.start.y, anchor.y, scaleY),
+      },
+      end: {
+        x: scaleValue(element.end.x, anchor.x, scaleX),
+        y: scaleValue(element.end.y, anchor.y, scaleY),
+      },
+      style: { ...element.style },
+    };
+  }
+
+  if (element.type === "text") {
+    return {
+      ...base,
+      type: "text",
+      style: { ...element.style },
+    };
+  }
+
+  return {
+    ...base,
+    type: "image",
   };
 }
 
@@ -178,4 +263,30 @@ export function duplicateStrokeSelection(
     .filter((stroke) => selected.has(stroke.id))
     .map((stroke) => translateStroke(stroke, dx, dy, createId(stroke.id)));
   return [...strokes, ...duplicates];
+}
+
+export function resizeLassoSelection(
+  elements: SketchElement[],
+  selectedIds: string[],
+  anchor: ResizeAnchor,
+  scaleX: number,
+  scaleY: number,
+): SketchElement[] {
+  const selected = selectionSet(selectedIds);
+  return elements.map((element) =>
+    selected.has(element.id) ? resizeElement(element, anchor, scaleX, scaleY) : element,
+  );
+}
+
+export function resizeStrokeSelection(
+  strokes: Stroke[],
+  selectedIds: string[],
+  anchor: ResizeAnchor,
+  scaleX: number,
+  scaleY: number,
+): Stroke[] {
+  const selected = selectionSet(selectedIds);
+  return strokes.map((stroke) =>
+    selected.has(stroke.id) ? resizeStroke(stroke, anchor, scaleX, scaleY) : stroke,
+  );
 }

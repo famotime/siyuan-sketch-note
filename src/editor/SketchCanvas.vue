@@ -68,9 +68,12 @@ import {
   recolorStrokeSelection,
   removeLassoSelection,
   removeStrokeSelection,
+  resizeLassoSelection,
+  resizeStrokeSelection,
   translateStrokeSelection,
   translateLassoSelection,
 } from "@/elements/lassoEdit";
+import type { Bounds, SketchElement } from "@/elements/model";
 import { migrateStrokesToElements } from "@/elements/model";
 import {
   createRulerState,
@@ -117,6 +120,12 @@ let selectedLassoIds: string[] = [];
 let lassoMove: {
   lastPoint: StrokePoint;
 } | null = null;
+let lassoResize: {
+  anchor: { x: number; y: number };
+  initialBounds: Bounds;
+  elements: SketchElement[];
+  strokes: SketchData["strokes"];
+} | null = null;
 const ruler = ref<RulerState>(createRulerState({
   x: 80,
   y: 220,
@@ -127,6 +136,8 @@ let rulerMove: {
   lastPoint: StrokePoint;
 } | null = null;
 const LASSO_DUPLICATE_OFFSET = 24;
+const LASSO_RESIZE_HANDLE_SIZE = 14;
+const LASSO_MIN_RESIZE_SIZE = 16;
 
 const rulerStyle = computed(() => ({
   left: `${ruler.value.x}px`,
@@ -200,6 +211,20 @@ function onPointerDown(e: PointerEvent) {
   (e.target as HTMLElement).setPointerCapture(e.pointerId);
   if (props.tool === "lasso") {
     const point = eventPoint(e);
+    const selectionBounds = getLassoSelectionBounds();
+    if (selectionBounds && isPointInLassoResizeHandle(selectionBounds, point)) {
+      lassoResize = {
+        anchor: {
+          x: selectionBounds.x,
+          y: selectionBounds.y,
+        },
+        initialBounds: selectionBounds,
+        elements: state.elements,
+        strokes: state.strokes,
+      };
+      pushHistorySnapshot(state);
+      return;
+    }
     const selectedElement = hitTestElement(
       getSelectableElements().filter((element) => selectedLassoIds.includes(element.id)),
       point.x,
@@ -278,6 +303,30 @@ function onPointerMove(e: PointerEvent) {
   e.preventDefault();
   if (props.tool === "lasso") {
     const point = eventPoint(e);
+    if (lassoResize) {
+      const width = Math.max(LASSO_MIN_RESIZE_SIZE, point.x - lassoResize.anchor.x);
+      const height = Math.max(LASSO_MIN_RESIZE_SIZE, point.y - lassoResize.anchor.y);
+      const scaleX = width / Math.max(1, lassoResize.initialBounds.width);
+      const scaleY = height / Math.max(1, lassoResize.initialBounds.height);
+      state.elements = resizeLassoSelection(
+        lassoResize.elements,
+        selectedLassoIds,
+        lassoResize.anchor,
+        scaleX,
+        scaleY,
+      );
+      state.strokes = resizeStrokeSelection(
+        lassoResize.strokes,
+        selectedLassoIds,
+        lassoResize.anchor,
+        scaleX,
+        scaleY,
+      );
+      state.isDirty = true;
+      fullRedrawStrokeCanvas(getCanvas(), state);
+      drawLassoSelectionOutline();
+      return;
+    }
     if (lassoMove) {
       const dx = point.x - lassoMove.lastPoint.x;
       const dy = point.y - lassoMove.lastPoint.y;
@@ -347,6 +396,12 @@ function onPointerMove(e: PointerEvent) {
 
 function onPointerUp(e: PointerEvent) {
   if (props.tool === "lasso") {
+    if (lassoResize) {
+      lassoResize = null;
+      updateUndoRedoState();
+      emit("stroke");
+      return;
+    }
     if (lassoMove) {
       lassoMove = null;
       updateUndoRedoState();
@@ -448,6 +503,7 @@ function drawLassoPath() {
 function drawLassoSelectionOutline() {
   const selected = getSelectableElements().filter((element) => selectedLassoIds.includes(element.id));
   if (selected.length === 0) return;
+  const bounds = getBoundsForElements(selected);
   const ctx = getCanvas().getContext("2d")!;
   ctx.save();
   ctx.strokeStyle = "#2f80ed";
@@ -461,7 +517,53 @@ function drawLassoSelectionOutline() {
   for (const element of selected) {
     ctx.fillRect(element.bounds.x, element.bounds.y, element.bounds.width, element.bounds.height);
   }
+  if (bounds) {
+    ctx.fillStyle = "#2f80ed";
+    ctx.fillRect(
+      bounds.x + bounds.width - LASSO_RESIZE_HANDLE_SIZE,
+      bounds.y + bounds.height - LASSO_RESIZE_HANDLE_SIZE,
+      LASSO_RESIZE_HANDLE_SIZE,
+      LASSO_RESIZE_HANDLE_SIZE,
+    );
+    ctx.strokeStyle = "#ffffff";
+    ctx.lineWidth = 1;
+    ctx.strokeRect(
+      bounds.x + bounds.width - LASSO_RESIZE_HANDLE_SIZE,
+      bounds.y + bounds.height - LASSO_RESIZE_HANDLE_SIZE,
+      LASSO_RESIZE_HANDLE_SIZE,
+      LASSO_RESIZE_HANDLE_SIZE,
+    );
+  }
   ctx.restore();
+}
+
+function getBoundsForElements(elements: SketchElement[]): Bounds | null {
+  if (elements.length === 0) return null;
+  const minX = Math.min(...elements.map((element) => element.bounds.x));
+  const minY = Math.min(...elements.map((element) => element.bounds.y));
+  const maxX = Math.max(...elements.map((element) => element.bounds.x + element.bounds.width));
+  const maxY = Math.max(...elements.map((element) => element.bounds.y + element.bounds.height));
+  return {
+    x: minX,
+    y: minY,
+    width: maxX - minX,
+    height: maxY - minY,
+  };
+}
+
+function getLassoSelectionBounds(): Bounds | null {
+  return getBoundsForElements(
+    getSelectableElements().filter((element) => selectedLassoIds.includes(element.id)),
+  );
+}
+
+function isPointInLassoResizeHandle(bounds: Bounds, point: StrokePoint): boolean {
+  const left = bounds.x + bounds.width - LASSO_RESIZE_HANDLE_SIZE;
+  const top = bounds.y + bounds.height - LASSO_RESIZE_HANDLE_SIZE;
+  return point.x >= left
+    && point.x <= bounds.x + bounds.width
+    && point.y >= top
+    && point.y <= bounds.y + bounds.height;
 }
 
 function getSelectableElements() {
@@ -481,6 +583,7 @@ function clearInteractionState() {
   lassoPath = [];
   selectedLassoIds = [];
   lassoMove = null;
+  lassoResize = null;
   rulerMove = null;
 }
 

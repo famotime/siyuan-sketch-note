@@ -7,6 +7,8 @@ import {
   recolorLassoSelection,
   removeLassoSelection,
   removeStrokeSelection,
+  resizeLassoSelection,
+  resizeStrokeSelection,
   translateStrokeSelection,
   translateLassoSelection,
 } from "./lassoEdit";
@@ -122,5 +124,24 @@ describe("lasso edit operations", () => {
       ],
       bounds: { x: 20, y: 24, width: 24, height: 24 },
     });
+  });
+
+  it("resizes selected elements around an anchor", () => {
+    const next = resizeLassoSelection(elements, ["text-1"], { x: 100, y: 120 }, 1.5, 2);
+
+    expect(next.find((element) => element.id === "text-1")).toMatchObject({
+      bounds: { x: 100, y: 120, width: 240, height: 96 },
+    });
+    expect(next.find((element) => element.id === "stroke-1")?.bounds).toEqual(elements[0].bounds);
+  });
+
+  it("resizes selected stroke points and bounds around an anchor", () => {
+    const next = resizeStrokeSelection([elements[0].stroke], ["stroke-1"], { x: 8, y: 8 }, 2, 3);
+
+    expect(next[0].points).toEqual([
+      { x: 12, y: 14, pressure: 0.5, timestamp: 1 },
+      { x: 52, y: 74, pressure: 0.5, timestamp: 2 },
+    ]);
+    expect(next[0].bounds).toEqual({ x: 8, y: 8, width: 48, height: 72 });
   });
 });
