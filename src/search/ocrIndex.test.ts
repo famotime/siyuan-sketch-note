@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   createOcrIndex,
+  createPageAwareOcrIndex,
   searchOcrIndexes,
   searchOcrIndex,
 } from "./ocrIndex";
@@ -76,6 +77,71 @@ describe("ocr index", () => {
       text: "Project Plan",
       bounds: { x: 10, y: 20, width: 100, height: 24 },
       confidence: 0.95,
+    }]);
+  });
+
+  it("assigns OCR lines to sketch pages by bounds", () => {
+    const index = createPageAwareOcrIndex("block-1", [
+      {
+        text: "First page task",
+        confidence: 0.92,
+        bounds: { x: 10, y: 120, width: 160, height: 32 },
+      },
+      {
+        text: "Second page note",
+        confidence: 0.88,
+        bounds: { x: 20, y: 1120, width: 180, height: 32 },
+      },
+    ], {
+      version: 1,
+      template: "blank",
+      canvasWidth: 800,
+      canvasHeight: 2000,
+      pageMode: "paged",
+      pages: [
+        { id: "page-1", index: 0, x: 0, y: 0, width: 800, height: 1000 },
+        { id: "page-2", index: 1, x: 0, y: 1000, width: 800, height: 1000 },
+      ],
+      strokes: [],
+    }, 1000);
+
+    expect(index.lines.map((line) => ({
+      text: line.text,
+      pageId: line.pageId,
+      pageNumber: line.pageNumber,
+    }))).toEqual([
+      { text: "First page task", pageId: "page-1", pageNumber: 1 },
+      { text: "Second page note", pageId: "page-2", pageNumber: 2 },
+    ]);
+  });
+
+  it("returns page metadata in OCR search results", () => {
+    const index = createPageAwareOcrIndex("block-1", [
+      {
+        text: "Second page note",
+        confidence: 0.88,
+        bounds: { x: 20, y: 1120, width: 180, height: 32 },
+      },
+    ], {
+      version: 1,
+      template: "blank",
+      canvasWidth: 800,
+      canvasHeight: 2000,
+      pageMode: "paged",
+      pages: [
+        { id: "page-1", index: 0, x: 0, y: 0, width: 800, height: 1000 },
+        { id: "page-2", index: 1, x: 0, y: 1000, width: 800, height: 1000 },
+      ],
+      strokes: [],
+    }, 1000);
+
+    expect(searchOcrIndex(index, "note")).toEqual([{
+      blockId: "block-1",
+      text: "Second page note",
+      bounds: { x: 20, y: 1120, width: 180, height: 32 },
+      confidence: 0.88,
+      pageId: "page-2",
+      pageNumber: 2,
     }]);
   });
 });

@@ -1,9 +1,13 @@
 import type { Bounds } from "@/elements/model";
+import type { SketchData, SketchPage } from "@/types/sketch";
+import { getSketchPages } from "@/pages/model";
 
 export interface OcrLine {
   text: string;
   confidence: number;
   bounds: Bounds;
+  pageId?: string;
+  pageNumber?: number;
 }
 
 export interface OcrIndex {
@@ -18,6 +22,8 @@ export interface OcrSearchResult {
   text: string;
   bounds: Bounds;
   confidence: number;
+  pageId?: string;
+  pageNumber?: number;
 }
 
 export function createOcrIndex(
@@ -38,6 +44,23 @@ export function createOcrIndex(
   };
 }
 
+export function createPageAwareOcrIndex(
+  blockId: string,
+  lines: OcrLine[],
+  data: SketchData,
+  updatedAt = Date.now(),
+): OcrIndex {
+  const pages = getSketchPages(data);
+  return createOcrIndex(
+    blockId,
+    lines.map((line) => ({
+      ...line,
+      ...findPageForBounds(line.bounds, pages),
+    })),
+    updatedAt,
+  );
+}
+
 export function searchOcrIndex(index: OcrIndex, query: string): OcrSearchResult[] {
   const normalizedQuery = normalizeText(query);
   if (!normalizedQuery) return [];
@@ -49,6 +72,8 @@ export function searchOcrIndex(index: OcrIndex, query: string): OcrSearchResult[
       text: line.text,
       bounds: line.bounds,
       confidence: line.confidence,
+      pageId: line.pageId,
+      pageNumber: line.pageNumber,
     }));
 }
 
@@ -58,4 +83,15 @@ export function searchOcrIndexes(indexes: OcrIndex[], query: string): OcrSearchR
 
 function normalizeText(value: string): string {
   return value.trim().replace(/\s+/g, " ").toLocaleLowerCase();
+}
+
+function findPageForBounds(bounds: Bounds, pages: SketchPage[]): Pick<OcrLine, "pageId" | "pageNumber"> {
+  const centerY = bounds.y + bounds.height / 2;
+  const page = pages.find((item) => centerY >= item.y && centerY <= item.y + item.height);
+  if (!page) return {};
+
+  return {
+    pageId: page.id,
+    pageNumber: page.index + 1,
+  };
 }
