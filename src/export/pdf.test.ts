@@ -53,6 +53,28 @@ describe("pdf export helpers", () => {
     expect(plan.pages[1].height).toBe(200);
   });
 
+  it("uses explicit sketch pages when exporting paged documents", () => {
+    const plan = createPdfExportPlanFromSketch("block-1", {
+      version: 1,
+      template: "blank",
+      canvasWidth: 800,
+      canvasHeight: 1800,
+      pageMode: "paged",
+      activePageId: "page-2",
+      pages: [
+        { id: "page-1", index: 0, x: 0, y: 0, width: 800, height: 900 },
+        { id: "page-2", index: 1, x: 0, y: 900, width: 800, height: 900 },
+      ],
+      strokes: [],
+    });
+
+    expect(plan.pageHeight).toBe(900);
+    expect(plan.pages).toEqual([
+      { index: 0, sourceX: 0, sourceY: 0, width: 800, height: 900 },
+      { index: 1, sourceX: 0, sourceY: 900, width: 800, height: 900 },
+    ]);
+  });
+
   it("exports planned pages into a PDF blob", async () => {
     const plan = createPdfExportPlan({
       blockId: "block-1",

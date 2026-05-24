@@ -57,5 +57,7 @@
   "statusSaved": "Saved",
   "statusDirty": "Unsaved",
   "statusError": "Error",
-  "dataRecovered": "Recovered damaged data"
+  "dataRecovered": "Recovered damaged data",
+  "page": "Page",
+  "addPage": "Add Page"
 }

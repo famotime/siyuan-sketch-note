@@ -86,6 +86,11 @@ import {
   rotateRuler,
 } from "@/tools/ruler";
 import type { RulerState } from "@/tools/ruler";
+import {
+  addSketchPage,
+  createPageNavigator,
+  getSketchPages,
+} from "@/pages/model";
 import { isShapeEditorTool } from "./tools";
 import type { EditorTool } from "./tools";
 
@@ -101,6 +106,7 @@ const emit = defineEmits<{
   (e: "update:canUndo", value: boolean): void;
   (e: "update:canRedo", value: boolean): void;
   (e: "heightChanged", height: number): void;
+  (e: "pagesChanged", pages: { current: number; total: number }): void;
   (e: "stroke"): void;
 }>();
 
@@ -165,6 +171,7 @@ onMounted(async () => {
   setupBackgroundCanvas(bgCanvasRef.value, state);
   setupStrokeCanvas(strokeCanvasRef.value, state);
   updateUndoRedoState();
+  emitPageState();
 });
 
 watch(() => props.tool, (t) => { if (state) state.tool = t === "eraser" ? "eraser" : "pen"; });
@@ -417,6 +424,7 @@ function onPointerMove(e: PointerEvent) {
   if (heightChanged) {
     resizeCanvases(bgCanvasRef.value!, strokeCanvasRef.value!, state);
     emit("heightChanged", state.canvasHeight);
+    emitPageState();
   }
 }
 
@@ -508,6 +516,15 @@ function createShapeStrokeForTool(
 function updateUndoRedoState() {
   emit("update:canUndo", state.undoStack.length > 0);
   emit("update:canRedo", state.redoStack.length > 0);
+}
+
+function emitPageState() {
+  const navigator = createPageNavigator(serializeState(state));
+  const currentIndex = navigator.current?.index ?? 0;
+  emit("pagesChanged", {
+    current: currentIndex + 1,
+    total: Math.max(1, navigator.pages.length),
+  });
 }
 
 function drawSelectionOutline() {
@@ -692,6 +709,47 @@ async function restoreData(data: SketchData) {
   setupBackgroundCanvas(bgCanvasRef.value, state);
   setupStrokeCanvas(strokeCanvasRef.value, state);
   updateUndoRedoState();
+  emitPageState();
+}
+function addPage() {
+  const next = addSketchPage(serializeState(state));
+  pushHistorySnapshot(state);
+  state.pageMode = next.pageMode;
+  state.pages = next.pages ?? getSketchPages(next);
+  state.activePageId = next.activePageId;
+  state.canvasHeight = next.canvasHeight;
+  state.isDirty = true;
+  resizeCanvases(bgCanvasRef.value!, strokeCanvasRef.value!, state);
+  updateUndoRedoState();
+  emitPageState();
+  emit("stroke");
+  scrollActivePageIntoView();
+}
+function goToPage(index: number) {
+  const next = createPageNavigator(serializeState(state)).goToIndex(index);
+  state.activePageId = next.activePageId;
+  emitPageState();
+  scrollActivePageIntoView();
+}
+function goToPreviousPage() {
+  const next = createPageNavigator(serializeState(state)).goToPrevious();
+  state.activePageId = next.activePageId;
+  emitPageState();
+  scrollActivePageIntoView();
+}
+function goToNextPage() {
+  const next = createPageNavigator(serializeState(state)).goToNext();
+  state.activePageId = next.activePageId;
+  emitPageState();
+  scrollActivePageIntoView();
+}
+function scrollActivePageIntoView() {
+  const page = createPageNavigator(serializeState(state)).current;
+  if (!page) return;
+  containerRef.value?.parentElement?.scrollTo({
+    top: page.y,
+    behavior: "smooth",
+  });
 }
 function deleteLassoSelection() {
   if (selectedLassoIds.length === 0) return;
@@ -784,6 +842,10 @@ defineExpose({
   duplicateLassoSelection,
   recolorLasso,
   rotateRulerBy,
+  addPage,
+  goToPage,
+  goToPreviousPage,
+  goToNextPage,
 });
 </script>
 

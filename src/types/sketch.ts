@@ -23,6 +23,9 @@ export interface SketchData {
   template: string;         // template id: "blank" | "grid"
   canvasWidth: number;
   canvasHeight: number;
+  pageMode?: SketchPageMode;
+  pages?: SketchPage[];
+  activePageId?: string;
   recovery?: SketchDataRecoveryInfo;
   ocrIndex?: OcrIndex;
   toolPresets?: ToolPresetCollection;
@@ -34,6 +37,17 @@ export interface SketchData {
 export interface SketchDataRecoveryInfo {
   recovered: boolean;
   reason: string;
+}
+
+export type SketchPageMode = "infinite" | "paged";
+
+export interface SketchPage {
+  id: string;
+  index: number;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
 }
 
 export const DEFAULT_SKETCH_DATA: SketchData = {

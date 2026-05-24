@@ -1,4 +1,5 @@
 import type { SketchData } from "@/types/sketch";
+import { getSketchPages } from "@/pages/model";
 
 export const DEFAULT_PDF_PAGE_HEIGHT = 1000;
 
@@ -75,6 +76,20 @@ export function createPdfExportPlanFromSketch(
   data: SketchData,
   pageHeight = DEFAULT_PDF_PAGE_HEIGHT,
 ): PdfExportPlan {
+  if (data.pageMode === "paged" && data.pages?.length) {
+    return {
+      blockId,
+      pageHeight: data.pages[0].height,
+      pages: getSketchPages(data).map((page) => ({
+        index: page.index,
+        sourceX: page.x,
+        sourceY: page.y,
+        width: page.width,
+        height: page.height,
+      })),
+    };
+  }
+
   return createPdfExportPlan({
     blockId,
     canvasWidth: data.canvasWidth,

@@ -1,4 +1,4 @@
-import type { Stroke, StrokePoint, SketchTool, SketchData, ToolPresetCollection } from "@/types/sketch";
+import type { SketchData, SketchPage, SketchTool, Stroke, StrokePoint, ToolPresetCollection } from "@/types/sketch";
 import {
   CANVAS_LOGICAL_WIDTH,
   CANVAS_HEIGHT_INCREMENT,
@@ -8,6 +8,7 @@ import { normalizeToolPresets } from "@/tools/presets";
 import { migrateStrokesToElements, withStrokeBounds } from "@/elements/model";
 import type { SketchElement } from "@/elements/model";
 import { splitElementsForRender } from "@/elements/renderOrder";
+import { getSketchPages } from "@/pages/model";
 import {
   filterStrokePointsByDistance,
   getPressureWidth,
@@ -32,6 +33,9 @@ export interface EngineState {
   toolPresets: ToolPresetCollection;
   canvasWidth: number;
   canvasHeight: number;
+  pageMode: SketchData["pageMode"];
+  pages: SketchPage[];
+  activePageId: string | undefined;
   templateId: string;
   isDirty: boolean;
 }
@@ -56,6 +60,9 @@ export function createEngineState(
     toolPresets: normalizeToolPresets(),
     canvasWidth,
     canvasHeight,
+    pageMode: "infinite",
+    pages: getSketchPages({ canvasWidth, canvasHeight, pageMode: "infinite" }),
+    activePageId: undefined,
     templateId,
     isDirty: false,
   };
@@ -72,6 +79,9 @@ export function restoreEngineState(data: SketchData): EngineState {
     toolPresets: normalizeToolPresets(data.toolPresets),
     canvasWidth: data.canvasWidth,
     canvasHeight: data.canvasHeight,
+    pageMode: data.pageMode ?? "infinite",
+    pages: getSketchPages(data),
+    activePageId: data.activePageId,
     templateId: data.template,
     isDirty: false,
   };
@@ -278,6 +288,9 @@ export function serializeState(state: EngineState): SketchData {
     template: state.templateId,
     canvasWidth: state.canvasWidth,
     canvasHeight: state.canvasHeight,
+    pageMode: state.pageMode,
+    pages: state.pageMode === "paged" ? state.pages : undefined,
+    activePageId: state.activePageId,
     toolPresets: state.toolPresets,
     elements: [
       ...migrateStrokesToElements(strokes),

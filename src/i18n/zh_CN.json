@@ -57,5 +57,7 @@
   "statusSaved": "已保存",
   "statusDirty": "未保存",
   "statusError": "保存失败",
-  "dataRecovered": "已恢复损坏数据"
+  "dataRecovered": "已恢复损坏数据",
+  "page": "第",
+  "addPage": "加页"
 }

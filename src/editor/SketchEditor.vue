@@ -12,6 +12,26 @@
           v-if="loadedData?.recovery?.recovered"
           class="sketch-recovery"
         >{{ t("dataRecovered") }}</span>
+        <div class="sketch-pages">
+          <button
+            class="sketch-btn sketch-btn--page"
+            :disabled="pageState.current <= 1"
+            @click="canvasRef?.goToPreviousPage()"
+          >‹</button>
+          <button
+            class="sketch-btn sketch-btn--page-label"
+            @click="canvasRef?.goToPage(pageState.current - 1)"
+          >{{ t("page") }} {{ pageState.current }} / {{ pageState.total }}</button>
+          <button
+            class="sketch-btn sketch-btn--page"
+            :disabled="pageState.current >= pageState.total"
+            @click="canvasRef?.goToNextPage()"
+          >›</button>
+          <button
+            class="sketch-btn sketch-btn--page-add"
+            @click="canvasRef?.addPage()"
+          >+ {{ t("addPage") }}</button>
+        </div>
         <span class="sketch-spacer" />
         <button
           class="sketch-btn sketch-btn--toggle"
@@ -223,6 +243,7 @@
         @update:canUndo="canUndo = $event"
         @update:canRedo="canRedo = $event"
         @heightChanged="onHeightChanged"
+        @pagesChanged="pageState = $event"
         @stroke="onStroke"
       />
     </div>
@@ -276,6 +297,7 @@ const toolPresets = ref(normalizeToolPresets(props.initialData?.toolPresets));
 const recentColors = ref(normalizeRecentColors(props.initialData?.recentColors));
 const canUndo = ref(false);
 const canRedo = ref(false);
+const pageState = ref({ current: 1, total: 1 });
 const currentTemplate = ref(props.initialData?.template ?? "blank");
 const templates = getAllTemplates();
 const loadedData = ref<SketchData | null>(props.initialData);
@@ -705,6 +727,26 @@ function onHeightChanged(_h: number) {}
   color: #d97706;
   font-size: 12px;
   white-space: nowrap;
+}
+.sketch-pages {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.sketch-btn--page {
+  min-width: 28px;
+  width: 28px;
+  padding: 0;
+  font-size: 18px;
+}
+.sketch-btn--page-label {
+  min-width: 72px;
+  padding: 4px 8px;
+  font-size: 12px;
+}
+.sketch-btn--page-add {
+  min-width: 52px;
+  font-size: 12px;
 }
 
 /* ── Body ── */
