@@ -1,4 +1,5 @@
 import type { SketchElement } from "@/elements/model";
+import type { OcrIndex } from "@/search/ocrIndex";
 
 export interface StrokePoint {
   x: number;
@@ -22,6 +23,7 @@ export interface SketchData {
   canvasWidth: number;
   canvasHeight: number;
   recovery?: SketchDataRecoveryInfo;
+  ocrIndex?: OcrIndex;
   toolPresets?: ToolPresetCollection;
   elements?: SketchElement[];
   strokes: Stroke[];
