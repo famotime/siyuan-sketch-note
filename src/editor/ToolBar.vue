@@ -201,8 +201,9 @@ const currentShapeIcon = computed<IconParkName>(() => {
   transform: scale(0.95);
 }
 
-/* 选中激活状态：高亮微光 */
-.sketch-btn--tool-active {
+/* 选中激活状态：高亮微光；覆盖 hover，避免点击后高亮被悬停态遮住 */
+.sketch-btn--tool-active,
+.sketch-btn--tool.sketch-btn--tool-active:hover {
   background: var(--b3-theme-primary) !important;
   color: #fff !important;
   border-color: transparent !important;

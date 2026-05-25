@@ -50,3 +50,14 @@ describe("editor top bar layout", () => {
     expect(canvas).toMatch(/\.zoom-indicator__lock\s*\{[^}]*width:\s*24px;[^}]*height:\s*24px;[^}]*padding:\s*0/s);
   });
 });
+
+it("keeps active tool highlight visible while the button is hovered", () => {
+  const toolbar = readFileSync(resolve(process.cwd(), "src/editor/ToolBar.vue"), "utf8");
+  const editor = readFileSync(resolve(process.cwd(), "src/editor/SketchEditor.vue"), "utf8");
+
+  const activeHoverRule = /\.sketch-btn--tool\.sketch-btn--tool-active:hover\s*\{[^}]*background:\s*var\(--b3-theme-primary\)\s*!important/s;
+
+  expect(toolbar).toMatch(activeHoverRule);
+  expect(editor).toMatch(activeHoverRule);
+});
+

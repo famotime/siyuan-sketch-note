@@ -991,7 +991,8 @@ function onHeightChanged(_h: number) {}
   color: #fff !important;
   border-color: transparent !important;
 }
-.sketch-btn--tool-active {
+.sketch-btn--tool-active,
+.sketch-btn--tool.sketch-btn--tool-active:hover {
   background: var(--b3-theme-primary) !important;
   color: #fff !important;
   border-color: transparent !important;
