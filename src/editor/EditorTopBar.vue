@@ -1,6 +1,13 @@
 <template>
   <div class="sketch-editor__row">
-    <button class="sketch-btn sketch-btn--back" @click="$emit('back')">← {{ t("back") }}</button>
+    <button
+      class="sketch-btn sketch-btn--back"
+      :title="t('back')"
+      :aria-label="t('back')"
+      @click="$emit('back')"
+    >
+      ←
+    </button>
     <select class="sketch-select" :value="templateId" @change="$emit('update:templateId', ($event.target as HTMLSelectElement).value)">
       <option v-for="tpl in templates" :key="tpl.id" :value="tpl.id">{{ t(tpl.nameKey) }}</option>
     </select>
@@ -83,7 +90,7 @@
     <button class="sketch-btn sketch-btn--action" :title="t('clear')" @click="$emit('clear')">⌧</button>
     <span class="sketch-sep" />
     <div class="sketch-more-wrap" ref="moreWrapRef">
-      <button class="sketch-btn sketch-btn--more" :class="{ 'sketch-btn--more-on': moreOpen }" :title="t('settings') || '设置'" @click="moreOpen = !moreOpen">⋯</button>
+      <button class="sketch-btn sketch-btn--more" :class="{ 'sketch-btn--more-on': moreOpen }" :title="t('settings')" @click="moreOpen = !moreOpen">⋯</button>
       <div v-if="moreOpen" class="sketch-more-popover">
         <label class="sketch-more-row">
           <span class="sketch-more-label">{{ t("stylusOnly") }}</span>

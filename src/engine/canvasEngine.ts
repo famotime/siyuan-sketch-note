@@ -243,7 +243,8 @@ export function handlePointerMove(
 
   const ctx = canvas.getContext("2d")!;
   const pts = state.currentStroke.points;
-  if (pts.length >= 2) {
+  const shouldRenderLiveSegment = !(state.currentStroke.tool === "eraser" && state.toolPresets.eraser.mode === "stroke");
+  if (shouldRenderLiveSegment && pts.length >= 2) {
     const prev = pts[pts.length - 2];
     const curr = pts[pts.length - 1];
     renderStrokeSegment(ctx, state.currentStroke, prev, curr);

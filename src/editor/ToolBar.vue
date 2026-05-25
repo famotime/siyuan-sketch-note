@@ -49,8 +49,8 @@
       <button
         class="sketch-btn sketch-btn--tool sketch-btn--icon-tool"
         :class="{ 'sketch-btn--tool-active': isShapeActive }"
-        :title="t('shape') || '图形'"
-        :aria-label="t('shape') || '图形'"
+        :title="t('shape')"
+        :aria-label="t('shape')"
         @click="$emit('selectTool', lastShapeTool)"
       >
         <span class="sketch-btn__icon" aria-hidden="true">{{ currentShapeIcon }}</span>

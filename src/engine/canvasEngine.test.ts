@@ -80,6 +80,48 @@ describe("canvas engine history", () => {
     expect(state.isDirty).toBe(true);
   });
 
+  it("does not pixel-erase the live canvas while stroke eraser is drawing", () => {
+    const state = createEngineState("blank");
+    state.tool = "eraser";
+    state.toolPresets.eraser.mode = "stroke";
+
+    const operations: string[] = [];
+    const canvas = {
+      getBoundingClientRect: () => ({ left: 0, top: 0 }),
+      getContext: () => ({
+        save() { operations.push("save"); },
+        restore() { operations.push("restore"); },
+        beginPath() { operations.push("beginPath"); },
+        moveTo() { operations.push("moveTo"); },
+        lineTo() { operations.push("lineTo"); },
+        stroke() { operations.push("stroke"); },
+        set lineWidth(_value: number) {},
+        set lineJoin(_value: string) {},
+        set lineCap(_value: string) {},
+        set globalAlpha(_value: number) {},
+        set globalCompositeOperation(value: string) { operations.push(`composite:${value}`); },
+        set strokeStyle(_value: string) {},
+      }),
+    } as unknown as HTMLCanvasElement;
+
+    handlePointerDown(state, {
+      clientX: 10,
+      clientY: 10,
+      pressure: 0.5,
+      timeStamp: 1,
+    } as PointerEvent, canvas);
+    handlePointerMove(state, {
+      clientX: 40,
+      clientY: 10,
+      pressure: 0.5,
+      timeStamp: 2,
+    } as PointerEvent, canvas);
+
+    expect(operations).not.toContain("composite:destination-out");
+    expect(operations).not.toContain("stroke");
+    expect(state.currentStroke?.points).toHaveLength(2);
+  });
+
   it("stores precomputed bounds on completed freehand strokes", () => {
     const state = createEngineState("blank");
     const canvas = {

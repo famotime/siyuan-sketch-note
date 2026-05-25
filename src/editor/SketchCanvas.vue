@@ -737,6 +737,9 @@ function onPointerUp(e: PointerEvent) {
   }
   const completed = enginePointerUp(state);
   if (completed) {
+    if (props.tool === "eraser" && props.toolPresets.eraser.mode === "stroke") {
+      fullRedrawStrokeCanvas(getCanvas(), state);
+    }
     updateUndoRedoState();
     emit("stroke");
   }
@@ -1341,13 +1344,13 @@ defineExpose({
   font-family: inherit;
   font-size: 16px;
   color: var(--b3-theme-text-main, #333);
-  background: var(--b3-theme-background, #fff);
+  background: transparent;
   border: 1px solid var(--b3-theme-primary, #2f80ed);
   border-radius: 4px;
   padding: 2px 6px;
   min-width: 150px;
   max-width: 300px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  box-shadow: none;
   outline: none;
   font-weight: 500;
 }

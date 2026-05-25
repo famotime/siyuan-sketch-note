@@ -102,7 +102,7 @@
       @updatePreset="updateActivePreset"
       @deleteSelection="canvasRef?.deleteLassoSelection()"
       @duplicateSelection="canvasRef?.duplicateLassoSelection()"
-      @recolorSelection="canvasRef?.recolorLasso(activePreset.color)"
+      @recolorSelection="recolorSelection"
       @deleteColor="deleteColor"
       @resetDefaultColors="resetDefaultColors"
     />
@@ -276,6 +276,11 @@ function selectCustomColor(c: string) {
   updateActivePreset({ color: c });
   // 自定义颜色选择时，将其从后端追加，推动现有颜色往前滚
   recentColors.value = appendRecentColor(recentColors.value, c);
+}
+
+function recolorSelection(c: string) {
+  canvasRef.value?.recolorLasso(c);
+  recentColors.value = addRecentColor(recentColors.value, c);
 }
 
 function deleteColor(color: string) {

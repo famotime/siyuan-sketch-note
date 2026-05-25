@@ -36,7 +36,7 @@
           :title="t('lassoModeFreehand')"
           @click="$emit('update:lassoMode', 'freehand')"
         >
-          自由
+          {{ t('lassoModeFreehand') }}
         </button>
         <button
           class="sketch-float-mode-btn"
@@ -44,7 +44,7 @@
           :title="t('lassoModeBox')"
           @click="$emit('update:lassoMode', 'box')"
         >
-          框选
+          {{ t('lassoModeBox') }}
         </button>
       </div>
       <div class="sketch-float-divider" />
@@ -52,23 +52,31 @@
       <button
         class="sketch-float-action-btn"
         :title="t('recolor')"
-        @click="$emit('recolorSelection')"
+        @click="openRecolorPicker"
       >
         🎨 <span class="sketch-float-action-label">{{ t('recolor') }}</span>
       </button>
+      <input
+        ref="recolorInputRef"
+        class="sketch-hidden-color-input"
+        type="color"
+        :value="preset.color"
+        :aria-label="t('recolor')"
+        @change="onRecolorPicked"
+      >
       <button
         class="sketch-float-action-btn"
         :title="t('duplicateSelection')"
         @click="$emit('duplicateSelection')"
       >
-        ⧉ <span class="sketch-float-action-label">克隆</span>
+        ⧉ <span class="sketch-float-action-label">{{ t('duplicateSelection') }}</span>
       </button>
       <button
         class="sketch-float-action-btn"
         :title="t('deleteSelection')"
         @click="$emit('deleteSelection')"
       >
-        ⌫ <span class="sketch-float-action-label">删除</span>
+        ⌫ <span class="sketch-float-action-label">{{ t('deleteSelection') }}</span>
       </button>
     </div>
 
@@ -81,7 +89,7 @@
           :title="t('eraserModePixel')"
           @click="$emit('updatePreset', { mode: 'pixel' })"
         >
-          像素
+          {{ t('eraserModePixel') }}
         </button>
         <button
           class="sketch-float-mode-btn"
@@ -89,7 +97,7 @@
           :title="t('eraserModeStroke')"
           @click="$emit('updatePreset', { mode: 'stroke' })"
         >
-          整笔
+          {{ t('eraserModeStroke') }}
         </button>
       </div>
       <div class="sketch-float-divider" />
@@ -105,7 +113,7 @@
           class="sketch-float-color"
           :class="{ 'sketch-float-color--active': preset.color === c }"
           :style="{ backgroundColor: c }"
-          :title="`${c} (长按或右击删除)`"
+          :title="`${c} (${t('deleteColorHint')})`"
           @click="onColorClick(c)"
           @touchstart.passive="onColorTouchStart(c)"
           @touchend.passive="onColorTouchEnd"
@@ -128,7 +136,7 @@
         </label>
         <button
           class="sketch-float-reset-btn"
-          title="恢复默认颜色"
+          :title="t('resetDefaultColors')"
           @click="$emit('resetDefaultColors')"
         >
           🔄
@@ -138,7 +146,7 @@
     </div>
 
     <!-- 5. 粗细调节（三个常用粗细小圆点 + 滑动条） -->
-    <div v-if="hasStrokeControls" class="sketch-float-group sketch-float-widths">
+    <div v-if="hasStrokeControls" ref="widthControlRef" class="sketch-float-group sketch-float-widths">
       <div class="sketch-float-widths-presets">
         <button
           v-for="sz in widthPresets"
@@ -165,7 +173,7 @@
 
       <div v-if="showWidthSlider" class="sketch-float-slider-popover">
         <div class="sketch-float-slider-header">
-          <span>{{ activeTool === 'text' ? '字号' : t('width') }}: {{ preset.width }}px</span>
+          <span>{{ activeTool === 'text' ? t('fontSize') : t('width') }}: {{ preset.width }}px</span>
         </div>
         <input
           type="range"
@@ -179,7 +187,7 @@
     </div>
 
     <!-- 6. 透明度调节（仅在支持透明度调节时显示） -->
-    <div v-if="hasOpacityControl" class="sketch-float-group sketch-float-opacity">
+    <div v-if="hasOpacityControl" ref="opacityControlRef" class="sketch-float-group sketch-float-opacity">
       <button
         class="sketch-float-slider-toggle"
         :class="{ 'sketch-float-slider-toggle--active': showOpacitySlider }"
@@ -222,7 +230,7 @@ const props = defineProps<{
 const emit = defineEmits<{
   (e: "deleteSelection"): void;
   (e: "duplicateSelection"): void;
-  (e: "recolorSelection"): void;
+  (e: "recolorSelection", color: string): void;
   (e: "selectColor", color: string): void;
   (e: "selectCustomColor", color: string): void;
   (e: "selectTool", tool: EditorTool): void;
@@ -234,6 +242,9 @@ const emit = defineEmits<{
 
 // ── 拖拽状态与逻辑 ──
 const panelRef = ref<HTMLDivElement>();
+const widthControlRef = ref<HTMLDivElement>();
+const opacityControlRef = ref<HTMLDivElement>();
+const recolorInputRef = ref<HTMLInputElement>();
 const pos = ref({ left: 20, top: 150 });
 let dragStartOffset = { x: 0, y: 0 };
 let isDragging = false;
@@ -350,30 +361,48 @@ function onColorClick(c: string) {
 const showWidthSlider = ref(false);
 const showOpacitySlider = ref(false);
 
+function closeSlidersOnOutsideClick(e: MouseEvent) {
+  const target = e.target as Node;
+  if (showWidthSlider.value && widthControlRef.value && !widthControlRef.value.contains(target)) {
+    showWidthSlider.value = false;
+  }
+  if (showOpacitySlider.value && opacityControlRef.value && !opacityControlRef.value.contains(target)) {
+    showOpacitySlider.value = false;
+  }
+}
+
+function openRecolorPicker() {
+  recolorInputRef.value?.click();
+}
+
+function onRecolorPicked(e: Event) {
+  emit("recolorSelection", (e.target as HTMLInputElement).value);
+}
+
 const widthPresets = computed(() => {
   if (props.activeTool === "highlighter") {
     return [
-      { val: 8, dotSize: 4, label: "细" },
-      { val: 18, dotSize: 9, label: "中" },
-      { val: 28, dotSize: 14, label: "粗" },
+      { val: 8, dotSize: 4, label: props.t("sizeThin") },
+      { val: 18, dotSize: 9, label: props.t("sizeMedium") },
+      { val: 28, dotSize: 14, label: props.t("sizeThick") },
     ];
   } else if (props.activeTool === "eraser") {
     return [
-      { val: 10, dotSize: 5, label: "细" },
-      { val: 20, dotSize: 10, label: "中" },
-      { val: 30, dotSize: 15, label: "粗" },
+      { val: 10, dotSize: 5, label: props.t("sizeThin") },
+      { val: 20, dotSize: 10, label: props.t("sizeMedium") },
+      { val: 30, dotSize: 15, label: props.t("sizeThick") },
     ];
   } else if (props.activeTool === "text") {
     return [
-      { val: 14, dotSize: 4, label: "小" },
-      { val: 20, dotSize: 7, label: "中" },
-      { val: 28, dotSize: 11, label: "大" },
+      { val: 14, dotSize: 4, label: props.t("sizeSmall") },
+      { val: 20, dotSize: 7, label: props.t("sizeMedium") },
+      { val: 28, dotSize: 11, label: props.t("sizeLarge") },
     ];
   } else {
     return [
-      { val: 2, dotSize: 3, label: "细" },
-      { val: 6, dotSize: 7, label: "中" },
-      { val: 12, dotSize: 12, label: "粗" },
+      { val: 2, dotSize: 3, label: props.t("sizeThin") },
+      { val: 6, dotSize: 7, label: props.t("sizeMedium") },
+      { val: 12, dotSize: 12, label: props.t("sizeThick") },
     ];
   }
 });
@@ -414,6 +443,7 @@ const shapeOptions = [
 ] as const;
 
 onMounted(() => {
+  document.addEventListener("mousedown", closeSlidersOnOutsideClick);
   try {
     const cached = localStorage.getItem("sketch-note-float-pos");
     if (cached) {
@@ -428,6 +458,7 @@ onMounted(() => {
 });
 
 onUnmounted(() => {
+  document.removeEventListener("mousedown", closeSlidersOnOutsideClick);
   window.removeEventListener("mousemove", onDragging);
   window.removeEventListener("touchmove", onDragging);
   window.removeEventListener("mouseup", onDragEnd);
@@ -595,6 +626,17 @@ onUnmounted(() => {
   color: rgba(255, 255, 255, 0.5);
   margin-top: 1px;
   transform: scale(0.9);
+  max-width: 34px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.sketch-hidden-color-input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
 }
 
 /* 4. 颜色控制与滑动面板 */
