@@ -1,9 +1,14 @@
 <template>
-  <div class="sketch-canvas-container" ref="containerRef">
+  <div
+    class="sketch-canvas-container"
+    ref="containerRef"
+    :style="{ transform: `translate(${viewportPanX}px, ${viewportPanY}px) scale(${viewportScale})`, transformOrigin: '0 0' }"
+  >
     <canvas ref="bgCanvasRef" class="sketch-canvas sketch-canvas--bg" />
     <canvas
       ref="strokeCanvasRef"
       class="sketch-canvas sketch-canvas--stroke"
+      @contextmenu.prevent
       @dblclick="onCanvasDoubleClick"
       @pointerdown="onPointerDown"
       @pointermove="onPointerMove"
@@ -32,6 +37,12 @@
       >
     </div>
   </div>
+  <Transition name="zoom-fade">
+    <div v-if="showIndicator || zoomLocked" class="zoom-indicator" @pointerdown.stop>
+      <span class="zoom-indicator__value">{{ Math.round(viewportScale * 100) }}%</span>
+      <button class="zoom-indicator__lock" @click="toggleZoomLock">{{ zoomLocked ? '🔒' : '🔓' }}</button>
+    </div>
+  </Transition>
 </template>
 
 <script setup lang="ts">
@@ -137,6 +148,33 @@ const textEditorInputRef = ref<HTMLInputElement>();
 const containerRef = ref<HTMLDivElement>();
 const bgCanvasRef = ref<HTMLCanvasElement>();
 const strokeCanvasRef = ref<HTMLCanvasElement>();
+
+// ── Viewport zoom/pan state ──
+const viewportScale = ref(1);
+const viewportPanX = ref(0);
+const viewportPanY = ref(0);
+const showIndicator = ref(false);
+const zoomLocked = ref(loadZoomLock());
+let indicatorHideTimer: ReturnType<typeof setTimeout> | null = null;
+
+// ── Two-finger gesture tracking ──
+const pointers = new Map<number, { x: number; y: number; type: string }>();
+let pinchStartDist = 0;
+let pinchStartScale = 1;
+let pinchStartMidX = 0;
+let pinchStartMidY = 0;
+let pinchStartPanX = 0;
+let pinchStartPanY = 0;
+let twoFingerActive = false;
+let postPinchGuard = 0;
+let pinchPrevMidX = 0;
+let pinchPrevMidY = 0;
+
+// ── Right-click pan tracking ──
+let rightPanActive = false;
+let rightPanLastX = 0;
+let rightPanLastY = 0;
+
 let state: EngineState;
 let shapeStart: StrokePoint | null = null;
 let imageTransform: {
@@ -237,19 +275,122 @@ watch(() => props.templateId, (tpl) => {
 
 function getCanvas(): HTMLCanvasElement { return strokeCanvasRef.value!; }
 
+// ── Zoom/pan helpers ──
+const ZOOM_LOCK_KEY = "sketch-note-zoom-lock";
+function loadZoomLock(): boolean {
+  try { return localStorage.getItem(ZOOM_LOCK_KEY) === "true"; }
+  catch { return false; }
+}
+function saveZoomLock(locked: boolean) {
+  try { localStorage.setItem(ZOOM_LOCK_KEY, String(locked)); }
+  catch { /* ignore */ }
+}
+function showZoomIndicator() {
+  showIndicator.value = true;
+  if (indicatorHideTimer) { clearTimeout(indicatorHideTimer); indicatorHideTimer = null; }
+}
+function scheduleHideZoomIndicator() {
+  if (zoomLocked.value) return;
+  if (indicatorHideTimer) clearTimeout(indicatorHideTimer);
+  indicatorHideTimer = setTimeout(() => { showIndicator.value = false; }, 1500);
+}
+function toggleZoomLock() {
+  zoomLocked.value = !zoomLocked.value;
+  saveZoomLock(zoomLocked.value);
+  if (zoomLocked.value) {
+    showZoomIndicator();
+    if (indicatorHideTimer) { clearTimeout(indicatorHideTimer); indicatorHideTimer = null; }
+  } else {
+    scheduleHideZoomIndicator();
+  }
+}
+function resetViewport() {
+  viewportScale.value = 1;
+  viewportPanX.value = 0;
+  viewportPanY.value = 0;
+}
+function handleWheelZoom(e: WheelEvent) {
+  if (zoomLocked.value) return;
+  const rect = containerRef.value!.getBoundingClientRect();
+  const cursorScreenX = e.clientX - rect.left;
+  const cursorScreenY = e.clientY - rect.top;
+  const canvasX = cursorScreenX / viewportScale.value;
+  const canvasY = cursorScreenY / viewportScale.value;
+  const zoomFactor = e.deltaY > 0 ? 0.9 : 1.1;
+  const newScale = Math.min(5, Math.max(1, viewportScale.value * zoomFactor));
+  viewportScale.value = newScale;
+  viewportPanX.value = cursorScreenX - canvasX * newScale;
+  viewportPanY.value = cursorScreenY - canvasY * newScale;
+  showZoomIndicator();
+  scheduleHideZoomIndicator();
+}
+
 function eventPoint(e: PointerEvent): StrokePoint {
   const rect = getCanvas().getBoundingClientRect();
-  const rawPoint = {
-    x: e.clientX - rect.left,
-    y: e.clientY - rect.top,
+  const s = viewportScale.value;
+  return {
+    x: (e.clientX - rect.left) / s,
+    y: (e.clientY - rect.top) / s,
     pressure: e.pressure || 0.5,
     timestamp: e.timeStamp,
   };
-  return rawPoint;
+}
+
+function transformedPointerEvent(e: PointerEvent): PointerEvent {
+  const s = viewportScale.value;
+  const rect = getCanvas().getBoundingClientRect();
+  const cx = rect.left + (e.clientX - rect.left) / s;
+  const cy = rect.top + (e.clientY - rect.top) / s;
+  return new Proxy(e, {
+    get(target, prop) {
+      if (prop === "clientX") return cx;
+      if (prop === "clientY") return cy;
+      const val = target[prop as keyof PointerEvent];
+      return typeof val === "function" ? (val as Function).bind(target) : val;
+    },
+  });
 }
 
 function onPointerDown(e: PointerEvent) {
   e.preventDefault();
+
+  // Track all active pointers for two-finger detection
+  pointers.set(e.pointerId, { x: e.clientX, y: e.clientY, type: e.pointerType });
+
+  // Two-finger gesture detection
+  if (pointers.size >= 2 && !twoFingerActive) {
+    // In stylusOnly mode, don't interrupt pen strokes with finger touches
+    if (props.inputSettings.stylusOnly) {
+      const hasPen = Array.from(pointers.values()).some(p => p.type === "pen");
+      if (hasPen) { return; }
+    }
+    twoFingerActive = true;
+    state.currentStroke = null;
+    const pts = Array.from(pointers.values());
+    pinchStartDist = Math.hypot(pts[1].x - pts[0].x, pts[1].y - pts[0].y);
+    pinchStartScale = viewportScale.value;
+    pinchStartMidX = (pts[0].x + pts[1].x) / 2;
+    pinchStartMidY = (pts[0].y + pts[1].y) / 2;
+    pinchStartPanX = viewportPanX.value;
+    pinchStartPanY = viewportPanY.value;
+    pinchPrevMidX = pinchStartMidX;
+    pinchPrevMidY = pinchStartMidY;
+    return;
+  }
+  if (twoFingerActive) return;
+
+  // Right-click pan (desktop)
+  if (e.button === 2) {
+    rightPanActive = true;
+    rightPanLastX = e.clientX;
+    rightPanLastY = e.clientY;
+    (e.target as HTMLElement).setPointerCapture(e.pointerId);
+    return;
+  }
+
+  // Guard against drawing immediately after a pinch ends
+  if (Date.now() < postPinchGuard) return;
+
   if (!shouldDrawFromPointer(e, props.inputSettings)) return;
   (e.target as HTMLElement).setPointerCapture(e.pointerId);
 
@@ -357,11 +498,51 @@ function onPointerDown(e: PointerEvent) {
     shapeStart = eventPoint(e);
     return;
   }
-  enginePointerDown(state, e, getCanvas());
+  enginePointerDown(state, transformedPointerEvent(e), getCanvas());
 }
 
 function onPointerMove(e: PointerEvent) {
   e.preventDefault();
+
+  // Update tracked pointer position
+  if (pointers.has(e.pointerId)) {
+    pointers.set(e.pointerId, { x: e.clientX, y: e.clientY, type: e.pointerType });
+  }
+
+  // Two-finger pinch/pan
+  if (twoFingerActive && pointers.size >= 2) {
+    const pts = Array.from(pointers.values());
+    const newDist = Math.hypot(pts[1].x - pts[0].x, pts[1].y - pts[0].y);
+    const midX = (pts[0].x + pts[1].x) / 2;
+    const midY = (pts[0].y + pts[1].y) / 2;
+    if (zoomLocked.value) {
+      // Locked: only pan, no zoom
+      viewportPanX.value += midX - pinchPrevMidX;
+      viewportPanY.value += midY - pinchPrevMidY;
+    } else {
+      // Unlocked: zoom + pan
+      const rawScale = pinchStartScale * (newDist / pinchStartDist);
+      const newScale = Math.min(5, Math.max(1, rawScale));
+      viewportScale.value = newScale;
+      viewportPanX.value = midX - (pinchStartMidX - pinchStartPanX) * (newScale / pinchStartScale);
+      viewportPanY.value = midY - (pinchStartMidY - pinchStartPanY) * (newScale / pinchStartScale);
+    }
+    pinchPrevMidX = midX;
+    pinchPrevMidY = midY;
+    showZoomIndicator();
+    return;
+  }
+  if (twoFingerActive) return;
+
+  // Right-click pan
+  if (rightPanActive) {
+    viewportPanX.value += e.clientX - rightPanLastX;
+    viewportPanY.value += e.clientY - rightPanLastY;
+    rightPanLastX = e.clientX;
+    rightPanLastY = e.clientY;
+    showZoomIndicator();
+    return;
+  }
   if (props.tool === "lasso") {
     const point = eventPoint(e);
     if (lassoResize) {
@@ -461,7 +642,7 @@ function onPointerMove(e: PointerEvent) {
   }
   if (shapeStart) return;
   const prevHeight = state.canvasHeight;
-  const heightChanged = enginePointerMove(state, e, getCanvas());
+  const heightChanged = enginePointerMove(state, transformedPointerEvent(e), getCanvas());
   if (heightChanged) {
     resizeCanvases(bgCanvasRef.value!, strokeCanvasRef.value!, state);
     emit("heightChanged", state.canvasHeight);
@@ -470,6 +651,30 @@ function onPointerMove(e: PointerEvent) {
 }
 
 function onPointerUp(e: PointerEvent) {
+  pointers.delete(e.pointerId);
+
+  // End two-finger gesture
+  if (twoFingerActive) {
+    if (pointers.size < 2) {
+      twoFingerActive = false;
+      postPinchGuard = Date.now() + 300;
+      scheduleHideZoomIndicator();
+    }
+    if (pointers.size === 0) {
+      (e.target as HTMLElement)?.releasePointerCapture?.(e.pointerId);
+    }
+    return;
+  }
+  if (Date.now() < postPinchGuard) return;
+
+  // End right-click pan
+  if (rightPanActive) {
+    rightPanActive = false;
+    (e.target as HTMLElement)?.releasePointerCapture?.(e.pointerId);
+    scheduleHideZoomIndicator();
+    return;
+  }
+
   if (props.tool === "lasso") {
     if (lassoResize) {
       lassoResize = null;
@@ -806,6 +1011,7 @@ async function restoreData(data: SketchData) {
   setupStrokeCanvas(strokeCanvasRef.value, state);
   updateUndoRedoState();
   emitPageState();
+  resetViewport();
 }
 function addPage() {
   const next = addSketchPage(serializeState(state));
@@ -1098,6 +1304,8 @@ defineExpose({
   goToPage,
   goToPreviousPage,
   goToNextPage,
+  handleWheelZoom,
+  resetViewport,
 });
 </script>
 
@@ -1144,5 +1352,55 @@ defineExpose({
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
   outline: none;
   font-weight: 500;
+}
+
+/* ── 浮动缩放指示器 ── */
+.zoom-indicator {
+  position: fixed;
+  top: 110px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 1100;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 14px;
+  background: rgba(28, 28, 30, 0.88);
+  backdrop-filter: blur(14px) saturate(160%);
+  -webkit-backdrop-filter: blur(14px) saturate(160%);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 12px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+  color: #fff;
+  font-size: 13px;
+  font-weight: 500;
+  user-select: none;
+  pointer-events: auto;
+}
+.zoom-indicator__value {
+  min-width: 40px;
+  text-align: center;
+}
+.zoom-indicator__lock {
+  background: none;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  cursor: pointer;
+  font-size: 14px;
+  padding: 2px 6px;
+  border-radius: 6px;
+  transition: background 0.15s ease;
+  line-height: 1.4;
+}
+.zoom-indicator__lock:hover {
+  background: rgba(255, 255, 255, 0.15);
+}
+.zoom-fade-enter-active,
+.zoom-fade-leave-active {
+  transition: opacity 0.2s ease, transform 0.2s ease;
+}
+.zoom-fade-enter-from,
+.zoom-fade-leave-to {
+  opacity: 0;
+  transform: translateX(-50%) translateY(-8px);
 }
 </style>

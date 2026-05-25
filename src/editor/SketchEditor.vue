@@ -243,6 +243,7 @@ onMounted(() => {
   document.body.style.overflow = "hidden";
   window.addEventListener("paste", onPaste);
   window.addEventListener("keydown", onKeyDown);
+  document.querySelector(".sketch-editor__body")?.addEventListener("wheel", onBodyWheel, { passive: false });
 });
 
 onUnmounted(() => {
@@ -250,6 +251,7 @@ onUnmounted(() => {
   if (autoSaveTimer) clearTimeout(autoSaveTimer);
   window.removeEventListener("paste", onPaste);
   window.removeEventListener("keydown", onKeyDown);
+  document.querySelector(".sketch-editor__body")?.removeEventListener("wheel", onBodyWheel);
 });
 
 // ─── Toolbar actions ───
@@ -648,6 +650,12 @@ async function onPaste(event: ClipboardEvent) {
   const dataUrl = await readFileAsDataUrl(file);
   await canvasRef.value?.insertImage(dataUrl);
   onStroke();
+}
+
+function onBodyWheel(e: WheelEvent) {
+  if (!e.ctrlKey && !e.metaKey) return;
+  e.preventDefault();
+  canvasRef.value?.handleWheelZoom(e);
 }
 
 function onKeyDown(event: KeyboardEvent) {
