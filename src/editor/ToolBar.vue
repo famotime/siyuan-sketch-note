@@ -129,14 +129,14 @@ const currentShapeIcon = computed<IconParkName>(() => {
 .sketch-editor__row--tools {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
   width: 100%;
 }
 
 .sketch-toolbar-group {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
 }
 
 /* ── 统一的第二行极简磨砂工具按钮 ── */
@@ -146,8 +146,8 @@ const currentShapeIcon = computed<IconParkName>(() => {
   color: rgba(255, 255, 255, 0.75) !important;
   border-radius: 8px;
   font-size: 13px;
-  min-height: 32px;
-  padding: 5px 12px;
+  min-height: 30px;
+  padding: 4px 10px;
   cursor: pointer;
   display: inline-flex;
   align-items: center;

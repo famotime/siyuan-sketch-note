@@ -745,12 +745,15 @@ function onHeightChanged(_h: number) {}
   position: fixed; inset: 0; z-index: 999;
   background: var(--b3-theme-background);
   overflow: hidden;
+  --sketch-editor-header-top: 12px;
+  --sketch-editor-header-height: 92px;
+  --sketch-editor-floating-gap: 16px;
 }
 
 /* ── 凌空悬浮的磨砂中控顶部卡片 ── */
 .sketch-editor__header {
   position: absolute;
-  top: 12px;
+  top: var(--sketch-editor-header-top);
   left: 12px;
   right: 12px;
   z-index: 1000;
@@ -760,16 +763,16 @@ function onHeightChanged(_h: number) {}
   border: 1px solid rgba(255, 255, 255, 0.12);
   border-radius: 16px;
   box-shadow: 0 10px 30px rgba(0, 0, 0, 0.25), 0 2px 8px rgba(0, 0, 0, 0.12);
-  padding: 8px 16px;
+  padding: 6px 14px;
   box-sizing: border-box;
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 2px;
 }
 
 .sketch-editor__row {
-  display: flex; align-items: center; gap: 10px;
-  min-height: 36px;
+  display: flex; align-items: center; gap: 8px;
+  min-height: 34px;
   overflow-x: auto;
   scrollbar-width: none;
 }
@@ -781,8 +784,8 @@ function onHeightChanged(_h: number) {}
 }
 
 .sketch-editor__row--tools {
-  margin-top: 8px;
-  padding-top: 8px;
+  margin-top: 4px;
+  padding-top: 4px;
   border-top: 1px solid rgba(255, 255, 255, 0.1);
 }
 .sketch-editor__title {
@@ -796,14 +799,14 @@ function onHeightChanged(_h: number) {}
   pointer-events: auto !important;
   box-sizing: border-box;
   display: inline-flex; align-items: center; justify-content: center;
-  padding: 5px 12px; border-radius: 8px;
+  padding: 4px 10px; border-radius: 8px;
   border: 1px solid rgba(255, 255, 255, 0.08) !important;
   background: rgba(255, 255, 255, 0.05) !important;
   color: rgba(255, 255, 255, 0.8) !important;
   cursor: pointer; font-size: 13px;
   white-space: nowrap; user-select: none;
   -webkit-tap-highlight-color: transparent;
-  min-height: 32px;
+  min-height: 30px;
   transition: all 0.2s cubic-bezier(0.25, 0.8, 0.25, 1);
 }
 .sketch-btn:hover {
@@ -866,7 +869,7 @@ function onHeightChanged(_h: number) {}
 }
 .sketch-btn--icon-tool {
   gap: 4px;
-  padding: 5px 8px;
+  padding: 4px 8px;
 }
 .sketch-btn__icon {
   display: inline-flex;
@@ -1056,8 +1059,7 @@ function onHeightChanged(_h: number) {}
   inset: 0;
   z-index: 1;
   overflow: hidden;
-  /* 顶部留出 116px 空间，恰好容纳绝对悬浮的双层中控顶卡，保证书写区域初始不在遮挡下 */
-  padding: 116px 0 12px 0;
+  padding: calc(var(--sketch-editor-header-top) + var(--sketch-editor-header-height) + 12px) 0 12px 0;
   box-sizing: border-box;
 }
 

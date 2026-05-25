@@ -217,8 +217,8 @@ function onClearSearch() {
 .sketch-editor__row {
   display: flex;
   align-items: center;
-  gap: 10px;
-  min-height: 44px;
+  gap: 8px;
+  min-height: 36px;
   width: 100%;
 }
 
@@ -228,10 +228,10 @@ function onClearSearch() {
   border: 1px solid rgba(255, 255, 255, 0.08) !important;
   color: rgba(255, 255, 255, 0.8) !important;
   border-radius: 8px;
-  padding: 5px 12px;
+  padding: 4px 10px;
   cursor: pointer;
   font-size: 13px;
-  min-height: 32px;
+  min-height: 30px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -263,7 +263,7 @@ function onClearSearch() {
   border-radius: 8px;
   padding: 4px 10px;
   font-size: 13px;
-  min-height: 32px;
+  min-height: 30px;
   outline: none;
   cursor: pointer;
   transition: all 0.2s ease;
@@ -309,8 +309,8 @@ function onClearSearch() {
   border-color: rgba(255, 255, 255, 0.1) !important;
   font-size: 18px;
   letter-spacing: 2px;
-  padding: 4px 8px;
-  min-width: 32px;
+  padding: 3px 8px;
+  min-width: 30px;
 }
 .sketch-btn--more-on {
   background: rgba(255, 255, 255, 0.18) !important;

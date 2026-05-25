@@ -1361,14 +1361,15 @@ defineExpose({
 /* ── 浮动缩放指示器 ── */
 .zoom-indicator {
   position: fixed;
-  top: 110px;
+  top: calc(var(--sketch-editor-header-top, 12px) + var(--sketch-editor-header-height, 92px) + var(--sketch-editor-floating-gap, 16px));
   left: 50%;
   transform: translateX(-50%);
   z-index: 1100;
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 6px 14px;
+  gap: 6px;
+  width: max-content;
+  padding: 5px 8px;
   background: rgba(28, 28, 30, 0.88);
   backdrop-filter: blur(14px) saturate(160%);
   -webkit-backdrop-filter: blur(14px) saturate(160%);
@@ -1382,18 +1383,26 @@ defineExpose({
   pointer-events: auto;
 }
 .zoom-indicator__value {
-  min-width: 40px;
+  min-width: 4ch;
   text-align: center;
+  font-variant-numeric: tabular-nums;
 }
 .zoom-indicator__lock {
+  appearance: none;
   background: none;
   border: 1px solid rgba(255, 255, 255, 0.12);
+  color: #fff;
   cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
   font-size: 14px;
-  padding: 2px 6px;
+  padding: 0;
   border-radius: 6px;
   transition: background 0.15s ease;
-  line-height: 1.4;
+  line-height: 1;
 }
 .zoom-indicator__lock:hover {
   background: rgba(255, 255, 255, 0.15);
