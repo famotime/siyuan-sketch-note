@@ -36,7 +36,41 @@
         @click="$emit('selectTool', 'eraser')"
       >
         <span class="sketch-btn__icon" aria-hidden="true">
-          <IconParkIcon name="DeleteKey" />
+          <svg
+            class="sketch-icon"
+            viewBox="0 0 48 48"
+            xmlns="http://www.w3.org/2000/svg"
+          >
+            <g clip-path="url(#icon-c251fcf7c11bad3)">
+              <path
+                d="M44.7818 24.1702L31.918 7.09935L14.1348 20.5L27.5 37L30.8556 34.6643L44.7818 24.1702Z"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="4"
+                stroke-linejoin="round"
+              />
+              <path
+                d="M27.4998 37L23.6613 40.0748L13.0978 40.074L10.4973 36.6231L4.06543 28.0876L14.4998 20.2248"
+                stroke="currentColor"
+                stroke-width="4"
+                stroke-linejoin="round"
+              />
+              <path
+                d="M13.2056 40.072L44.5653 40.072"
+                stroke="currentColor"
+                stroke-width="4"
+                stroke-linecap="round"
+              />
+            </g>
+            <defs>
+              <clipPath id="icon-c251fcf7c11bad3">
+                <rect
+                  width="48"
+                  height="48"
+                />
+              </clipPath>
+            </defs>
+          </svg>
         </span>
       </button>
 
@@ -181,6 +215,13 @@ const currentShapeIcon = computed<IconParkName>(() => {
   line-height: 1;
   display: inline-flex;
   align-items: center;
+}
+
+.sketch-btn__icon > svg {
+  display: block;
+  width: 1em;
+  height: 1em;
+  fill: none;
 }
 
 </style>
