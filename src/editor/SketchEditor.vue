@@ -3,7 +3,7 @@
     v-if="visible"
     class="sketch-editor"
   >
-    <div class="sketch-editor__header">
+    <div v-show="!isZenMode" class="sketch-editor__header">
       <EditorTopBar
         :backgroundFit="activeCustomBackground?.fit"
         :canRedo="canRedo"
@@ -42,6 +42,7 @@
         @toggleExportBackground="exportIncludeBackground = !exportIncludeBackground"
         @toggleStylusOnly="toggleStylusOnly"
         @togglePressure="togglePressure"
+        @toggleZenMode="enterZenMode"
         @undo="canvasRef?.doUndo()"
         @update:templateId="onTemplateChange"
       />
@@ -77,6 +78,7 @@
     <div
       ref="bodyRef"
       class="sketch-editor__body"
+      :class="{ 'sketch-editor__body--zen': isZenMode }"
       @wheel="onBodyWheel"
     >
       <SketchCanvas
@@ -95,6 +97,7 @@
       />
     </div>
     <FloatingToolbar
+      v-if="!isZenMode"
       v-model:lassoMode="lassoMode"
       :activeTool="activeTool"
       :colors="colors"
@@ -110,6 +113,19 @@
       @deleteColor="deleteColor"
       @resetDefaultColors="resetDefaultColors"
     />
+    <button
+      v-if="isZenMode"
+      class="sketch-zen-toggle"
+      :style="{ left: `${zenTogglePos.left}px`, top: `${zenTogglePos.top}px` }"
+      :aria-label="t(zenToggleState.ariaLabelKey)"
+      :aria-pressed="zenToggleState.isPressed"
+      :title="t(zenToggleState.titleKey)"
+      @click="onZenToggleClick"
+      @mousedown="onZenToggleDragStart"
+      @touchstart="onZenToggleDragStart"
+    >
+      <IconParkIcon :name="zenToggleState.icon" />
+    </button>
   </div>
 </template>
 
@@ -150,6 +166,8 @@ import EditorTopBar from "./EditorTopBar.vue";
 import SketchCanvas from "./SketchCanvas.vue";
 import ToolBar from "./ToolBar.vue";
 import FloatingToolbar from "./FloatingToolbar.vue";
+import IconParkIcon from "./IconParkIcon.vue";
+import { clampZenTogglePosition, createZenToggleState } from "./zenMode";
 
 const props = defineProps<{
   blockId: string;
@@ -216,6 +234,12 @@ const saveStatus = ref<SaveStatus>("idle");
 const lastSavedAt = ref<number | null>(null);
 const autoSave = ref(true);
 const exportIncludeBackground = ref(true);
+const isZenMode = ref(false);
+const zenTogglePos = ref({ left: 24, top: 132 });
+const zenToggleState = computed(() => createZenToggleState(isZenMode.value));
+let zenDragOffset = { x: 0, y: 0 };
+let zenToggleDragging = false;
+let zenToggleMoved = false;
 
 const ocrState = ref<"idle" | "recognizing" | "completed" | "error">("idle");
 const ocrIndex = ref<SketchData["ocrIndex"]>(props.initialData?.ocrIndex ?? undefined);
@@ -260,9 +284,89 @@ onUnmounted(() => {
   if (autoSaveTimer) clearTimeout(autoSaveTimer);
   window.removeEventListener("paste", onPaste);
   window.removeEventListener("keydown", onKeyDown);
+  removeZenToggleDragListeners();
 });
 
 // ─── Toolbar actions ───
+
+function enterZenMode() {
+  isZenMode.value = true;
+  zenTogglePos.value = clampZenTogglePosition(zenTogglePos.value, getZenToggleBounds());
+}
+
+function exitZenMode() {
+  isZenMode.value = false;
+}
+
+function onZenToggleClick() {
+  if (zenToggleMoved) {
+    zenToggleMoved = false;
+    return;
+  }
+  exitZenMode();
+}
+
+function onZenToggleDragStart(e: MouseEvent | TouchEvent) {
+  zenToggleDragging = true;
+  zenToggleMoved = false;
+  const point = getClientPoint(e);
+  zenDragOffset = {
+    x: point.x - zenTogglePos.value.left,
+    y: point.y - zenTogglePos.value.top,
+  };
+  window.addEventListener("mousemove", onZenToggleDragging);
+  window.addEventListener("touchmove", onZenToggleDragging, { passive: false });
+  window.addEventListener("mouseup", onZenToggleDragEnd);
+  window.addEventListener("touchend", onZenToggleDragEnd, { passive: true });
+}
+
+function onZenToggleDragging(e: MouseEvent | TouchEvent) {
+  if (!zenToggleDragging) return;
+  if (e instanceof TouchEvent) {
+    e.preventDefault();
+  }
+  const point = getClientPoint(e);
+  const nextPos = clampZenTogglePosition(
+    {
+      left: point.x - zenDragOffset.x,
+      top: point.y - zenDragOffset.y,
+    },
+    getZenToggleBounds(),
+  );
+  if (Math.abs(nextPos.left - zenTogglePos.value.left) > 2 || Math.abs(nextPos.top - zenTogglePos.value.top) > 2) {
+    zenToggleMoved = true;
+  }
+  zenTogglePos.value = nextPos;
+}
+
+function onZenToggleDragEnd() {
+  zenToggleDragging = false;
+  removeZenToggleDragListeners();
+}
+
+function removeZenToggleDragListeners() {
+  window.removeEventListener("mousemove", onZenToggleDragging);
+  window.removeEventListener("touchmove", onZenToggleDragging);
+  window.removeEventListener("mouseup", onZenToggleDragEnd);
+  window.removeEventListener("touchend", onZenToggleDragEnd);
+}
+
+function getClientPoint(e: MouseEvent | TouchEvent) {
+  if (e instanceof MouseEvent) {
+    return { x: e.clientX, y: e.clientY };
+  }
+  const touch = e.touches[0] ?? e.changedTouches[0];
+  return { x: touch.clientX, y: touch.clientY };
+}
+
+function getZenToggleBounds() {
+  return {
+    width: window.innerWidth,
+    height: window.innerHeight,
+    size: 52,
+    margin: 12,
+  };
+}
 
 function selectColor(c: string) {
   activeColor.value = c;
@@ -1087,6 +1191,41 @@ function onHeightChanged(_h: number) {}
   overflow: hidden;
   padding: calc(var(--sketch-editor-header-top) + var(--sketch-editor-header-height) + 12px) 0 12px 0;
   box-sizing: border-box;
+  transition: padding 0.18s ease;
+}
+.sketch-editor__body--zen {
+  padding: 0;
+}
+
+.sketch-zen-toggle {
+  position: absolute;
+  z-index: 1001;
+  width: 52px;
+  height: 52px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  background: rgba(28, 28, 30, 0.72);
+  color: rgba(255, 255, 255, 0.92);
+  backdrop-filter: blur(16px) saturate(170%);
+  -webkit-backdrop-filter: blur(16px) saturate(170%);
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.28), 0 0 0 1px rgba(var(--b3-theme-primary-rgb), 0.16);
+  cursor: grab;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 20px;
+  padding: 0;
+  touch-action: none;
+  transition: transform 0.18s ease, background 0.18s ease, box-shadow 0.18s ease;
+}
+.sketch-zen-toggle:hover {
+  background: rgba(28, 28, 30, 0.86);
+  box-shadow: 0 12px 34px rgba(0, 0, 0, 0.34), 0 0 0 1px rgba(var(--b3-theme-primary-rgb), 0.3);
+  transform: scale(1.04);
+}
+.sketch-zen-toggle:active {
+  cursor: grabbing;
+  transform: scale(0.96);
 }
 
 @media (max-width: 760px) {

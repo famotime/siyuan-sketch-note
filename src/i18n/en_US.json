@@ -89,5 +89,8 @@
   "ocrRecognizing": "Recognizing…",
   "search": "Search",
   "searchPlaceholder": "Search handwriting…",
-  "noResults": "No results"
+  "noResults": "No results",
+  "zenMode": "Zen",
+  "enterZenMode": "Enter Zen Mode",
+  "exitZenMode": "Exit Zen Mode"
 }

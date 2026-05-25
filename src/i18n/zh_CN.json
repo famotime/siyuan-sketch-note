@@ -89,5 +89,8 @@
   "ocrRecognizing": "识别中…",
   "search": "搜索",
   "searchPlaceholder": "搜索手写内容…",
-  "noResults": "无结果"
+  "noResults": "无结果",
+  "zenMode": "禅模式",
+  "enterZenMode": "进入禅模式",
+  "exitZenMode": "退出禅模式"
 }

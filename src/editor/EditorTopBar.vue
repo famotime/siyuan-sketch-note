@@ -73,6 +73,16 @@
         <button v-if="searchQuery" class="sketch-btn sketch-btn--page" @click="onClearSearch">&#x2715;</button>
       </div>
     </div>
+    <button
+      class="sketch-btn sketch-btn--zen"
+      :aria-label="t(zenToggleState.ariaLabelKey)"
+      :aria-pressed="zenToggleState.isPressed"
+      :title="t(zenToggleState.titleKey)"
+      @click="$emit('toggleZenMode')"
+    >
+      <IconParkIcon :name="zenToggleState.icon" />
+      <span class="sketch-btn__zen-label">{{ t('zenMode') }}</span>
+    </button>
     <span class="sketch-sep" />
     <button class="sketch-btn sketch-btn--action" :disabled="!canUndo" :title="t('undo')" @click="$emit('undo')">
       <IconParkIcon name="Undo" />
@@ -164,10 +174,11 @@
 </template>
 
 <script setup lang="ts">
-import { ref, nextTick, onMounted, onUnmounted } from "vue";
+import { computed, ref, nextTick, onMounted, onUnmounted } from "vue";
 import type { PageOverviewItem } from "@/pages/model";
 import type { Template } from "@/template";
 import IconParkIcon from "./IconParkIcon.vue";
+import { createZenToggleState } from "./zenMode";
 
 const props = defineProps<{
   backgroundFit?: string;
@@ -210,9 +221,12 @@ const emit = defineEmits<{
   (e: "toggleExportBackground"): void;
   (e: "toggleStylusOnly"): void;
   (e: "togglePressure"): void;
+  (e: "toggleZenMode"): void;
   (e: "undo"): void;
   (e: "update:templateId", value: string): void;
 }>();
+
+const zenToggleState = computed(() => createZenToggleState(false));
 
 const searchOpen = ref(false);
 const searchQuery = ref("");
@@ -289,6 +303,22 @@ function onClearSearch() {
 .sketch-btn--back {
   background: rgba(255, 255, 255, 0.08) !important;
   border-color: rgba(255, 255, 255, 0.12) !important;
+  font-weight: 500;
+}
+
+.sketch-btn--zen {
+  gap: 6px;
+  min-width: 78px;
+  background: rgba(var(--b3-theme-primary-rgb), 0.18) !important;
+  border-color: rgba(var(--b3-theme-primary-rgb), 0.35) !important;
+  color: #fff !important;
+}
+.sketch-btn--zen:hover {
+  background: rgba(var(--b3-theme-primary-rgb), 0.28) !important;
+  box-shadow: 0 4px 14px rgba(var(--b3-theme-primary-rgb), 0.22);
+}
+.sketch-btn__zen-label {
+  font-size: 12px;
   font-weight: 500;
 }
 
