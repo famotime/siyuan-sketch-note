@@ -200,12 +200,12 @@ export function setupStrokeCanvas(
 
 export function handlePointerDown(
   state: EngineState,
-  e: PointerEvent,
+  e: Pick<PointerEvent, "pressure" | "timeStamp"> & { canvasX?: number; canvasY?: number; clientX?: number; clientY?: number },
   canvas: HTMLCanvasElement
 ): void {
   const rect = canvas.getBoundingClientRect();
-  const x = e.clientX - rect.left;
-  const y = e.clientY - rect.top;
+  const x = e.canvasX ?? ((e.clientX ?? 0) - rect.left);
+  const y = e.canvasY ?? ((e.clientY ?? 0) - rect.top);
   const preset = state.toolPresets[state.tool];
   const rawPressure = state.enablePressure ? (e.pressure || 0.5) : 0.5;
   state.currentStroke = {
@@ -220,13 +220,13 @@ export function handlePointerDown(
 
 export function handlePointerMove(
   state: EngineState,
-  e: PointerEvent,
+  e: Pick<PointerEvent, "pressure" | "timeStamp"> & { canvasX?: number; canvasY?: number; clientX?: number; clientY?: number },
   canvas: HTMLCanvasElement
 ): boolean {
   if (!state.currentStroke) return false;
   const rect = canvas.getBoundingClientRect();
-  const x = e.clientX - rect.left;
-  const y = e.clientY - rect.top;
+  const x = e.canvasX ?? ((e.clientX ?? 0) - rect.left);
+  const y = e.canvasY ?? ((e.clientY ?? 0) - rect.top);
   const lastPoint = state.currentStroke.points[state.currentStroke.points.length - 1];
   const rawPressure = state.enablePressure ? (e.pressure || 0.5) : 0.5;
   const nextPoint = { x, y, pressure: rawPressure, timestamp: e.timeStamp };
@@ -249,6 +249,12 @@ export function handlePointerMove(
     renderStrokeSegment(ctx, state.currentStroke, prev, curr);
   }
   return heightChanged;
+}
+
+export function cancelCurrentStroke(state: EngineState): boolean {
+  if (!state.currentStroke) return false;
+  state.currentStroke = null;
+  return true;
 }
 
 export function handlePointerUp(state: EngineState): boolean {

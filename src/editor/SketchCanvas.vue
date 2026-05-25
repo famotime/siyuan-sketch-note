@@ -56,6 +56,7 @@ import {
   handlePointerDown as enginePointerDown,
   handlePointerMove as enginePointerMove,
   handlePointerUp as enginePointerUp,
+  cancelCurrentStroke,
   undo as engineUndo,
   redo as engineRedo,
   clearAll as engineClear,
@@ -113,6 +114,7 @@ import {
   removeSketchPage,
 } from "@/pages/model";
 import { shouldDrawFromPointer } from "./inputMode";
+import { createCanvasPointConverter } from "./viewport";
 import type { SketchInputSettings } from "./inputMode";
 import { createInsertElementPosition } from "./insertPosition";
 import type { OcrSearchResult } from "@/search/ocrIndex";
@@ -325,30 +327,23 @@ function handleWheelZoom(e: WheelEvent) {
   scheduleHideZoomIndicator();
 }
 
-function eventPoint(e: PointerEvent): StrokePoint {
+function canvasPoint(e: PointerEvent) {
   const rect = getCanvas().getBoundingClientRect();
-  const s = viewportScale.value;
+  return createCanvasPointConverter(() => ({
+    left: rect.left,
+    top: rect.top,
+    scale: viewportScale.value,
+  }))(e);
+}
+
+function eventPoint(e: PointerEvent): StrokePoint {
+  const point = canvasPoint(e);
   return {
-    x: (e.clientX - rect.left) / s,
-    y: (e.clientY - rect.top) / s,
+    x: point.x,
+    y: point.y,
     pressure: e.pressure || 0.5,
     timestamp: e.timeStamp,
   };
-}
-
-function transformedPointerEvent(e: PointerEvent): PointerEvent {
-  const s = viewportScale.value;
-  const rect = getCanvas().getBoundingClientRect();
-  const cx = rect.left + (e.clientX - rect.left) / s;
-  const cy = rect.top + (e.clientY - rect.top) / s;
-  return new Proxy(e, {
-    get(target, prop) {
-      if (prop === "clientX") return cx;
-      if (prop === "clientY") return cy;
-      const val = target[prop as keyof PointerEvent];
-      return typeof val === "function" ? (val as Function).bind(target) : val;
-    },
-  });
 }
 
 function onPointerDown(e: PointerEvent) {
@@ -365,7 +360,9 @@ function onPointerDown(e: PointerEvent) {
       if (hasPen) { return; }
     }
     twoFingerActive = true;
-    state.currentStroke = null;
+    if (cancelCurrentStroke(state)) {
+      fullRedrawStrokeCanvas(getCanvas(), state);
+    }
     const pts = Array.from(pointers.values());
     pinchStartDist = Math.hypot(pts[1].x - pts[0].x, pts[1].y - pts[0].y);
     pinchStartScale = viewportScale.value;
@@ -498,7 +495,8 @@ function onPointerDown(e: PointerEvent) {
     shapeStart = eventPoint(e);
     return;
   }
-  enginePointerDown(state, transformedPointerEvent(e), getCanvas());
+  const point = eventPoint(e);
+  enginePointerDown(state, { ...point, canvasX: point.x, canvasY: point.y }, getCanvas());
 }
 
 function onPointerMove(e: PointerEvent) {
@@ -641,8 +639,8 @@ function onPointerMove(e: PointerEvent) {
     return;
   }
   if (shapeStart) return;
-  const prevHeight = state.canvasHeight;
-  const heightChanged = enginePointerMove(state, transformedPointerEvent(e), getCanvas());
+  const point = eventPoint(e);
+  const heightChanged = enginePointerMove(state, { ...point, canvasX: point.x, canvasY: point.y }, getCanvas());
   if (heightChanged) {
     resizeCanvases(bgCanvasRef.value!, strokeCanvasRef.value!, state);
     emit("heightChanged", state.canvasHeight);

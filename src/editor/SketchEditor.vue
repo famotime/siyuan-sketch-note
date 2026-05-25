@@ -70,7 +70,11 @@
       >
     </div>
 
-    <div class="sketch-editor__body">
+    <div
+      ref="bodyRef"
+      class="sketch-editor__body"
+      @wheel="onBodyWheel"
+    >
       <SketchCanvas
         ref="canvasRef"
         :initialData="loadedData"
@@ -156,6 +160,7 @@ function t(key: string): string { return props.i18n[key] ?? key; }
 
 const visible = ref(false);
 const canvasRef = ref<InstanceType<typeof SketchCanvas>>();
+const bodyRef = ref<HTMLDivElement>();
 const imageInputRef = ref<HTMLInputElement>();
 const jsonInputRef = ref<HTMLInputElement>();
 const backgroundInputRef = ref<HTMLInputElement>();
@@ -243,7 +248,6 @@ onMounted(() => {
   document.body.style.overflow = "hidden";
   window.addEventListener("paste", onPaste);
   window.addEventListener("keydown", onKeyDown);
-  document.querySelector(".sketch-editor__body")?.addEventListener("wheel", onBodyWheel, { passive: false });
 });
 
 onUnmounted(() => {
@@ -251,7 +255,6 @@ onUnmounted(() => {
   if (autoSaveTimer) clearTimeout(autoSaveTimer);
   window.removeEventListener("paste", onPaste);
   window.removeEventListener("keydown", onKeyDown);
-  document.querySelector(".sketch-editor__body")?.removeEventListener("wheel", onBodyWheel);
 });
 
 // ─── Toolbar actions ───

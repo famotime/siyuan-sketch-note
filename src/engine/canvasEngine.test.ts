@@ -6,6 +6,7 @@ import {
   handlePointerDown,
   handlePointerMove,
   handlePointerUp,
+  cancelCurrentStroke,
   pushHistorySnapshot,
   redo,
   undo,
@@ -119,5 +120,29 @@ describe("canvas engine history", () => {
       width: 33,
       height: 33,
     });
+  });
+});
+
+describe("canvas engine current stroke cancellation", () => {
+  it("clears an in-progress stroke without committing it to history", () => {
+    const state = createEngineState("blank");
+    state.currentStroke = {
+      id: "draft-stroke",
+      tool: "pen",
+      color: "#111111",
+      width: 4,
+      opacity: 1,
+      points: [
+        { x: 10, y: 20, pressure: 0.5, timestamp: 1 },
+        { x: 30, y: 40, pressure: 0.5, timestamp: 2 },
+      ],
+    };
+
+    expect(cancelCurrentStroke(state)).toBe(true);
+
+    expect(state.currentStroke).toBeNull();
+    expect(state.strokes).toEqual([]);
+    expect(state.undoStack).toEqual([]);
+    expect(state.isDirty).toBe(false);
   });
 });
