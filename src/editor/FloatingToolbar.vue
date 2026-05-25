@@ -118,9 +118,9 @@
           :style="{ backgroundColor: c }"
           :title="`${c} (${t('deleteColorHint')})`"
           @click="onColorClick(c)"
-          @touchstart.passive="onColorTouchStart(c)"
-          @touchend.passive="onColorTouchEnd"
-          @touchmove.passive="onColorTouchMove"
+          @touchstart="onColorTouchStart(c)"
+          @touchend="onColorTouchEnd"
+          @touchmove="onColorTouchMove"
           @contextmenu.prevent="$emit('deleteColor', c)"
         >
           <span v-if="preset.color === c" class="sketch-float-color-dot" />
@@ -144,6 +144,37 @@
         >
           <IconParkIcon name="Refresh" />
         </button>
+      </div>
+      <div ref="paletteToggleRef" class="sketch-float-palette-wrap">
+        <button
+          class="sketch-float-palette-toggle"
+          :class="{ 'sketch-float-palette-toggle--active': showColorPalette }"
+          :title="t('colorPalette')"
+          @click="showColorPalette = !showColorPalette"
+        >
+          <span class="sketch-float-palette-arrow" />
+        </button>
+        <div v-if="showColorPalette" class="sketch-float-preset-palette">
+          <button
+            v-for="c in rainbowPresetColors"
+            :key="`rainbow-${c}`"
+            class="sketch-float-preset-color"
+            :class="{ 'sketch-float-preset-color--active': preset.color === c }"
+            :style="{ backgroundColor: c }"
+            :title="c"
+            @click="onColorClick(c)"
+          />
+          <span class="sketch-float-preset-divider" />
+          <button
+            v-for="c in recentPaletteColors"
+            :key="`recent-${c}`"
+            class="sketch-float-preset-color sketch-float-preset-color--recent"
+            :class="{ 'sketch-float-preset-color--active': preset.color === c }"
+            :style="{ backgroundColor: c }"
+            :title="`${c} (${t('deleteColorHint')})`"
+            @click="onColorClick(c)"
+          />
+        </div>
       </div>
       <div class="sketch-float-divider" />
     </div>
@@ -251,6 +282,7 @@ const emit = defineEmits<{
 const panelRef = ref<HTMLDivElement>();
 const widthControlRef = ref<HTMLDivElement>();
 const opacityControlRef = ref<HTMLDivElement>();
+const paletteToggleRef = ref<HTMLDivElement>();
 const recolorInputRef = ref<HTMLInputElement>();
 const pos = ref({ left: 20, top: 150 });
 let dragStartOffset = { x: 0, y: 0 };
@@ -367,6 +399,7 @@ function onColorClick(c: string) {
 // ── 粗细与透明度 Slider 控制 ──
 const showWidthSlider = ref(false);
 const showOpacitySlider = ref(false);
+const showColorPalette = ref(false);
 
 function closeSlidersOnOutsideClick(e: MouseEvent) {
   const target = e.target as Node;
@@ -375,6 +408,9 @@ function closeSlidersOnOutsideClick(e: MouseEvent) {
   }
   if (showOpacitySlider.value && opacityControlRef.value && !opacityControlRef.value.contains(target)) {
     showOpacitySlider.value = false;
+  }
+  if (showColorPalette.value && paletteToggleRef.value && !paletteToggleRef.value.contains(target)) {
+    showColorPalette.value = false;
   }
 }
 
@@ -439,6 +475,29 @@ const hasStrokeControls = computed(() => {
 
 const hasOpacityControl = computed(() => {
   return props.activeTool !== "eraser" && props.activeTool !== "lasso";
+});
+
+const rainbowPresetColors = [
+  "#ff3b30",
+  "#ff9500",
+  "#ffcc00",
+  "#34c759",
+  "#00c7be",
+  "#007aff",
+  "#5856d6",
+  "#af52de",
+  "#ff2d55",
+] as const;
+
+const recentPaletteColors = computed(() => {
+  const seen = new Set<string>(rainbowPresetColors);
+  return props.colors
+    .filter((color) => {
+      if (seen.has(color)) return false;
+      seen.add(color);
+      return true;
+    })
+    .slice(-5);
 });
 
 const shapeOptions = [
@@ -773,6 +832,115 @@ onUnmounted(() => {
 }
 .sketch-float-reset-btn:active {
   transform: scale(0.9);
+}
+
+.sketch-float-palette-wrap {
+  position: relative;
+  display: flex;
+  justify-content: center;
+  width: 100%;
+}
+
+.sketch-float-palette-toggle {
+  width: 24px;
+  height: 18px;
+  border: 0;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.06);
+  color: rgba(255, 255, 255, 0.62);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  transition: background 0.2s ease, color 0.2s ease, transform 0.2s ease;
+}
+
+.sketch-float-palette-toggle:hover,
+.sketch-float-palette-toggle--active {
+  background: rgba(255, 255, 255, 0.16);
+  color: #fff;
+}
+
+.sketch-float-palette-toggle:active {
+  transform: scale(0.92);
+}
+
+.sketch-float-palette-arrow {
+  width: 0;
+  height: 0;
+  border-left: 5px solid transparent;
+  border-right: 5px solid transparent;
+  border-top: 6px solid currentColor;
+  transition: transform 0.2s ease;
+}
+
+.sketch-float-palette-toggle--active .sketch-float-palette-arrow {
+  transform: rotate(180deg);
+}
+
+.sketch-float-preset-palette {
+  position: absolute;
+  left: calc(100% + 10px);
+  bottom: -4px;
+  width: 166px;
+  display: grid;
+  grid-template-columns: repeat(5, 24px);
+  gap: 8px;
+  padding: 10px;
+  border-radius: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(28, 28, 30, 0.94);
+  backdrop-filter: blur(16px) saturate(150%);
+  -webkit-backdrop-filter: blur(16px) saturate(150%);
+  box-shadow: 0 14px 34px rgba(0, 0, 0, 0.34), 0 2px 8px rgba(0, 0, 0, 0.18);
+  box-sizing: border-box;
+  z-index: 2;
+}
+
+.sketch-float-preset-palette::before {
+  content: "";
+  position: absolute;
+  left: -5px;
+  bottom: 10px;
+  width: 10px;
+  height: 10px;
+  background: rgba(28, 28, 30, 0.94);
+  border-left: 1px solid rgba(255, 255, 255, 0.14);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.14);
+  transform: rotate(45deg);
+}
+
+.sketch-float-preset-color {
+  width: 24px;
+  height: 24px;
+  border: 2px solid rgba(255, 255, 255, 0.14);
+  border-radius: 50%;
+  cursor: pointer;
+  padding: 0;
+  box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.24);
+  box-sizing: border-box;
+  transition: transform 0.16s ease, border-color 0.16s ease, box-shadow 0.16s ease;
+}
+
+.sketch-float-preset-color:hover {
+  border-color: rgba(255, 255, 255, 0.72);
+  transform: scale(1.12);
+}
+
+.sketch-float-preset-color--recent {
+  border-style: dashed;
+}
+
+.sketch-float-preset-color--active {
+  border-color: #fff;
+  box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.22), inset 0 2px 4px rgba(0, 0, 0, 0.24);
+}
+
+.sketch-float-preset-divider {
+  grid-column: 1 / -1;
+  height: 1px;
+  background: rgba(255, 255, 255, 0.12);
 }
 
 /* 5. 粗细调节面板 */

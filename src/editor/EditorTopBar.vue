@@ -8,19 +8,6 @@
     >
       <IconParkIcon name="ArrowLeft" />
     </button>
-    <select class="sketch-select" :value="templateId" @change="$emit('update:templateId', ($event.target as HTMLSelectElement).value)">
-      <option v-for="tpl in templates" :key="tpl.id" :value="tpl.id">{{ t(tpl.nameKey) }}</option>
-    </select>
-    <select
-      v-if="backgroundFit"
-      class="sketch-select"
-      :value="backgroundFit"
-      @change="$emit('backgroundFitChange', ($event.target as HTMLSelectElement).value)"
-    >
-      <option value="cover">{{ t("backgroundFitCover") }}</option>
-      <option value="contain">{{ t("backgroundFitContain") }}</option>
-      <option value="stretch">{{ t("backgroundFitStretch") }}</option>
-    </select>
     <span v-if="recovered" class="sketch-recovery">{{ t("dataRecovered") }}</span>
 
     <div v-if="false" class="sketch-pages">
@@ -97,20 +84,70 @@
       <IconParkIcon name="Clear" />
     </button>
     <span class="sketch-sep" />
-    <div class="sketch-more-wrap" ref="moreWrapRef">
-      <button class="sketch-btn sketch-btn--more" :class="{ 'sketch-btn--more-on': moreOpen }" :title="t('settings')" @click="moreOpen = !moreOpen">
+    <div
+      ref="moreWrapRef"
+      class="sketch-more-wrap"
+    >
+      <button
+        class="sketch-btn sketch-btn--more"
+        :class="{ 'sketch-btn--more-on': moreOpen }"
+        :title="t('more')"
+        @click="moreOpen = !moreOpen"
+      >
         <IconParkIcon name="MoreFour" />
       </button>
-      <div v-if="moreOpen" class="sketch-more-popover">
+      <div
+        v-if="moreOpen"
+        class="sketch-more-popover"
+      >
+        <label class="sketch-more-row sketch-more-row--select">
+          <span class="sketch-more-label">{{ t("noteBackground") }}</span>
+          <select
+            class="sketch-select sketch-select--menu"
+            :value="templateId"
+            @change="$emit('update:templateId', ($event.target as HTMLSelectElement).value)"
+          >
+            <option
+              v-for="tpl in templates"
+              :key="tpl.id"
+              :value="tpl.id"
+            >
+              {{ t(tpl.nameKey) }}
+            </option>
+          </select>
+        </label>
+        <label
+          v-if="backgroundFit"
+          class="sketch-more-row sketch-more-row--select"
+        >
+          <span class="sketch-more-label">{{ t("backgroundFit") }}</span>
+          <select
+            class="sketch-select sketch-select--menu"
+            :value="backgroundFit"
+            @change="$emit('backgroundFitChange', ($event.target as HTMLSelectElement).value)"
+          >
+            <option value="cover">{{ t("backgroundFitCover") }}</option>
+            <option value="contain">{{ t("backgroundFitContain") }}</option>
+            <option value="stretch">{{ t("backgroundFitStretch") }}</option>
+          </select>
+        </label>
         <label class="sketch-more-row">
           <span class="sketch-more-label">{{ t("stylusOnly") }}</span>
-          <span class="sketch-toggle" :class="{ 'sketch-toggle--on': stylusOnly }" @click="$emit('toggleStylusOnly')">
+          <span
+            class="sketch-toggle"
+            :class="{ 'sketch-toggle--on': stylusOnly }"
+            @click="$emit('toggleStylusOnly')"
+          >
             <span class="sketch-toggle__knob" />
           </span>
         </label>
         <label class="sketch-more-row">
           <span class="sketch-more-label">{{ t("enablePressure") }}</span>
-          <span class="sketch-toggle" :class="{ 'sketch-toggle--on': enablePressure }" @click="$emit('togglePressure')">
+          <span
+            class="sketch-toggle"
+            :class="{ 'sketch-toggle--on': enablePressure }"
+            @click="$emit('togglePressure')"
+          >
             <span class="sketch-toggle__knob" />
           </span>
         </label>
@@ -307,10 +344,10 @@ function onClearSearch() {
 .sketch-btn--more {
   background: rgba(255, 255, 255, 0.06) !important;
   border-color: rgba(255, 255, 255, 0.1) !important;
-  font-size: 18px;
-  letter-spacing: 2px;
   padding: 3px 8px;
-  min-width: 30px;
+}
+.sketch-btn--more :deep(.sketch-icon) {
+  font-size: 16px;
 }
 .sketch-btn--more-on {
   background: rgba(255, 255, 255, 0.18) !important;
@@ -344,10 +381,17 @@ function onClearSearch() {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: 12px;
   padding: 8px 14px;
   cursor: pointer;
   user-select: none;
   transition: background 0.15s ease;
+}
+.sketch-more-row--select {
+  align-items: flex-start;
+  flex-direction: column;
+  gap: 6px;
+  cursor: default;
 }
 .sketch-more-row:hover {
   background: rgba(255, 255, 255, 0.06);
@@ -355,6 +399,9 @@ function onClearSearch() {
 .sketch-more-label {
   font-size: 13px;
   color: rgba(255, 255, 255, 0.85);
+}
+.sketch-select--menu {
+  width: 100%;
 }
 
 /* ── iOS 风格 Toggle 开关 ── */
