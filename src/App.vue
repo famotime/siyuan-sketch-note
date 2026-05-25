@@ -5,12 +5,13 @@
     :initialData="editorData"
     :i18n="pluginI18n"
     :saveData="pluginSaveData"
+    :themeMode="themeMode"
     @close="closeEditor"
   />
 </template>
 
 <script lang="ts">
-import { ref, nextTick } from "vue";
+import { ref, nextTick, onMounted, onUnmounted } from "vue";
 import { showMessage } from "siyuan";
 import { loadSketchData } from "@/storage";
 import { normalizeEditorI18n } from "@/i18n/editorI18n";
@@ -21,8 +22,44 @@ const editorBlockId = ref("");
 const editorData = ref<any>(null);
 const pluginI18n = ref<Record<string, string>>({});
 const pluginSaveData = ref<(key: string, data: any) => Promise<void>>(async () => {});
+const themeMode = ref<"light" | "dark">(resolveSiyuanThemeMode());
+let themeObserver: MutationObserver | null = null;
 
 let loadDataFn: (key: string) => Promise<any> = async () => null;
+
+function resolveSiyuanThemeMode(): "light" | "dark" {
+  const mode = (globalThis as any).window?.siyuan?.config?.appearance?.mode
+    ?? (globalThis as any).siyuan?.config?.appearance?.mode;
+  if (mode === 0 || mode === "0" || mode === "light") return "light";
+  if (mode === 1 || mode === "1" || mode === "dark") return "dark";
+
+  const attr = document.documentElement.getAttribute("data-theme")
+    ?? document.documentElement.getAttribute("data-theme-mode")
+    ?? document.body.getAttribute("data-theme")
+    ?? document.body.getAttribute("data-theme-mode");
+  if (attr?.toLowerCase().includes("light")) return "light";
+  if (attr?.toLowerCase().includes("dark")) return "dark";
+
+  return window.matchMedia?.("(prefers-color-scheme: light)").matches ? "light" : "dark";
+}
+
+function syncThemeMode() {
+  themeMode.value = resolveSiyuanThemeMode();
+}
+
+onMounted(() => {
+  syncThemeMode();
+  themeObserver = new MutationObserver(syncThemeMode);
+  themeObserver.observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme", "data-theme-mode", "class"] });
+  themeObserver.observe(document.body, { attributes: true, attributeFilter: ["data-theme", "data-theme-mode", "class"] });
+  window.matchMedia?.("(prefers-color-scheme: light)").addEventListener?.("change", syncThemeMode);
+});
+
+onUnmounted(() => {
+  themeObserver?.disconnect();
+  themeObserver = null;
+  window.matchMedia?.("(prefers-color-scheme: light)").removeEventListener?.("change", syncThemeMode);
+});
 
 export function setI18n(i18n: Record<string, string>) {
   pluginI18n.value = normalizeEditorI18n(i18n);
@@ -105,6 +142,7 @@ export default {
       editorData,
       pluginI18n,
       pluginSaveData,
+      themeMode,
       closeEditor,
     };
   },

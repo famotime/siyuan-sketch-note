@@ -70,8 +70,8 @@ it("adapts top and floating toolbars to SiYuan light and dark themes", () => {
   expect(editor).toMatch(/--sketch-toolbar-surface-dark:/);
   expect(editor).toMatch(/--sketch-toolbar-surface-light:/);
   expect(editor).toMatch(/@media\s*\(prefers-color-scheme:\s*light\)/);
-  expect(editor).toMatch(/html\[data-theme[^\]]*light[^\]]*\]\) \.sketch-editor/);
-  expect(editor).toMatch(/html\[data-theme[^\]]*dark[^\]]*\]\) \.sketch-editor/);
+  expect(editor).toMatch(/\.sketch-editor--theme-light\s*\{/);
+  expect(editor).toMatch(/\.sketch-editor--theme-dark\s*\{/);
 
   expect(floatingToolbar).toContain("var(--sketch-toolbar-surface)");
 
@@ -82,3 +82,16 @@ it("adapts top and floating toolbars to SiYuan light and dark themes", () => {
   }
 });
 
+
+
+it("uses the SiYuan runtime appearance mode for toolbar theme classes", () => {
+  const app = readFileSync(resolve(process.cwd(), "src/App.vue"), "utf8");
+  const editor = readFileSync(resolve(process.cwd(), "src/editor/SketchEditor.vue"), "utf8");
+
+  expect(app).toContain("resolveSiyuanThemeMode");
+  expect(app).toContain("MutationObserver");
+  expect(app).toContain(':themeMode="themeMode"');
+  expect(editor).toContain("themeMode: 'light' | 'dark'");
+  expect(editor).toContain("sketch-editor--theme-light");
+  expect(editor).toContain("sketch-editor--theme-dark");
+});

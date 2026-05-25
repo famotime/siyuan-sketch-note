@@ -1,6 +1,7 @@
 <template>
   <div
     v-if="visible"
+    :class="[`sketch-editor--theme-${themeMode}`]"
     class="sketch-editor"
   >
     <div
@@ -177,6 +178,7 @@ const props = defineProps<{
   i18n: Record<string, string>;
   saveData: (key: string, data: any) => Promise<void>;
   ocrProvider?: OcrProvider;
+  themeMode: 'light' | 'dark';
 }>();
 
 const emit = defineEmits<{ (e: "close"): void }>();
@@ -883,6 +885,27 @@ function onHeightChanged(_h: number) {}
   --sketch-toolbar-shadow: 0 10px 30px rgba(0, 0, 0, 0.25), 0 2px 8px rgba(0, 0, 0, 0.12);
   --sketch-toolbar-hover-shadow: 0 12px 35px rgba(0, 0, 0, 0.35), 0 4px 12px rgba(0, 0, 0, 0.15);
   --sketch-toolbar-active-shadow: 0 4px 12px rgba(0, 0, 0, 0.18);
+}
+
+.sketch-editor--theme-light {
+  --sketch-toolbar-surface: var(--sketch-toolbar-surface-light);
+  --sketch-toolbar-popover-surface: rgba(255, 255, 255, 0.96);
+  --sketch-toolbar-border: rgba(15, 23, 42, 0.1);
+  --sketch-toolbar-control-bg: rgba(15, 23, 42, 0.045);
+  --sketch-toolbar-control-border: rgba(15, 23, 42, 0.08);
+  --sketch-toolbar-hover-bg: rgba(15, 23, 42, 0.09);
+  --sketch-toolbar-hover-border: rgba(15, 23, 42, 0.14);
+  --sketch-toolbar-text: rgba(15, 23, 42, 0.78);
+  --sketch-toolbar-muted-text: rgba(15, 23, 42, 0.52);
+  --sketch-toolbar-strong-text: rgba(15, 23, 42, 0.94);
+  --sketch-toolbar-separator: rgba(15, 23, 42, 0.1);
+  --sketch-toolbar-shadow: 0 12px 32px rgba(15, 23, 42, 0.12), 0 2px 8px rgba(15, 23, 42, 0.06);
+  --sketch-toolbar-hover-shadow: 0 14px 36px rgba(15, 23, 42, 0.16), 0 4px 12px rgba(15, 23, 42, 0.08);
+  --sketch-toolbar-active-shadow: 0 4px 12px rgba(var(--b3-theme-primary-rgb), 0.24);
+}
+
+.sketch-editor--theme-dark {
+  --sketch-toolbar-surface: var(--sketch-toolbar-surface-dark);
 }
 
 @media (prefers-color-scheme: light) {
