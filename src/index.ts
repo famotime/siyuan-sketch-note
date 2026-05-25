@@ -7,7 +7,7 @@ import {
 import "@/index.scss";
 import { init, destroy } from "./main";
 import { openSketchEditor, setI18n } from "./App.vue";
-import { storageKey, createEmptySketchData } from "./storage";
+import { storageKey, createEmptySketchData, loadEditorPreferences } from "./storage";
 import {
   createPlaceholderPng,
   uploadPngToAssets,
@@ -213,8 +213,10 @@ export default class SketchNotePlugin extends Plugin {
     const fileName = sketchAssetFileName(blockId);
 
     try {
+      const editorPreferences = await loadEditorPreferences((key) => this.loadData(key));
+
       // 1. 创建并上传占位图片
-      const placeholderBlob = createPlaceholderPng("blank");
+      const placeholderBlob = createPlaceholderPng(editorPreferences.template);
       await uploadPngToAssets(placeholderBlob, fileName);
 
       // 2. 尝试通过高精度的“三重保障机制”获取当前编辑区内光标聚焦块的 ID
@@ -300,7 +302,7 @@ export default class SketchNotePlugin extends Plugin {
       }
 
       // 4. 保存初始空手写数据
-      await this.saveData(storageKey(blockId), createEmptySketchData("blank"));
+      await this.saveData(storageKey(blockId), createEmptySketchData(editorPreferences));
 
       // 5. 打开手写编辑器
       await openSketchEditor(blockId);

@@ -5,7 +5,6 @@
   >
     <div class="sketch-editor__header">
       <EditorTopBar
-        v-model:templateId="currentTemplate"
         :backgroundFit="activeCustomBackground?.fit"
         :canRedo="canRedo"
         :canUndo="canUndo"
@@ -18,6 +17,7 @@
         :stylusOnly="inputSettings.stylusOnly"
         :enablePressure="inputSettings.enablePressure ?? false"
         :t="t"
+        :templateId="currentTemplate"
         :templates="templates"
         @addPage="canvasRef?.addPage()"
         @back="goBack"
@@ -43,6 +43,7 @@
         @toggleStylusOnly="toggleStylusOnly"
         @togglePressure="togglePressure"
         @undo="canvasRef?.doUndo()"
+        @update:templateId="onTemplateChange"
       />
       <ToolBar
         :activeTool="activeTool"
@@ -117,7 +118,7 @@ import { ref, computed, onMounted, onUnmounted } from "vue";
 import type { SketchData, ToolPreset } from "@/types/sketch";
 import { PRESET_COLORS, HIGHLIGHTER_PRESET_COLORS } from "@/types/sketch";
 import { getAllTemplates } from "@/template";
-import { storageKey } from "@/storage";
+import { saveEditorPreferences, storageKey } from "@/storage";
 import { renderSketchPdfPageImages, renderSketchPngPageImage, thumbnailSketchDataAsync } from "@/storage/thumbnail";
 import { showMessage } from "siyuan";
 import { sketchAssetFileName, uploadDataUrlToAssets } from "@/utils/uploadPng";
@@ -348,6 +349,7 @@ function toggleStylusOnly() {
     ...inputSettings.value,
     stylusOnly: !inputSettings.value.stylusOnly,
   };
+  persistEditorPreferences();
   markDirty();
   if (autoSave.value) scheduleAutoSave();
 }
@@ -357,8 +359,26 @@ function togglePressure() {
     ...inputSettings.value,
     enablePressure: inputSettings.value.enablePressure === undefined ? false : !inputSettings.value.enablePressure,
   };
+  persistEditorPreferences();
   markDirty();
   if (autoSave.value) scheduleAutoSave();
+}
+
+function onTemplateChange(value: string) {
+  currentTemplate.value = value;
+  persistEditorPreferences();
+  markDirty();
+  if (autoSave.value) scheduleAutoSave();
+}
+
+function persistEditorPreferences() {
+  saveEditorPreferences(props.saveData, {
+    template: currentTemplate.value,
+    inputSettings: inputSettings.value,
+    customBackgrounds: customBackgrounds.value,
+  }).catch((e) => {
+    console.error("[Sketch Note] Save editor preferences failed:", e);
+  });
 }
 
 // ─── Save logic ───
@@ -563,6 +583,7 @@ async function onBackgroundFitChange(value: string) {
     template: currentTemplate.value,
     customBackgrounds: customBackgrounds.value,
   };
+  persistEditorPreferences();
   await canvasRef.value.restoreData(loadedData.value);
   onStroke();
 }
@@ -626,6 +647,7 @@ async function onBackgroundSelected(event: Event) {
     template: background.id,
     customBackgrounds: customBackgrounds.value,
   };
+  persistEditorPreferences();
   await canvasRef.value.restoreData(loadedData.value);
   onStroke();
 }
