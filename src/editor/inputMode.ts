@@ -6,7 +6,7 @@ export interface SketchInputSettings {
 export function createDefaultInputSettings(): SketchInputSettings {
   return {
     stylusOnly: false,
-    enablePressure: true,
+    enablePressure: false,
   };
 }
 

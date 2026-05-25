@@ -14,7 +14,6 @@
       <option value="contain">{{ t("backgroundFitContain") }}</option>
       <option value="stretch">{{ t("backgroundFitStretch") }}</option>
     </select>
-    <span class="sketch-editor__title">{{ t("sketchNote") }}</span>
     <span v-if="recovered" class="sketch-recovery">{{ t("dataRecovered") }}</span>
 
     <div v-if="false" class="sketch-pages">
@@ -78,20 +77,28 @@
         <button v-if="searchQuery" class="sketch-btn sketch-btn--page" @click="onClearSearch">&#x2715;</button>
       </div>
     </div>
-    <button class="sketch-btn sketch-btn--toggle" :class="{ 'sketch-btn--toggle-on': autoSave }" @click="$emit('toggleAutoSave')">
-      {{ autoSave ? "ON" : "OFF" }} {{ t("autoSave") }}
-    </button>
-    <button class="sketch-btn sketch-btn--toggle" :class="{ 'sketch-btn--toggle-on': stylusOnly }" @click="$emit('toggleStylusOnly')">
-      {{ stylusOnly ? "ON" : "OFF" }} {{ t("stylusOnly") }}
-    </button>
-    <button class="sketch-btn sketch-btn--toggle" :class="{ 'sketch-btn--toggle-on': enablePressure }" @click="$emit('togglePressure')">
-      {{ enablePressure ? "ON" : "OFF" }} {{ t("enablePressure") }}
-    </button>
-    <button v-if="false" class="sketch-btn sketch-btn--toggle" :class="{ 'sketch-btn--toggle-on': exportIncludeBackground }" @click="$emit('toggleExportBackground')">
-      {{ exportIncludeBackground ? "ON" : "OFF" }} {{ t("exportBackground") }}
-    </button>
-    <span class="sketch-status" :class="`sketch-status--${saveStatus}`">{{ statusLabel }}</span>
-    <button class="sketch-btn sketch-btn--save" :disabled="saveStatus === 'saving'" @click="$emit('save')">{{ t("save") }}</button>
+    <span class="sketch-sep" />
+    <button class="sketch-btn sketch-btn--action" :disabled="!canUndo" :title="t('undo')" @click="$emit('undo')">↩</button>
+    <button class="sketch-btn sketch-btn--action" :disabled="!canRedo" :title="t('redo')" @click="$emit('redo')">↪</button>
+    <button class="sketch-btn sketch-btn--action" :title="t('clear')" @click="$emit('clear')">⌧</button>
+    <span class="sketch-sep" />
+    <div class="sketch-more-wrap" ref="moreWrapRef">
+      <button class="sketch-btn sketch-btn--more" :class="{ 'sketch-btn--more-on': moreOpen }" :title="t('settings') || '设置'" @click="moreOpen = !moreOpen">⋯</button>
+      <div v-if="moreOpen" class="sketch-more-popover">
+        <label class="sketch-more-row">
+          <span class="sketch-more-label">{{ t("stylusOnly") }}</span>
+          <span class="sketch-toggle" :class="{ 'sketch-toggle--on': stylusOnly }" @click="$emit('toggleStylusOnly')">
+            <span class="sketch-toggle__knob" />
+          </span>
+        </label>
+        <label class="sketch-more-row">
+          <span class="sketch-more-label">{{ t("enablePressure") }}</span>
+          <span class="sketch-toggle" :class="{ 'sketch-toggle--on': enablePressure }" @click="$emit('togglePressure')">
+            <span class="sketch-toggle__knob" />
+          </span>
+        </label>
+      </div>
+    </div>
     <button v-if="false" class="sketch-btn sketch-btn--action" @click="$emit('exportPng')">⇩ {{ t("exportPng") }}</button>
     <button v-if="false" class="sketch-btn sketch-btn--action" @click="$emit('exportPdf')">⇩ {{ t("exportPdf") }}</button>
     <button v-if="false" class="sketch-btn sketch-btn--action" @click="$emit('exportJson')">⇩ {{ t("exportJson") }}</button>
@@ -101,22 +108,20 @@
 </template>
 
 <script setup lang="ts">
-import { ref, nextTick } from "vue";
+import { ref, nextTick, onMounted, onUnmounted } from "vue";
 import type { PageOverviewItem } from "@/pages/model";
 import type { Template } from "@/template";
-import type { SaveStatus } from "@/storage/saveStatus";
 
 const props = defineProps<{
-  autoSave: boolean;
   backgroundFit?: string;
+  canRedo: boolean;
+  canUndo: boolean;
   exportIncludeBackground: boolean;
   ocrState: "idle" | "recognizing" | "completed" | "error";
   pageOverview: PageOverviewItem[];
   pageState: { current: number; total: number };
   recovered: boolean;
-  saveStatus: SaveStatus;
   searchResultCount: number;
-  statusLabel: string;
   stylusOnly: boolean;
   enablePressure: boolean;
   templateId: string;
@@ -128,6 +133,7 @@ const emit = defineEmits<{
   (e: "addPage"): void;
   (e: "back"): void;
   (e: "backgroundFitChange", value: string): void;
+  (e: "clear"): void;
   (e: "clearSearch"): void;
   (e: "deletePage"): void;
   (e: "duplicatePage"): void;
@@ -140,20 +146,31 @@ const emit = defineEmits<{
   (e: "nextPage"): void;
   (e: "previousPage"): void;
   (e: "recognize"): void;
-  (e: "save"): void;
+  (e: "redo"): void;
   (e: "search", query: string): void;
   (e: "searchNext"): void;
   (e: "searchPrev"): void;
-  (e: "toggleAutoSave"): void;
   (e: "toggleExportBackground"): void;
   (e: "toggleStylusOnly"): void;
   (e: "togglePressure"): void;
+  (e: "undo"): void;
   (e: "update:templateId", value: string): void;
 }>();
 
 const searchOpen = ref(false);
 const searchQuery = ref("");
 const searchInputRef = ref<HTMLInputElement>();
+const moreOpen = ref(false);
+const moreWrapRef = ref<HTMLDivElement>();
+
+function onDocClick(e: MouseEvent) {
+  if (moreOpen.value && moreWrapRef.value && !moreWrapRef.value.contains(e.target as Node)) {
+    moreOpen.value = false;
+  }
+}
+
+onMounted(() => document.addEventListener("mousedown", onDocClick));
+onUnmounted(() => document.removeEventListener("mousedown", onDocClick));
 
 function toggleSearch() {
   searchOpen.value = !searchOpen.value;
@@ -218,40 +235,6 @@ function onClearSearch() {
   font-weight: 500;
 }
 
-/* ── Toggle 开关按钮样式 ── */
-.sketch-btn--toggle {
-  color: rgba(255, 255, 255, 0.65) !important;
-}
-.sketch-btn--toggle-on {
-  background: rgba(255, 255, 255, 0.18) !important;
-  border-color: var(--b3-theme-primary) !important;
-  color: #fff !important;
-  box-shadow: 0 0 8px rgba(var(--b3-theme-primary-rgb), 0.15);
-}
-
-/* ── 手动保存主按钮 ── */
-.sketch-btn--save {
-  background: var(--b3-theme-primary) !important;
-  border-color: transparent !important;
-  color: #fff !important;
-  font-weight: 500;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
-}
-.sketch-btn--save:hover {
-  background: var(--b3-theme-primary) !important;
-  opacity: 0.92;
-  box-shadow: 0 4px 16px rgba(var(--b3-theme-primary-rgb), 0.3);
-  transform: scale(1.03);
-}
-.sketch-btn--save:active {
-  transform: scale(0.96);
-}
-.sketch-btn--save:disabled {
-  opacity: 0.4 !important;
-  transform: none !important;
-  cursor: not-allowed;
-}
-
 /* ── 下拉选择菜单 ── */
 .sketch-select {
   background: rgba(255, 255, 255, 0.05) !important;
@@ -276,37 +259,6 @@ function onClearSearch() {
   color: #fff;
 }
 
-/* ── 标题样式 ── */
-.sketch-editor__title {
-  font-weight: 600;
-  font-size: 14px;
-  color: #fff;
-  letter-spacing: 0.5px;
-  text-shadow: 0 2px 4px rgba(0,0,0,0.15);
-  margin-left: 4px;
-}
-
-/* ── 柔光霓虹色状态指示 ── */
-.sketch-status {
-  font-size: 11px;
-  font-weight: 500;
-  width: 96px; /* 固定宽度，坚如磐石，彻底杜绝按钮移位跳动 */
-  height: 24px;
-  text-align: center;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 6px;
-  background: rgba(255, 255, 255, 0.04);
-  border: 1px solid rgba(255, 255, 255, 0.05);
-  box-sizing: border-box;
-  flex-shrink: 0; /* 禁止弹性收缩 */
-}
-.sketch-status--saved  { color: #2ecc71; border-color: rgba(46, 204, 113, 0.2); background: rgba(46, 204, 113, 0.05); }
-.sketch-status--saving { color: rgba(255, 255, 255, 0.5); }
-.sketch-status--error  { color: #e74c3c; border-color: rgba(231, 76, 60, 0.2); background: rgba(231, 76, 60, 0.05); }
-.sketch-status--dirty  { color: #f39c12; border-color: rgba(243, 156, 18, 0.2); background: rgba(243, 156, 18, 0.05); }
-
 /* 恢复损坏提示 */
 .sketch-recovery {
   color: #f39c12;
@@ -316,7 +268,103 @@ function onClearSearch() {
   text-shadow: 0 0 4px rgba(243, 156, 18, 0.2);
 }
 
+.sketch-sep {
+  width: 1px;
+  height: 20px;
+  background: rgba(255, 255, 255, 0.12);
+  margin: 0 4px;
+  flex-shrink: 0;
+}
+
 .sketch-spacer {
   flex: 1;
+}
+
+/* ── 更多按钮 ── */
+.sketch-more-wrap {
+  position: relative;
+}
+.sketch-btn--more {
+  background: rgba(255, 255, 255, 0.06) !important;
+  border-color: rgba(255, 255, 255, 0.1) !important;
+  font-size: 18px;
+  letter-spacing: 2px;
+  padding: 4px 8px;
+  min-width: 32px;
+}
+.sketch-btn--more-on {
+  background: rgba(255, 255, 255, 0.18) !important;
+  border-color: var(--b3-theme-primary) !important;
+  color: #fff !important;
+}
+
+/* ── 更多弹出菜单 ── */
+.sketch-more-popover {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  min-width: 180px;
+  background: rgba(28, 28, 30, 0.95);
+  backdrop-filter: blur(14px) saturate(160%);
+  -webkit-backdrop-filter: blur(14px) saturate(160%);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 12px;
+  padding: 6px 0;
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.35), 0 2px 8px rgba(0, 0, 0, 0.15);
+  z-index: 1100;
+  animation: sketch-pop-in 0.15s ease-out;
+}
+@keyframes sketch-pop-in {
+  from { opacity: 0; transform: translateY(-4px) scale(0.96); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+/* ── 菜单行 ── */
+.sketch-more-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 14px;
+  cursor: pointer;
+  user-select: none;
+  transition: background 0.15s ease;
+}
+.sketch-more-row:hover {
+  background: rgba(255, 255, 255, 0.06);
+}
+.sketch-more-label {
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.85);
+}
+
+/* ── iOS 风格 Toggle 开关 ── */
+.sketch-toggle {
+  position: relative;
+  width: 40px;
+  height: 24px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.15);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  cursor: pointer;
+  transition: background 0.25s ease, border-color 0.25s ease;
+  flex-shrink: 0;
+}
+.sketch-toggle--on {
+  background: var(--b3-theme-primary);
+  border-color: transparent;
+}
+.sketch-toggle__knob {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.3);
+  transition: transform 0.25s cubic-bezier(0.25, 0.8, 0.25, 1);
+}
+.sketch-toggle--on .sketch-toggle__knob {
+  transform: translateX(16px);
 }
 </style>
