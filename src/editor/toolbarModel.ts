@@ -1,5 +1,6 @@
 import type { EditorTool } from "./tools";
 import type { IconParkName } from "./iconParkIcons";
+import { isShapeEditorTool } from "./tools";
 
 export interface EditorToolButton {
   icon: IconParkName;
@@ -20,7 +21,7 @@ export function createEditorToolButtons(): EditorToolButton[] {
     { icon: "FormatBrush", labelKey: "highlighter", tool: "highlighter" },
     { icon: "DeleteKey", labelKey: "eraser", tool: "eraser" },
     { icon: "Selected", labelKey: "lasso", tool: "lasso" },
-    { icon: "Minus", labelKey: "line", tool: "line" },
+    { icon: "Minus", labelKey: "shape", tool: "line" },
     { icon: "Text", labelKey: "text", tool: "text" },
     { icon: "AddPic", labelKey: "image", tool: "image" },
   ];
@@ -33,4 +34,11 @@ export function getToolOptionsVisibility(tool: EditorTool): ToolOptionsVisibilit
     opacity: tool !== "eraser",
     strokeControls: true,
   };
+}
+
+export function getToolButtonActiveState(activeTool: EditorTool, buttonTool: EditorTool): boolean {
+  if (isShapeEditorTool(buttonTool)) {
+    return isShapeEditorTool(activeTool);
+  }
+  return activeTool === buttonTool;
 }

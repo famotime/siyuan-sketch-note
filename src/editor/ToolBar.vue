@@ -4,7 +4,7 @@
       <!-- 画笔 -->
       <button
         class="sketch-btn sketch-btn--tool sketch-btn--icon-tool"
-        :class="{ 'sketch-btn--tool-active': activeTool === 'pen' }"
+        :class="{ 'sketch-btn--tool-active': getToolButtonActiveState(activeTool, 'pen') }"
         :title="t('pen')"
         :aria-label="t('pen')"
         @click="$emit('selectTool', 'pen')"
@@ -17,7 +17,7 @@
       <!-- 荧光笔 -->
       <button
         class="sketch-btn sketch-btn--tool sketch-btn--icon-tool"
-        :class="{ 'sketch-btn--tool-active': activeTool === 'highlighter' }"
+        :class="{ 'sketch-btn--tool-active': getToolButtonActiveState(activeTool, 'highlighter') }"
         :title="t('highlighter')"
         :aria-label="t('highlighter')"
         @click="$emit('selectTool', 'highlighter')"
@@ -30,7 +30,7 @@
       <!-- 橡皮擦 -->
       <button
         class="sketch-btn sketch-btn--tool sketch-btn--icon-tool"
-        :class="{ 'sketch-btn--tool-active': activeTool === 'eraser' }"
+        :class="{ 'sketch-btn--tool-active': getToolButtonActiveState(activeTool, 'eraser') }"
         :title="t('eraser')"
         :aria-label="t('eraser')"
         @click="$emit('selectTool', 'eraser')"
@@ -43,7 +43,7 @@
       <!-- 套索（选区合一） -->
       <button
         class="sketch-btn sketch-btn--tool sketch-btn--icon-tool"
-        :class="{ 'sketch-btn--tool-active': activeTool === 'lasso' }"
+        :class="{ 'sketch-btn--tool-active': getToolButtonActiveState(activeTool, 'lasso') }"
         :title="t('lasso')"
         :aria-label="t('lasso')"
         @click="$emit('selectTool', 'lasso')"
@@ -56,7 +56,7 @@
       <!-- 图形（图形合一主按钮） -->
       <button
         class="sketch-btn sketch-btn--tool sketch-btn--icon-tool"
-        :class="{ 'sketch-btn--tool-active': isShapeActive }"
+        :class="{ 'sketch-btn--tool-active': getToolButtonActiveState(activeTool, lastShapeTool) }"
         :title="t('shape')"
         :aria-label="t('shape')"
         @click="$emit('selectTool', lastShapeTool)"
@@ -69,6 +69,7 @@
       <!-- 文本 -->
       <button
         class="sketch-btn sketch-btn--tool sketch-btn--icon-tool"
+        :class="{ 'sketch-btn--tool-active': getToolButtonActiveState(activeTool, 'text') }"
         :title="t('text')"
         :aria-label="t('text')"
         @click="$emit('selectTool', 'text')"
@@ -99,7 +100,7 @@ import { computed } from "vue";
 import type { EditorTool, ShapeEditorTool } from "./tools";
 import IconParkIcon from "./IconParkIcon.vue";
 import type { IconParkName } from "./iconParkIcons";
-import { isShapeEditorTool } from "./tools";
+import { getToolButtonActiveState } from "./toolbarModel";
 
 const props = defineProps<{
   activeTool: EditorTool;
@@ -110,9 +111,6 @@ const props = defineProps<{
 defineEmits<{
   (e: "selectTool", tool: EditorTool): void;
 }>();
-
-// ── 形状工具激活状态 ──
-const isShapeActive = computed(() => isShapeEditorTool(props.activeTool));
 
 // ── 根据上次选择的图形映射图形图标 ──
 const currentShapeIcon = computed<IconParkName>(() => {

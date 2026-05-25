@@ -1,5 +1,5 @@
 <template>
-  <div class="sketch-editor__row">
+  <div class="sketch-editor__row sketch-editor__row--topbar">
     <button
       class="sketch-btn sketch-btn--back"
       :title="t('back')"

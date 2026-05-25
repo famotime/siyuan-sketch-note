@@ -13,6 +13,7 @@
 import { ref, nextTick } from "vue";
 import { showMessage } from "siyuan";
 import { loadSketchData } from "@/storage";
+import { normalizeEditorI18n } from "@/i18n/editorI18n";
 import SketchEditor from "@/editor/SketchEditor.vue";
 
 const editorVisible = ref(false);
@@ -24,7 +25,7 @@ const pluginSaveData = ref<(key: string, data: any) => Promise<void>>(async () =
 let loadDataFn: (key: string) => Promise<any> = async () => null;
 
 export function setI18n(i18n: Record<string, string>) {
-  pluginI18n.value = i18n;
+  pluginI18n.value = normalizeEditorI18n(i18n);
 }
 
 export function setSaveDataFn(fn: (key: string, data: any) => Promise<void>) {

@@ -773,6 +773,9 @@ function onHeightChanged(_h: number) {}
   overflow-x: auto;
   scrollbar-width: none;
 }
+.sketch-editor__row--topbar {
+  overflow: visible;
+}
 .sketch-editor__row::-webkit-scrollbar {
   display: none;
 }

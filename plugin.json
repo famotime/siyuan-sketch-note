@@ -4,8 +4,8 @@
   "url": "https://github.com/famotime/siyuan-sketch-note",
   "version": "0.1.0",
   "minAppVersion": "2.10.14",
-  "backends": ["windows", "linux", "darwin", "docker"],
-  "frontends": ["desktop", "browser-desktop", "desktop-window"],
+  "backends": ["all"],
+  "frontends": ["all"],
   "displayName": {
     "default": "Sketch Note",
     "zh_CN": "闲笔"

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   createEditorToolButtons,
+  getToolButtonActiveState,
   getToolOptionsVisibility,
 } from "./toolbarModel";
 
@@ -22,6 +23,20 @@ describe("editor toolbar model", () => {
       icon: "Write",
       labelKey: "pen",
     });
+    expect(buttons.find((button) => button.tool === "line")).toMatchObject({
+      icon: "Minus",
+      labelKey: "shape",
+    });
+    expect(buttons.find((button) => button.tool === "text")).toMatchObject({
+      icon: "Text",
+      labelKey: "text",
+    });
+  });
+
+  it("marks grouped shape tools and insert tools active from the current tool", () => {
+    expect(getToolButtonActiveState("rectangle", "line")).toBe(true);
+    expect(getToolButtonActiveState("text", "text")).toBe(true);
+    expect(getToolButtonActiveState("pen", "text")).toBe(false);
   });
 
   it("shows only relevant option controls for active tool families", () => {

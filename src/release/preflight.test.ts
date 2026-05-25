@@ -28,8 +28,8 @@ describe("release preflight configuration", () => {
     expect(plugin.author).not.toBe("sketch-note");
     expect(plugin.url).toMatch(/^https:\/\//);
     expect(plugin.funding).toBeUndefined();
-    expect(plugin.frontends).not.toEqual(["all"]);
-    expect(plugin.backends).not.toEqual(["all"]);
+    expect(plugin.frontends).toEqual(["all"]);
+    expect(plugin.backends).toEqual(["all"]);
   });
 
   it("keeps release assets within Bazaar limits", () => {
