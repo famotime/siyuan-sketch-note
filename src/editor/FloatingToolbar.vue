@@ -64,7 +64,7 @@
         </button>
         <ColorPickerPopup
           v-if="showRecolorPopup"
-          :modelValue="preset.color"
+          :modelValue="pendingRecolor ?? preset.color"
           :rainbowColors="rainbowPresetColors"
           :recentColors="recentPaletteColors"
           :t="t"
@@ -149,7 +149,7 @@
         </button>
         <ColorPickerPopup
           v-if="showAddColorPopup"
-          :modelValue="preset.color"
+          :modelValue="pendingAddColor ?? preset.color"
           :rainbowColors="rainbowPresetColors"
           :recentColors="recentPaletteColors"
           :t="t"
@@ -390,6 +390,26 @@ const showWidthSlider = ref(false);
 const showOpacitySlider = ref(false);
 const showAddColorPopup = ref(false);
 const showRecolorPopup = ref(false);
+const pendingAddColor = ref<string | null>(null);
+const pendingRecolor = ref<string | null>(null);
+
+watch(showAddColorPopup, (open, wasOpen) => {
+  if (open) {
+    pendingAddColor.value = props.preset.color;
+  } else if (wasOpen && pendingAddColor.value) {
+    emit("selectCustomColor", pendingAddColor.value);
+    pendingAddColor.value = null;
+  }
+});
+
+watch(showRecolorPopup, (open, wasOpen) => {
+  if (open) {
+    pendingRecolor.value = props.preset.color;
+  } else if (wasOpen && pendingRecolor.value) {
+    emit("recolorSelection", pendingRecolor.value);
+    pendingRecolor.value = null;
+  }
+});
 
 function closeSlidersOnOutsideClick(e: MouseEvent) {
   const target = e.target as Node;
@@ -408,13 +428,11 @@ function closeSlidersOnOutsideClick(e: MouseEvent) {
 }
 
 function onCustomColorPicked(color: string) {
-  emit("selectCustomColor", color);
-  showAddColorPopup.value = false;
+  pendingAddColor.value = color;
 }
 
 function onRecolorPicked(color: string) {
-  emit("recolorSelection", color);
-  showRecolorPopup.value = false;
+  pendingRecolor.value = color;
 }
 
 const widthPresets = computed(() => {
