@@ -6,7 +6,7 @@
       :aria-label="t('back')"
       @click="$emit('back')"
     >
-      ←
+      <IconParkIcon name="ArrowLeft" />
     </button>
     <select class="sketch-select" :value="templateId" @change="$emit('update:templateId', ($event.target as HTMLSelectElement).value)">
       <option v-for="tpl in templates" :key="tpl.id" :value="tpl.id">{{ t(tpl.nameKey) }}</option>
@@ -46,7 +46,9 @@
       <button class="sketch-btn sketch-btn--page" :disabled="pageState.current >= pageState.total" @click="$emit('nextPage')">›</button>
       <button class="sketch-btn sketch-btn--page-add" @click="$emit('addPage')">+ {{ t("addPage") }}</button>
       <button class="sketch-btn sketch-btn--page-add" @click="$emit('duplicatePage')">⧉ {{ t("duplicatePage") }}</button>
-      <button class="sketch-btn sketch-btn--page-add" :disabled="pageState.total <= 1" @click="$emit('deletePage')">⌫ {{ t("deletePage") }}</button>
+      <button class="sketch-btn sketch-btn--page-add" :disabled="pageState.total <= 1" @click="$emit('deletePage')">
+        <IconParkIcon name="Delete" /> {{ t("deletePage") }}
+      </button>
     </div>
 
     <span class="sketch-spacer" />
@@ -85,12 +87,20 @@
       </div>
     </div>
     <span class="sketch-sep" />
-    <button class="sketch-btn sketch-btn--action" :disabled="!canUndo" :title="t('undo')" @click="$emit('undo')">↩</button>
-    <button class="sketch-btn sketch-btn--action" :disabled="!canRedo" :title="t('redo')" @click="$emit('redo')">↪</button>
-    <button class="sketch-btn sketch-btn--action" :title="t('clear')" @click="$emit('clear')">⌧</button>
+    <button class="sketch-btn sketch-btn--action" :disabled="!canUndo" :title="t('undo')" @click="$emit('undo')">
+      <IconParkIcon name="Undo" />
+    </button>
+    <button class="sketch-btn sketch-btn--action" :disabled="!canRedo" :title="t('redo')" @click="$emit('redo')">
+      <IconParkIcon name="Redo" />
+    </button>
+    <button class="sketch-btn sketch-btn--action" :title="t('clear')" @click="$emit('clear')">
+      <IconParkIcon name="Clear" />
+    </button>
     <span class="sketch-sep" />
     <div class="sketch-more-wrap" ref="moreWrapRef">
-      <button class="sketch-btn sketch-btn--more" :class="{ 'sketch-btn--more-on': moreOpen }" :title="t('settings')" @click="moreOpen = !moreOpen">⋯</button>
+      <button class="sketch-btn sketch-btn--more" :class="{ 'sketch-btn--more-on': moreOpen }" :title="t('settings')" @click="moreOpen = !moreOpen">
+        <IconParkIcon name="MoreFour" />
+      </button>
       <div v-if="moreOpen" class="sketch-more-popover">
         <label class="sketch-more-row">
           <span class="sketch-more-label">{{ t("stylusOnly") }}</span>
@@ -110,7 +120,9 @@
     <button v-if="false" class="sketch-btn sketch-btn--action" @click="$emit('exportPdf')">⇩ {{ t("exportPdf") }}</button>
     <button v-if="false" class="sketch-btn sketch-btn--action" @click="$emit('exportJson')">⇩ {{ t("exportJson") }}</button>
     <button v-if="false" class="sketch-btn sketch-btn--action" @click="$emit('importJson')">⇧ {{ t("importJson") }}</button>
-    <button v-if="false" class="sketch-btn sketch-btn--action" @click="$emit('importBackground')">▧ {{ t("importBackground") }}</button>
+    <button v-if="false" class="sketch-btn sketch-btn--action" @click="$emit('importBackground')">
+      <IconParkIcon name="AddPic" /> {{ t("importBackground") }}
+    </button>
   </div>
 </template>
 
@@ -118,6 +130,7 @@
 import { ref, nextTick, onMounted, onUnmounted } from "vue";
 import type { PageOverviewItem } from "@/pages/model";
 import type { Template } from "@/template";
+import IconParkIcon from "./IconParkIcon.vue";
 
 const props = defineProps<{
   backgroundFit?: string;

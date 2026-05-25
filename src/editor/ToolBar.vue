@@ -1,7 +1,7 @@
 <template>
   <div class="sketch-editor__row sketch-editor__row--tools">
     <div class="sketch-toolbar-group">
-      <!-- ✏ 画笔 -->
+      <!-- 画笔 -->
       <button
         class="sketch-btn sketch-btn--tool sketch-btn--icon-tool"
         :class="{ 'sketch-btn--tool-active': activeTool === 'pen' }"
@@ -9,10 +9,12 @@
         :aria-label="t('pen')"
         @click="$emit('selectTool', 'pen')"
       >
-        <span class="sketch-btn__icon" aria-hidden="true">✏</span>
+        <span class="sketch-btn__icon" aria-hidden="true">
+          <IconParkIcon name="Write" />
+        </span>
       </button>
 
-      <!-- ▰ 荧光笔 -->
+      <!-- 荧光笔 -->
       <button
         class="sketch-btn sketch-btn--tool sketch-btn--icon-tool"
         :class="{ 'sketch-btn--tool-active': activeTool === 'highlighter' }"
@@ -20,10 +22,12 @@
         :aria-label="t('highlighter')"
         @click="$emit('selectTool', 'highlighter')"
       >
-        <span class="sketch-btn__icon" aria-hidden="true">▰</span>
+        <span class="sketch-btn__icon" aria-hidden="true">
+          <IconParkIcon name="FormatBrush" />
+        </span>
       </button>
 
-      <!-- ⌫ 橡皮擦 -->
+      <!-- 橡皮擦 -->
       <button
         class="sketch-btn sketch-btn--tool sketch-btn--icon-tool"
         :class="{ 'sketch-btn--tool-active': activeTool === 'eraser' }"
@@ -31,10 +35,12 @@
         :aria-label="t('eraser')"
         @click="$emit('selectTool', 'eraser')"
       >
-        <span class="sketch-btn__icon" aria-hidden="true">⌫</span>
+        <span class="sketch-btn__icon" aria-hidden="true">
+          <IconParkIcon name="DeleteKey" />
+        </span>
       </button>
 
-      <!-- ◇ 套索（选区合一） -->
+      <!-- 套索（选区合一） -->
       <button
         class="sketch-btn sketch-btn--tool sketch-btn--icon-tool"
         :class="{ 'sketch-btn--tool-active': activeTool === 'lasso' }"
@@ -42,7 +48,9 @@
         :aria-label="t('lasso')"
         @click="$emit('selectTool', 'lasso')"
       >
-        <span class="sketch-btn__icon" aria-hidden="true">◇</span>
+        <span class="sketch-btn__icon" aria-hidden="true">
+          <IconParkIcon name="Selected" />
+        </span>
       </button>
 
       <!-- 图形（图形合一主按钮） -->
@@ -53,20 +61,24 @@
         :aria-label="t('shape')"
         @click="$emit('selectTool', lastShapeTool)"
       >
-        <span class="sketch-btn__icon" aria-hidden="true">{{ currentShapeIcon }}</span>
+        <span class="sketch-btn__icon" aria-hidden="true">
+          <IconParkIcon :name="currentShapeIcon" />
+        </span>
       </button>
 
-      <!-- T 文本 -->
+      <!-- 文本 -->
       <button
         class="sketch-btn sketch-btn--tool sketch-btn--icon-tool"
         :title="t('text')"
         :aria-label="t('text')"
         @click="$emit('selectTool', 'text')"
       >
-        <span class="sketch-btn__icon" aria-hidden="true">T</span>
+        <span class="sketch-btn__icon" aria-hidden="true">
+          <IconParkIcon name="Text" />
+        </span>
       </button>
 
-      <!-- ▧ 图片 -->
+      <!-- 图片 -->
       <button
         v-if="false"
         class="sketch-btn sketch-btn--tool sketch-btn--icon-tool"
@@ -74,7 +86,9 @@
         :aria-label="t('image')"
         @click="$emit('selectTool', 'image')"
       >
-        <span class="sketch-btn__icon" aria-hidden="true">▧</span>
+        <span class="sketch-btn__icon" aria-hidden="true">
+          <IconParkIcon name="AddPic" />
+        </span>
       </button>
     </div>
   </div>
@@ -83,6 +97,8 @@
 <script setup lang="ts">
 import { computed } from "vue";
 import type { EditorTool, ShapeEditorTool } from "./tools";
+import IconParkIcon from "./IconParkIcon.vue";
+import type { IconParkName } from "./iconParkIcons";
 import { isShapeEditorTool } from "./tools";
 
 const props = defineProps<{
@@ -99,15 +115,15 @@ defineEmits<{
 const isShapeActive = computed(() => isShapeEditorTool(props.activeTool));
 
 // ── 根据上次选择的图形映射图形图标 ──
-const currentShapeIcon = computed(() => {
-  const icons: Record<ShapeEditorTool, string> = {
-    line: "／",
-    arrow: "→",
-    rectangle: "□",
-    ellipse: "○",
-    triangle: "△",
+const currentShapeIcon = computed<IconParkName>(() => {
+  const icons: Record<ShapeEditorTool, IconParkName> = {
+    line: "Minus",
+    arrow: "ArrowRight",
+    rectangle: "Rectangle",
+    ellipse: "Round",
+    triangle: "Triangle",
   };
-  return icons[props.lastShapeTool] ?? "／";
+  return icons[props.lastShapeTool] ?? "Minus";
 });
 </script>
 

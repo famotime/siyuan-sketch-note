@@ -21,7 +21,7 @@
         :title="t(shape.labelKey)"
         @click="$emit('selectTool', shape.tool)"
       >
-        {{ shape.icon }}
+        <IconParkIcon :name="shape.icon" />
       </button>
       <div class="sketch-float-divider" />
     </div>
@@ -54,7 +54,8 @@
         :title="t('recolor')"
         @click="openRecolorPicker"
       >
-        🎨 <span class="sketch-float-action-label">{{ t('recolor') }}</span>
+        <IconParkIcon name="ColorFilter" />
+        <span class="sketch-float-action-label">{{ t('recolor') }}</span>
       </button>
       <input
         ref="recolorInputRef"
@@ -69,14 +70,16 @@
         :title="t('duplicateSelection')"
         @click="$emit('duplicateSelection')"
       >
-        ⧉ <span class="sketch-float-action-label">{{ t('duplicateSelection') }}</span>
+        <IconParkIcon name="Copy" />
+        <span class="sketch-float-action-label">{{ t('duplicateSelection') }}</span>
       </button>
       <button
         class="sketch-float-action-btn"
         :title="t('deleteSelection')"
         @click="$emit('deleteSelection')"
       >
-        ⌫ <span class="sketch-float-action-label">{{ t('deleteSelection') }}</span>
+        <IconParkIcon name="Delete" />
+        <span class="sketch-float-action-label">{{ t('deleteSelection') }}</span>
       </button>
     </div>
 
@@ -139,7 +142,7 @@
           :title="t('resetDefaultColors')"
           @click="$emit('resetDefaultColors')"
         >
-          🔄
+          <IconParkIcon name="Refresh" />
         </button>
       </div>
       <div class="sketch-float-divider" />
@@ -168,7 +171,8 @@
         :class="{ 'sketch-float-slider-toggle--active': showWidthSlider }"
         @click="showWidthSlider = !showWidthSlider"
       >
-        ⚙ <span class="sketch-val-text">{{ preset.width }}px</span>
+        <IconParkIcon :name="activeTool === 'text' ? 'FontSize' : 'AutoLineWidth'" />
+        <span class="sketch-val-text">{{ preset.width }}px</span>
       </button>
 
       <div v-if="showWidthSlider" class="sketch-float-slider-popover">
@@ -193,7 +197,8 @@
         :class="{ 'sketch-float-slider-toggle--active': showOpacitySlider }"
         @click="showOpacitySlider = !showOpacitySlider"
       >
-        💧 <span class="sketch-val-text">{{ Math.round(preset.opacity * 100) }}%</span>
+        <IconParkIcon name="Water" />
+        <span class="sketch-val-text">{{ Math.round(preset.opacity * 100) }}%</span>
       </button>
 
       <div v-if="showOpacitySlider" class="sketch-float-slider-popover">
@@ -217,6 +222,8 @@
 import { ref, computed, onMounted, onUnmounted, watch, nextTick } from "vue";
 import type { ToolPreset } from "@/types/sketch";
 import type { EditorTool } from "./tools";
+import IconParkIcon from "./IconParkIcon.vue";
+import type { IconParkName } from "./iconParkIcons";
 import { isShapeEditorTool } from "./tools";
 
 const props = defineProps<{
@@ -435,12 +442,16 @@ const hasOpacityControl = computed(() => {
 });
 
 const shapeOptions = [
-  { tool: "line", labelKey: "line", icon: "／" },
-  { tool: "arrow", labelKey: "arrow", icon: "→" },
-  { tool: "rectangle", labelKey: "rectangle", icon: "□" },
-  { tool: "ellipse", labelKey: "ellipse", icon: "○" },
-  { tool: "triangle", labelKey: "triangle", icon: "△" },
-] as const;
+  { tool: "line", labelKey: "line", icon: "Minus" },
+  { tool: "arrow", labelKey: "arrow", icon: "ArrowRight" },
+  { tool: "rectangle", labelKey: "rectangle", icon: "Rectangle" },
+  { tool: "ellipse", labelKey: "ellipse", icon: "Round" },
+  { tool: "triangle", labelKey: "triangle", icon: "Triangle" },
+] as const satisfies readonly {
+  tool: EditorTool;
+  labelKey: string;
+  icon: IconParkName;
+}[];
 
 onMounted(() => {
   document.addEventListener("mousedown", closeSlidersOnOutsideClick);
@@ -737,7 +748,7 @@ onUnmounted(() => {
   margin-top: -1px;
 }
 
-/* 恢复默认旋转按钮 🔄 */
+/* 恢复默认颜色按钮 */
 .sketch-float-reset-btn {
   width: 22px;
   height: 22px;

@@ -40,7 +40,9 @@
   <Transition name="zoom-fade">
     <div v-if="showIndicator || zoomLocked" class="zoom-indicator" @pointerdown.stop>
       <span class="zoom-indicator__value">{{ Math.round(viewportScale * 100) }}%</span>
-      <button class="zoom-indicator__lock" @click="toggleZoomLock">{{ zoomLocked ? '🔒' : '🔓' }}</button>
+      <button class="zoom-indicator__lock" @click="toggleZoomLock">
+        <IconParkIcon :name="zoomLocked ? 'Lock' : 'Unlock'" />
+      </button>
     </div>
   </Transition>
 </template>
@@ -117,6 +119,7 @@ import { shouldDrawFromPointer } from "./inputMode";
 import { createCanvasPointConverter } from "./viewport";
 import type { SketchInputSettings } from "./inputMode";
 import { createInsertElementPosition } from "./insertPosition";
+import IconParkIcon from "./IconParkIcon.vue";
 import type { OcrSearchResult } from "@/search/ocrIndex";
 import { isShapeEditorTool } from "./tools";
 import type { EditorTool } from "./tools";

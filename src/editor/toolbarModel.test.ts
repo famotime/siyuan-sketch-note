@@ -19,7 +19,7 @@ describe("editor toolbar model", () => {
     ]);
     expect(buttons.every((button) => button.icon.length > 0)).toBe(true);
     expect(buttons.find((button) => button.tool === "pen")).toMatchObject({
-      icon: "✏",
+      icon: "Write",
       labelKey: "pen",
     });
   });

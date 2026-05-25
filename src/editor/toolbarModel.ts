@@ -1,7 +1,8 @@
 import type { EditorTool } from "./tools";
+import type { IconParkName } from "./iconParkIcons";
 
 export interface EditorToolButton {
-  icon: string;
+  icon: IconParkName;
   labelKey: string;
   tool: EditorTool;
 }
@@ -15,13 +16,13 @@ export interface ToolOptionsVisibility {
 
 export function createEditorToolButtons(): EditorToolButton[] {
   return [
-    { icon: "✏", labelKey: "pen", tool: "pen" },
-    { icon: "▰", labelKey: "highlighter", tool: "highlighter" },
-    { icon: "⌫", labelKey: "eraser", tool: "eraser" },
-    { icon: "◇", labelKey: "lasso", tool: "lasso" },
-    { icon: "／", labelKey: "line", tool: "line" },
-    { icon: "T", labelKey: "text", tool: "text" },
-    { icon: "▧", labelKey: "image", tool: "image" },
+    { icon: "Write", labelKey: "pen", tool: "pen" },
+    { icon: "FormatBrush", labelKey: "highlighter", tool: "highlighter" },
+    { icon: "DeleteKey", labelKey: "eraser", tool: "eraser" },
+    { icon: "Selected", labelKey: "lasso", tool: "lasso" },
+    { icon: "Minus", labelKey: "line", tool: "line" },
+    { icon: "Text", labelKey: "text", tool: "text" },
+    { icon: "AddPic", labelKey: "image", tool: "image" },
   ];
 }
 
