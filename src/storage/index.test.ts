@@ -5,6 +5,8 @@ import {
   storageKey,
 } from ".";
 
+const legacyStorageKey = (blockId: string) => `sketch:${blockId}`;
+
 const stroke: Stroke = {
   id: "stroke-1",
   tool: "pen",
@@ -18,6 +20,35 @@ const stroke: Stroke = {
 };
 
 describe("sketch storage", () => {
+  it("uses a filesystem-safe storage key", () => {
+    const key = storageKey("block-1");
+
+    expect(key).toBe("sketch-block-1.json");
+    expect(key).not.toMatch(/[<>:"/\\|?*]/);
+  });
+
+  it("falls back to legacy colon-prefixed storage keys", async () => {
+    const keys: string[] = [];
+    const data = await loadSketchData(async (key) => {
+      keys.push(key);
+      return key === legacyStorageKey("block-1")
+        ? {
+            version: 1,
+            template: "blank",
+            canvasWidth: 800,
+            canvasHeight: 1200,
+            strokes: [stroke],
+          }
+        : null;
+    }, "block-1");
+
+    expect(keys).toEqual([
+      storageKey("block-1"),
+      legacyStorageKey("block-1"),
+    ]);
+    expect(data?.strokes).toHaveLength(1);
+  });
+
   it("loads legacy v1 data through migrations", async () => {
     const data = await loadSketchData(async (key) => {
       expect(key).toBe(storageKey("block-1"));

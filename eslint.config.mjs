@@ -1,6 +1,4 @@
 import antfu from '@antfu/eslint-config'
-import perfectionist from 'eslint-plugin-perfectionist'
-import i18nPlugin from './src/utils/eslint/i18n-validate-keys.mjs'
 
 export default antfu(
   {
@@ -44,17 +42,13 @@ export default antfu(
       'no-console': 'off',
       'no-empty': 'off',
 
-      'object-curly-newline': ['error', {
-        multiline: true,
-        minProperties: 2,
-        consistent: true,
-      }],
-      'object-property-newline': ['error', {
-        allowAllPropertiesOnSameLine: false,
-      }],
+      'object-curly-newline': 'off',
+      'object-property-newline': 'off',
 
       'style/arrow-parens': ['warn', 'always'],
       'style/brace-style': 'off',
+      'style/max-statements-per-line': 'off',
+      'style/member-delimiter-style': 'off',
       'style/no-multiple-empty-lines': ['warn', {
         max: 7,
       }],
@@ -65,6 +59,7 @@ export default antfu(
       }],
       'style/padded-blocks': 'off',
       'style/quotes': 'off',
+      'style/semi': ['error', 'always'],
 
       'ts/consistent-type-imports': 'off',
       'ts/explicit-function-return-type': 'off',
@@ -84,6 +79,11 @@ export default antfu(
       'regexp/no-unused-capturing-group': 'warn',
 
       'style/comma-dangle': ['error', 'always-multiline'],
+
+      'perfectionist/sort-imports': 'off',
+      'perfectionist/sort-named-imports': 'off',
+
+      'no-alert': 'off',
 
       'vue/block-order': ['warn', {
         order: ['template', 'script', 'style'],
@@ -114,15 +114,8 @@ export default antfu(
 
       'vue/valid-template-root': 'off',
 
-      'vue/object-curly-newline': ['error', {
-        multiline: true,
-        minProperties: 2,
-        consistent: true,
-      }],
-      'vue/object-property-newline': ['error', {
-        allowAllPropertiesOnSameLine: false,
-        allowMultiplePropertiesPerLine: true,
-      }],
+      'vue/object-curly-newline': 'off',
+      'vue/object-property-newline': 'off',
     },
   },
 )

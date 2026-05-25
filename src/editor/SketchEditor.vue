@@ -1,5 +1,8 @@
 <template>
-  <div v-if="visible" class="sketch-editor">
+  <div
+    v-if="visible"
+    class="sketch-editor"
+  >
     <div class="sketch-editor__header">
       <EditorTopBar
         v-model:templateId="currentTemplate"
@@ -114,6 +117,7 @@ import { ref, computed, onMounted, onUnmounted } from "vue";
 import type { SketchData, ToolPreset } from "@/types/sketch";
 import { PRESET_COLORS, HIGHLIGHTER_PRESET_COLORS } from "@/types/sketch";
 import { getAllTemplates } from "@/template";
+import { storageKey } from "@/storage";
 import { renderSketchPdfPageImages, renderSketchPngPageImage, thumbnailSketchDataAsync } from "@/storage/thumbnail";
 import { showMessage } from "siyuan";
 import { sketchAssetFileName, uploadDataUrlToAssets } from "@/utils/uploadPng";
@@ -286,7 +290,7 @@ function recolorSelection(c: string) {
 function deleteColor(color: string) {
   recentColors.value = recentColors.value.filter((c) => c !== color);
   showMessage(t("colorDeleted") || "已删除该颜色", 3000, "info");
-  
+
   if (activePreset.value.color === color) {
     const fallback = recentColors.value[0] ?? PRESET_COLORS[0];
     selectColor(fallback);
@@ -298,7 +302,7 @@ function deleteColor(color: string) {
 function resetDefaultColors() {
   recentColors.value = normalizeRecentColors(PRESET_COLORS);
   showMessage(t("colorReset") || "已恢复默认颜色设置", 3000, "info");
-  
+
   selectColor(PRESET_COLORS[0]);
   markDirty();
   if (autoSave.value) scheduleAutoSave();
@@ -408,7 +412,7 @@ async function runSave(): Promise<boolean> {
   try {
     const fileName = sketchAssetFileName(props.blockId);
     await uploadDataUrlToAssets(pngDataUrl, fileName);
-    await props.saveData(`sketch:${props.blockId}`, data);
+    await props.saveData(storageKey(props.blockId), data);
     saveStatus.value = "saved";
     lastSavedAt.value = Date.now();
     canvasRef.value.getState().isDirty = false;

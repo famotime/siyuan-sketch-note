@@ -4,10 +4,16 @@ import { recoverSketchData } from "./migrations";
 
 export { thumbnailCanvas } from "./thumbnail";
 
-const STORAGE_PREFIX = "sketch:";
+const STORAGE_PREFIX = "sketch-";
+const STORAGE_SUFFIX = ".json";
+const LEGACY_STORAGE_PREFIX = "sketch:";
 
 export function storageKey(blockId: string): string {
-  return `${STORAGE_PREFIX}${blockId}`;
+  return `${STORAGE_PREFIX}${blockId}${STORAGE_SUFFIX}`;
+}
+
+function legacyStorageKey(blockId: string): string {
+  return `${LEGACY_STORAGE_PREFIX}${blockId}`;
 }
 
 /**
@@ -16,10 +22,13 @@ export function storageKey(blockId: string): string {
  */
 export async function loadSketchData(
   loadData: (key: string) => Promise<any>,
-  blockId: string
+  blockId: string,
 ): Promise<SketchData | null> {
   const key = storageKey(blockId);
-  const raw = await loadData(key);
+  let raw = await loadData(key);
+  if (!raw) {
+    raw = await loadData(legacyStorageKey(blockId));
+  }
   if (!raw) return null;
 
   const recovery = recoverSketchData(raw);
@@ -35,7 +44,7 @@ export async function loadSketchData(
 export async function saveSketchData(
   saveData: (key: string, data: any) => Promise<void>,
   blockId: string,
-  data: SketchData
+  data: SketchData,
 ): Promise<void> {
   const key = storageKey(blockId);
   await saveData(key, data);
