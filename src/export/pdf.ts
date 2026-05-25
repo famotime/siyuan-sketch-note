@@ -164,13 +164,13 @@ function addPlaceholder(objects: string[]): number {
 }
 
 function parseImageDataUrl(dataUrl: string): { binary: string; filter: string } {
-  const match = /^data:(image\/jpeg);base64,(.+)$/i.exec(dataUrl);
+  const match = /^data:image\/jpeg;base64,(.+)$/i.exec(dataUrl);
   if (!match) {
     throw new Error("PDF export only supports JPEG data URLs");
   }
 
   return {
-    binary: atob(match[2]),
+    binary: atob(match[1]),
     filter: "/DCTDecode",
   };
 }

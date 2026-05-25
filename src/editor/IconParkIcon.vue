@@ -1,5 +1,9 @@
 <template>
-  <span class="sketch-icon" aria-hidden="true" v-html="markup" />
+  <span
+    class="sketch-icon"
+    aria-hidden="true"
+    v-html="markup"
+  />
 </template>
 
 <script setup lang="ts">

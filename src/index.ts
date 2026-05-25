@@ -191,7 +191,7 @@ export default class SketchNotePlugin extends Plugin {
    */
   private getCurrentDocId(): string | null {
     const editor = getActiveEditor();
-    // @ts-ignore - 运行时 protyle 存取
+    // @ts-expect-error - 运行时 protyle 存取
     return editor?.protyle?.block?.rootID || null;
   }
 
@@ -222,17 +222,17 @@ export default class SketchNotePlugin extends Plugin {
       // 2. 尝试通过高精度的“三重保障机制”获取当前编辑区内光标聚焦块的 ID
       let focusedBlockId: string | null = null;
       const editor = getActiveEditor();
-      
+
       if (editor?.protyle) {
         let range: Range | null = null;
         const selection = window.getSelection();
         if (selection && selection.rangeCount > 0) {
           range = selection.getRangeAt(0);
         }
-        
+
         // 【第一重保障】：如果常规选区为空，或选区超出了当前编辑区的 DOM 容器范围，
         // 则尝试读取思源 protyle 对象在失去焦点前暂存的 range 缓存
-        // @ts-ignore - 访问思源未公开的 protyle 运行时属性
+        // @ts-expect-error - 访问思源未公开的 protyle 运行时属性
         const protyleRange = editor.protyle.range || editor.protyle.toolbar?.range;
         if (!range || range.startContainer === document.body || !editor.protyle.wysiwyg?.element?.contains(range.startContainer)) {
           if (protyleRange) {

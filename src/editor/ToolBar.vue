@@ -9,7 +9,10 @@
         :aria-label="t('pen')"
         @click="$emit('selectTool', 'pen')"
       >
-        <span class="sketch-btn__icon" aria-hidden="true">
+        <span
+          class="sketch-btn__icon"
+          aria-hidden="true"
+        >
           <IconParkIcon name="Write" />
         </span>
       </button>
@@ -22,7 +25,10 @@
         :aria-label="t('highlighter')"
         @click="$emit('selectTool', 'highlighter')"
       >
-        <span class="sketch-btn__icon" aria-hidden="true">
+        <span
+          class="sketch-btn__icon"
+          aria-hidden="true"
+        >
           <IconParkIcon name="FormatBrush" />
         </span>
       </button>
@@ -35,7 +41,10 @@
         :aria-label="t('eraser')"
         @click="$emit('selectTool', 'eraser')"
       >
-        <span class="sketch-btn__icon" aria-hidden="true">
+        <span
+          class="sketch-btn__icon"
+          aria-hidden="true"
+        >
           <svg
             class="sketch-icon"
             viewBox="0 0 48 48"
@@ -82,7 +91,10 @@
         :aria-label="t('lasso')"
         @click="$emit('selectTool', 'lasso')"
       >
-        <span class="sketch-btn__icon" aria-hidden="true">
+        <span
+          class="sketch-btn__icon"
+          aria-hidden="true"
+        >
           <IconParkIcon name="Selected" />
         </span>
       </button>
@@ -95,7 +107,10 @@
         :aria-label="t('shape')"
         @click="$emit('selectTool', lastShapeTool)"
       >
-        <span class="sketch-btn__icon" aria-hidden="true">
+        <span
+          class="sketch-btn__icon"
+          aria-hidden="true"
+        >
           <IconParkIcon :name="currentShapeIcon" />
         </span>
       </button>
@@ -108,7 +123,10 @@
         :aria-label="t('text')"
         @click="$emit('selectTool', 'text')"
       >
-        <span class="sketch-btn__icon" aria-hidden="true">
+        <span
+          class="sketch-btn__icon"
+          aria-hidden="true"
+        >
           <IconParkIcon name="Text" />
         </span>
       </button>
@@ -121,7 +139,10 @@
         :aria-label="t('image')"
         @click="$emit('selectTool', 'image')"
       >
-        <span class="sketch-btn__icon" aria-hidden="true">
+        <span
+          class="sketch-btn__icon"
+          aria-hidden="true"
+        >
           <IconParkIcon name="AddPic" />
         </span>
       </button>
@@ -175,9 +196,9 @@ const currentShapeIcon = computed<IconParkName>(() => {
 
 /* ── 统一的第二行极简磨砂工具按钮 ── */
 .sketch-btn--tool {
-  background: rgba(255, 255, 255, 0.05) !important;
-  border: 1px solid rgba(255, 255, 255, 0.08) !important;
-  color: rgba(255, 255, 255, 0.75) !important;
+  background: var(--sketch-toolbar-control-bg) !important;
+  border: 1px solid var(--sketch-toolbar-control-border) !important;
+  color: var(--sketch-toolbar-text) !important;
   border-radius: 8px;
   font-size: 13px;
   min-height: 30px;
@@ -192,9 +213,9 @@ const currentShapeIcon = computed<IconParkName>(() => {
   box-sizing: border-box;
 }
 .sketch-btn--tool:hover {
-  background: rgba(255, 255, 255, 0.12) !important;
-  border-color: rgba(255, 255, 255, 0.15) !important;
-  color: #fff !important;
+  background: var(--sketch-toolbar-border) !important;
+  border-color: var(--sketch-toolbar-hover-bg) !important;
+  color: var(--sketch-toolbar-strong-text) !important;
   transform: scale(1.03);
 }
 .sketch-btn--tool:active {
@@ -205,7 +226,7 @@ const currentShapeIcon = computed<IconParkName>(() => {
 .sketch-btn--tool-active,
 .sketch-btn--tool.sketch-btn--tool-active:hover {
   background: var(--b3-theme-primary) !important;
-  color: #fff !important;
+  color: var(--sketch-toolbar-strong-text) !important;
   border-color: transparent !important;
   box-shadow: 0 4px 12px rgba(var(--b3-theme-primary-rgb), 0.25);
 }

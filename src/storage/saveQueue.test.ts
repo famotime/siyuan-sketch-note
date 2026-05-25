@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { SaveQueue } from "./saveQueue";
 
-describe("SaveQueue", () => {
+describe("saveQueue", () => {
   it("runs save jobs serially in request order", async () => {
     const queue = new SaveQueue();
     const events: string[] = [];

@@ -6,13 +6,20 @@
     :style="{ left: `${pos.left}px`, top: `${pos.top}px` }"
   >
     <!-- 拖动手柄 -->
-    <div class="sketch-float-panel__handle" @mousedown="onDragStart" @touchstart="onDragStart">
+    <div
+      class="sketch-float-panel__handle"
+      @mousedown="onDragStart"
+      @touchstart="onDragStart"
+    >
       <span class="sketch-float-panel__handle-dot" />
       <span class="sketch-float-panel__handle-dot" />
     </div>
 
     <!-- 1. 形状工具选择（仅在选择图形工具时显示在最上方） -->
-    <div v-if="isShapeMode" class="sketch-float-group sketch-float-group--shapes">
+    <div
+      v-if="isShapeMode"
+      class="sketch-float-group sketch-float-group--shapes"
+    >
       <button
         v-for="shape in shapeOptions"
         :key="shape.tool"
@@ -27,7 +34,10 @@
     </div>
 
     <!-- 2. 套索操作（仅在选择套索工具时显示） -->
-    <div v-if="activeTool === 'lasso'" class="sketch-float-group">
+    <div
+      v-if="activeTool === 'lasso'"
+      class="sketch-float-group"
+    >
       <!-- 套索模式切换 -->
       <div class="sketch-float-mode-select">
         <button
@@ -91,7 +101,10 @@
     </div>
 
     <!-- 3. 橡配擦模式切换（仅在橡皮擦模式下显示） -->
-    <div v-if="activeTool === 'eraser'" class="sketch-float-group">
+    <div
+      v-if="activeTool === 'eraser'"
+      class="sketch-float-group"
+    >
       <div class="sketch-float-mode-select">
         <button
           class="sketch-float-mode-btn"
@@ -114,9 +127,15 @@
     </div>
 
     <!-- 4. 颜色调色盘（画笔、荧光笔、图形工具需要） -->
-    <div v-if="hasColorPalette" class="sketch-float-group sketch-float-colors">
+    <div
+      v-if="hasColorPalette"
+      class="sketch-float-group sketch-float-colors"
+    >
       <!-- 可滑动查看区域 -->
-      <div ref="colorsScrollRef" class="sketch-float-colors-scroll">
+      <div
+        ref="colorsScrollRef"
+        class="sketch-float-colors-scroll"
+      >
         <button
           v-for="c in colors"
           :key="c"
@@ -130,7 +149,10 @@
           @touchmove="onColorTouchMove"
           @contextmenu.prevent="$emit('deleteColor', c)"
         >
-          <span v-if="preset.color === c" class="sketch-float-color-dot" />
+          <span
+            v-if="preset.color === c"
+            class="sketch-float-color-dot"
+          />
         </button>
       </div>
 
@@ -168,7 +190,11 @@
     </div>
 
     <!-- 5. 粗细调节（三个常用粗细小圆点 + 滑动条） -->
-    <div v-if="hasStrokeControls" ref="widthControlRef" class="sketch-float-group sketch-float-widths">
+    <div
+      v-if="hasStrokeControls"
+      ref="widthControlRef"
+      class="sketch-float-group sketch-float-widths"
+    >
       <div class="sketch-float-widths-presets">
         <button
           v-for="sz in widthPresets"
@@ -194,7 +220,10 @@
         <span class="sketch-val-text">{{ preset.width }}px</span>
       </button>
 
-      <div v-if="showWidthSlider" class="sketch-float-slider-popover">
+      <div
+        v-if="showWidthSlider"
+        class="sketch-float-slider-popover"
+      >
         <div class="sketch-float-slider-header">
           <span>{{ activeTool === 'text' ? t('fontSize') : t('width') }}: {{ preset.width }}px</span>
         </div>
@@ -206,11 +235,18 @@
           @input="emitWidth(($event.target as HTMLInputElement).value)"
         >
       </div>
-      <div v-if="hasOpacityControl" class="sketch-float-divider" />
+      <div
+        v-if="hasOpacityControl"
+        class="sketch-float-divider"
+      />
     </div>
 
     <!-- 6. 透明度调节（仅在支持透明度调节时显示） -->
-    <div v-if="hasOpacityControl" ref="opacityControlRef" class="sketch-float-group sketch-float-opacity">
+    <div
+      v-if="hasOpacityControl"
+      ref="opacityControlRef"
+      class="sketch-float-group sketch-float-opacity"
+    >
       <button
         class="sketch-float-slider-toggle"
         :class="{ 'sketch-float-slider-toggle--active': showOpacitySlider }"
@@ -220,7 +256,10 @@
         <span class="sketch-val-text">{{ Math.round(preset.opacity * 100) }}%</span>
       </button>
 
-      <div v-if="showOpacitySlider" class="sketch-float-slider-popover">
+      <div
+        v-if="showOpacitySlider"
+        class="sketch-float-slider-popover"
+      >
         <div class="sketch-float-slider-header">
           <span>{{ t('opacity') }}: {{ Math.round(preset.opacity * 100) }}%</span>
         </div>
@@ -281,7 +320,7 @@ function onDragStart(e: MouseEvent | TouchEvent) {
   isDragging = true;
   const clientX = e instanceof MouseEvent ? e.clientX : e.touches[0].clientX;
   const clientY = e instanceof MouseEvent ? e.clientY : e.touches[0].clientY;
-  
+
   dragStartOffset = {
     x: clientX - pos.value.left,
     y: clientY - pos.value.top,
@@ -348,7 +387,7 @@ watch(
       });
     }
   },
-  { deep: true }
+  { deep: true },
 );
 
 // ── 移动端长按手势删除颜色 ──
@@ -555,12 +594,12 @@ onUnmounted(() => {
   position: absolute;
   z-index: 1000;
   width: 56px;
-  background: rgba(28, 28, 30, 0.88);
+  background: var(--sketch-toolbar-surface);
   backdrop-filter: blur(14px) saturate(160%);
   -webkit-backdrop-filter: blur(14px) saturate(160%);
-  border: 1px solid rgba(255, 255, 255, 0.12);
+  border: 1px solid var(--sketch-toolbar-border);
   border-radius: 20px;
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.28), 0 2px 8px rgba(0, 0, 0, 0.12);
+  box-shadow: var(--sketch-toolbar-shadow);
   padding: 10px 6px;
   box-sizing: border-box;
   display: flex;
@@ -572,7 +611,7 @@ onUnmounted(() => {
 }
 
 .sketch-float-panel:hover {
-  box-shadow: 0 12px 35px rgba(0, 0, 0, 0.35), 0 4px 12px rgba(0, 0, 0, 0.15);
+  box-shadow: var(--sketch-toolbar-hover-shadow);
 }
 
 /* 拖拽手柄：置于面板顶部，设计为极简的小圆点/横杠，增强仪式感 */
@@ -591,18 +630,18 @@ onUnmounted(() => {
   width: 14px;
   height: 2px;
   border-radius: 1px;
-  background: rgba(255, 255, 255, 0.35);
+  background: var(--sketch-toolbar-hover-border);
   transition: background-color 0.2s ease;
 }
 .sketch-float-panel__handle:hover .sketch-float-panel__handle-dot {
-  background: rgba(255, 255, 255, 0.6);
+  background: var(--sketch-toolbar-muted-text);
 }
 
 /* 分割线 */
 .sketch-float-divider {
   width: 32px;
   height: 1px;
-  background: rgba(255, 255, 255, 0.1);
+  background: var(--sketch-toolbar-separator);
   margin: 6px 0;
 }
 
@@ -621,7 +660,7 @@ onUnmounted(() => {
   height: 36px;
   border: 1px solid transparent;
   background: transparent;
-  color: rgba(255, 255, 255, 0.7);
+  color: var(--sketch-toolbar-text);
   border-radius: 10px;
   cursor: pointer;
   display: flex;
@@ -632,8 +671,8 @@ onUnmounted(() => {
   outline: none;
 }
 .sketch-float-btn:hover {
-  background: rgba(255, 255, 255, 0.1);
-  color: #fff;
+  background: var(--sketch-toolbar-separator);
+  color: var(--sketch-toolbar-strong-text);
   transform: scale(1.05);
 }
 .sketch-float-btn:active {
@@ -641,9 +680,9 @@ onUnmounted(() => {
 }
 .sketch-float-btn--active {
   background: var(--b3-theme-primary) !important;
-  color: #fff !important;
-  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.25);
-  border-color: rgba(255, 255, 255, 0.1);
+  color: var(--sketch-toolbar-strong-text) !important;
+  box-shadow: var(--sketch-toolbar-active-shadow);
+  border-color: var(--sketch-toolbar-separator);
 }
 
 /* 模式切换：像素/整笔，自由/框选 等 */
@@ -651,17 +690,17 @@ onUnmounted(() => {
   display: flex;
   flex-direction: column;
   gap: 3px;
-  background: rgba(255, 255, 255, 0.05);
+  background: var(--sketch-toolbar-control-bg);
   padding: 2px;
   border-radius: 8px;
-  border: 1px solid rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--sketch-toolbar-control-bg);
 }
 .sketch-float-mode-btn {
   width: 38px;
   height: 22px;
   border: none;
   background: transparent;
-  color: rgba(255, 255, 255, 0.55);
+  color: var(--sketch-toolbar-muted-text);
   border-radius: 6px;
   font-size: 11px;
   cursor: pointer;
@@ -671,11 +710,11 @@ onUnmounted(() => {
   text-align: center;
 }
 .sketch-float-mode-btn:hover {
-  color: #fff;
+  color: var(--sketch-toolbar-strong-text);
 }
 .sketch-float-mode-btn--active {
-  background: rgba(255, 255, 255, 0.18);
-  color: #fff;
+  background: var(--sketch-toolbar-hover-border);
+  color: var(--sketch-toolbar-strong-text);
   font-weight: 500;
 }
 
@@ -684,9 +723,9 @@ onUnmounted(() => {
   width: 38px;
   height: 38px;
   border-radius: 10px;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  background: rgba(255, 255, 255, 0.04);
-  color: rgba(255, 255, 255, 0.85);
+  border: 1px solid var(--sketch-toolbar-control-border);
+  background: var(--sketch-toolbar-control-bg);
+  color: var(--sketch-toolbar-text);
   cursor: pointer;
   display: flex;
   flex-direction: column;
@@ -697,21 +736,21 @@ onUnmounted(() => {
   padding: 0;
 }
 .sketch-float-action-btn:hover {
-  background: rgba(255, 255, 255, 0.15);
+  background: var(--sketch-toolbar-hover-bg);
   transform: scale(1.05);
-  border-color: rgba(255, 255, 255, 0.2);
+  border-color: var(--sketch-toolbar-hover-border);
 }
 .sketch-float-action-btn:active {
   transform: scale(0.92);
 }
 .sketch-float-action-btn--active {
-  background: rgba(255, 255, 255, 0.18) !important;
-  border-color: rgba(255, 255, 255, 0.25) !important;
-  color: #fff !important;
+  background: var(--sketch-toolbar-hover-border) !important;
+  border-color: var(--sketch-toolbar-hover-border) !important;
+  color: var(--sketch-toolbar-strong-text) !important;
 }
 .sketch-float-action-label {
   font-size: 8px;
-  color: rgba(255, 255, 255, 0.5);
+  color: var(--sketch-toolbar-muted-text);
   margin-top: 1px;
   transform: scale(0.9);
   max-width: 34px;
@@ -747,7 +786,7 @@ onUnmounted(() => {
   width: 26px;
   height: 26px;
   border-radius: 50%;
-  border: 2px solid rgba(255, 255, 255, 0.15);
+  border: 2px solid var(--sketch-toolbar-hover-bg);
   cursor: pointer;
   transition: all 0.2s ease;
   display: flex;
@@ -760,18 +799,18 @@ onUnmounted(() => {
 }
 .sketch-float-color:hover {
   transform: scale(1.15);
-  border-color: rgba(255, 255, 255, 0.5);
+  border-color: var(--sketch-toolbar-muted-text);
 }
 .sketch-float-color--active {
-  border-color: #fff !important;
+  border-color: var(--sketch-toolbar-strong-text) !important;
   transform: scale(1.1);
-  box-shadow: 0 0 8px rgba(255, 255, 255, 0.35);
+  box-shadow: 0 0 8px var(--sketch-toolbar-hover-border);
 }
 .sketch-float-color-dot {
   width: 6px;
   height: 6px;
   border-radius: 50%;
-  background: #fff;
+  background: var(--sketch-toolbar-strong-text);
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.4);
 }
 
@@ -791,8 +830,8 @@ onUnmounted(() => {
   width: 22px;
   height: 22px;
   border-radius: 50%;
-  border: 1px dashed rgba(255, 255, 255, 0.4);
-  color: rgba(255, 255, 255, 0.6);
+  border: 1px dashed var(--sketch-toolbar-muted-text);
+  color: var(--sketch-toolbar-muted-text);
   cursor: pointer;
   display: inline-flex;
   align-items: center;
@@ -801,14 +840,14 @@ onUnmounted(() => {
   transition: all 0.2s ease;
   box-sizing: border-box;
   overflow: hidden;
-  background: rgba(255, 255, 255, 0.03);
+  background: var(--sketch-toolbar-control-bg);
 }
 .sketch-float-color-picker:hover,
 .sketch-float-color-picker--open {
-  border-color: #fff;
-  color: #fff;
+  border-color: var(--sketch-toolbar-strong-text);
+  color: var(--sketch-toolbar-strong-text);
   transform: scale(1.1);
-  background: rgba(255, 255, 255, 0.08);
+  background: var(--sketch-toolbar-control-border);
 }
 .sketch-float-color-picker .plus-icon {
   margin-top: -1px;
@@ -819,9 +858,9 @@ onUnmounted(() => {
   width: 22px;
   height: 22px;
   border-radius: 50%;
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  background: rgba(255, 255, 255, 0.04);
-  color: rgba(255, 255, 255, 0.6);
+  border: 1px solid var(--sketch-toolbar-hover-border);
+  background: var(--sketch-toolbar-control-bg);
+  color: var(--sketch-toolbar-muted-text);
   cursor: pointer;
   display: inline-flex;
   align-items: center;
@@ -832,9 +871,9 @@ onUnmounted(() => {
   box-sizing: border-box;
 }
 .sketch-float-reset-btn:hover {
-  border-color: #fff;
-  color: #fff;
-  background: rgba(255, 255, 255, 0.15);
+  border-color: var(--sketch-toolbar-strong-text);
+  color: var(--sketch-toolbar-strong-text);
+  background: var(--sketch-toolbar-hover-bg);
   transform: scale(1.1);
 }
 .sketch-float-reset-btn:active {
@@ -870,24 +909,24 @@ onUnmounted(() => {
   transition: all 0.2s ease;
 }
 .sketch-float-width-circle:hover {
-  background: rgba(255, 255, 255, 0.08);
+  background: var(--sketch-toolbar-control-border);
 }
 .sketch-float-width-circle--active {
-  background: rgba(255, 255, 255, 0.16) !important;
-  border-color: rgba(255, 255, 255, 0.35) !important;
+  background: var(--sketch-toolbar-hover-bg) !important;
+  border-color: var(--sketch-toolbar-hover-border) !important;
 }
 .sketch-float-width-dot {
   border-radius: 50%;
-  background: #fff;
+  background: var(--sketch-toolbar-strong-text);
   box-shadow: 0 1px 2px rgba(0,0,0,0.3);
 }
 
 /* 精细调节触点与浮窗 */
 .sketch-float-slider-toggle {
-  background: rgba(255, 255, 255, 0.04);
-  border: 1px solid rgba(255, 255, 255, 0.06);
+  background: var(--sketch-toolbar-control-bg);
+  border: 1px solid var(--sketch-toolbar-control-bg);
   border-radius: 8px;
-  color: rgba(255, 255, 255, 0.65);
+  color: var(--sketch-toolbar-muted-text);
   font-size: 11px;
   padding: 4px 2px;
   width: 38px;
@@ -904,12 +943,12 @@ onUnmounted(() => {
   font-weight: 500;
 }
 .sketch-float-slider-toggle:hover {
-  color: #fff;
-  background: rgba(255, 255, 255, 0.12);
-  border-color: rgba(255, 255, 255, 0.18);
+  color: var(--sketch-toolbar-strong-text);
+  background: var(--sketch-toolbar-border);
+  border-color: var(--sketch-toolbar-hover-border);
 }
 .sketch-float-slider-toggle--active {
-  color: #fff;
+  color: var(--sketch-toolbar-strong-text);
   background: var(--b3-theme-primary);
   border-color: transparent;
 }
@@ -923,12 +962,12 @@ onUnmounted(() => {
   position: absolute;
   left: 62px;
   bottom: 0;
-  background: rgba(28, 28, 30, 0.95);
+  background: var(--sketch-toolbar-popover-surface);
   backdrop-filter: blur(10px);
-  border: 1px solid rgba(255, 255, 255, 0.15);
+  border: 1px solid var(--sketch-toolbar-hover-bg);
   border-radius: 12px;
   padding: 8px 10px;
-  box-shadow: 0 6px 20px rgba(0,0,0,0.3);
+  box-shadow: var(--sketch-toolbar-shadow);
   display: flex;
   flex-direction: column;
   gap: 6px;
@@ -937,7 +976,7 @@ onUnmounted(() => {
 }
 .sketch-float-slider-header {
   font-size: 11px;
-  color: rgba(255, 255, 255, 0.7);
+  color: var(--sketch-toolbar-text);
   display: flex;
   justify-content: space-between;
 }

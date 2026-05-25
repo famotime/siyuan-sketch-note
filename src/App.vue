@@ -42,7 +42,7 @@ export async function openSketchEditor(blockId: string) {
     editorData.value = await loadSketchData(loadDataFn, blockId);
   } catch (e) {
     console.error("[Sketch Note] Failed to load sketch data:", e);
-    showMessage("Sketch Note: " + (pluginI18n.value["loadFailed"] || "Data load failed"), 5000, "error");
+    showMessage(`Sketch Note: ${pluginI18n.value.loadFailed || "Data load failed"}`, 5000, "error");
     editorData.value = null;
   }
   editorVisible.value = true;

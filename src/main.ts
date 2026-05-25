@@ -1,6 +1,5 @@
 import { createApp } from "vue";
-import App from "./App.vue";
-import { setI18n, setSaveDataFn, setLoadDataFn } from "./App.vue";
+import App, { setSaveDataFn, setLoadDataFn } from "./App.vue";
 import type { Plugin } from "siyuan";
 
 let app: ReturnType<typeof createApp> | null = null;

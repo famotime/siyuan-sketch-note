@@ -83,6 +83,6 @@ function assertSketchDataShape(raw: unknown): asserts raw is SketchData {
   }
 
   if (!Array.isArray(candidate.strokes)) {
-    throw new Error("Sketch data strokes field is not an array");
+    throw new TypeError("Sketch data strokes field is not an array");
   }
 }

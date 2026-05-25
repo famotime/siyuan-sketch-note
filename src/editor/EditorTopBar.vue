@@ -8,14 +8,32 @@
     >
       <IconParkIcon name="ArrowLeft" />
     </button>
-    <span v-if="recovered" class="sketch-recovery">{{ t("dataRecovered") }}</span>
+    <span
+      v-if="recovered"
+      class="sketch-recovery"
+    >{{ t("dataRecovered") }}</span>
 
-    <div v-if="false" class="sketch-pages">
-      <button class="sketch-btn sketch-btn--page" :disabled="pageState.current <= 1" @click="$emit('previousPage')">‹</button>
-      <button class="sketch-btn sketch-btn--page-label" @click="$emit('goToPage', pageState.current - 1)">
+    <div
+      v-if="false"
+      class="sketch-pages"
+    >
+      <button
+        class="sketch-btn sketch-btn--page"
+        :disabled="pageState.current <= 1"
+        @click="$emit('previousPage')"
+      >
+        ‹
+      </button>
+      <button
+        class="sketch-btn sketch-btn--page-label"
+        @click="$emit('goToPage', pageState.current - 1)"
+      >
         {{ t("page") }} {{ pageState.current }} / {{ pageState.total }}
       </button>
-      <div class="sketch-page-overview" :aria-label="t('pageOverview')">
+      <div
+        class="sketch-page-overview"
+        :aria-label="t('pageOverview')"
+      >
         <button
           v-for="page in pageOverview"
           :key="page.id"
@@ -30,10 +48,30 @@
           {{ page.pageNumber }}
         </button>
       </div>
-      <button class="sketch-btn sketch-btn--page" :disabled="pageState.current >= pageState.total" @click="$emit('nextPage')">›</button>
-      <button class="sketch-btn sketch-btn--page-add" @click="$emit('addPage')">+ {{ t("addPage") }}</button>
-      <button class="sketch-btn sketch-btn--page-add" @click="$emit('duplicatePage')">⧉ {{ t("duplicatePage") }}</button>
-      <button class="sketch-btn sketch-btn--page-add" :disabled="pageState.total <= 1" @click="$emit('deletePage')">
+      <button
+        class="sketch-btn sketch-btn--page"
+        :disabled="pageState.current >= pageState.total"
+        @click="$emit('nextPage')"
+      >
+        ›
+      </button>
+      <button
+        class="sketch-btn sketch-btn--page-add"
+        @click="$emit('addPage')"
+      >
+        + {{ t("addPage") }}
+      </button>
+      <button
+        class="sketch-btn sketch-btn--page-add"
+        @click="$emit('duplicatePage')"
+      >
+        ⧉ {{ t("duplicatePage") }}
+      </button>
+      <button
+        class="sketch-btn sketch-btn--page-add"
+        :disabled="pageState.total <= 1"
+        @click="$emit('deletePage')"
+      >
         <IconParkIcon name="Delete" /> {{ t("deletePage") }}
       </button>
     </div>
@@ -47,7 +85,11 @@
     >
       {{ ocrState === "recognizing" ? t("ocrRecognizing") : t("ocrRecognize") }}
     </button>
-    <div v-if="false" class="sketch-search" :class="{ 'sketch-search--open': searchOpen }">
+    <div
+      v-if="false"
+      class="sketch-search"
+      :class="{ 'sketch-search--open': searchOpen }"
+    >
       <button
         class="sketch-btn sketch-btn--toggle"
         :class="{ 'sketch-btn--toggle-on': searchOpen }"
@@ -55,7 +97,10 @@
       >
         {{ t("search") }}
       </button>
-      <div v-if="searchOpen" class="sketch-search__bar">
+      <div
+        v-if="searchOpen"
+        class="sketch-search__bar"
+      >
         <input
           ref="searchInputRef"
           class="sketch-search__input"
@@ -65,12 +110,33 @@
           @keydown.enter="$emit('searchNext')"
           @keydown.escape="onClearSearch"
         >
-        <span v-if="searchQuery" class="sketch-search__count">
+        <span
+          v-if="searchQuery"
+          class="sketch-search__count"
+        >
           {{ searchResultCount > 0 ? `${searchResultCount}` : t("noResults") }}
         </span>
-        <button v-if="searchQuery && searchResultCount > 0" class="sketch-btn sketch-btn--page" @click="$emit('searchPrev')">&#8249;</button>
-        <button v-if="searchQuery && searchResultCount > 0" class="sketch-btn sketch-btn--page" @click="$emit('searchNext')">&#8250;</button>
-        <button v-if="searchQuery" class="sketch-btn sketch-btn--page" @click="onClearSearch">&#x2715;</button>
+        <button
+          v-if="searchQuery && searchResultCount > 0"
+          class="sketch-btn sketch-btn--page"
+          @click="$emit('searchPrev')"
+        >
+          &#8249;
+        </button>
+        <button
+          v-if="searchQuery && searchResultCount > 0"
+          class="sketch-btn sketch-btn--page"
+          @click="$emit('searchNext')"
+        >
+          &#8250;
+        </button>
+        <button
+          v-if="searchQuery"
+          class="sketch-btn sketch-btn--page"
+          @click="onClearSearch"
+        >
+          &#x2715;
+        </button>
       </div>
     </div>
     <button
@@ -84,13 +150,27 @@
       <span class="sketch-btn__zen-label">{{ t('zenMode') }}</span>
     </button>
     <span class="sketch-sep" />
-    <button class="sketch-btn sketch-btn--action" :disabled="!canUndo" :title="t('undo')" @click="$emit('undo')">
+    <button
+      class="sketch-btn sketch-btn--action"
+      :disabled="!canUndo"
+      :title="t('undo')"
+      @click="$emit('undo')"
+    >
       <IconParkIcon name="Undo" />
     </button>
-    <button class="sketch-btn sketch-btn--action" :disabled="!canRedo" :title="t('redo')" @click="$emit('redo')">
+    <button
+      class="sketch-btn sketch-btn--action"
+      :disabled="!canRedo"
+      :title="t('redo')"
+      @click="$emit('redo')"
+    >
       <IconParkIcon name="Redo" />
     </button>
-    <button class="sketch-btn sketch-btn--action" :title="t('clear')" @click="$emit('clear')">
+    <button
+      class="sketch-btn sketch-btn--action"
+      :title="t('clear')"
+      @click="$emit('clear')"
+    >
       <IconParkIcon name="Clear" />
     </button>
     <span class="sketch-sep" />
@@ -163,11 +243,39 @@
         </label>
       </div>
     </div>
-    <button v-if="false" class="sketch-btn sketch-btn--action" @click="$emit('exportPng')">⇩ {{ t("exportPng") }}</button>
-    <button v-if="false" class="sketch-btn sketch-btn--action" @click="$emit('exportPdf')">⇩ {{ t("exportPdf") }}</button>
-    <button v-if="false" class="sketch-btn sketch-btn--action" @click="$emit('exportJson')">⇩ {{ t("exportJson") }}</button>
-    <button v-if="false" class="sketch-btn sketch-btn--action" @click="$emit('importJson')">⇧ {{ t("importJson") }}</button>
-    <button v-if="false" class="sketch-btn sketch-btn--action" @click="$emit('importBackground')">
+    <button
+      v-if="false"
+      class="sketch-btn sketch-btn--action"
+      @click="$emit('exportPng')"
+    >
+      ⇩ {{ t("exportPng") }}
+    </button>
+    <button
+      v-if="false"
+      class="sketch-btn sketch-btn--action"
+      @click="$emit('exportPdf')"
+    >
+      ⇩ {{ t("exportPdf") }}
+    </button>
+    <button
+      v-if="false"
+      class="sketch-btn sketch-btn--action"
+      @click="$emit('exportJson')"
+    >
+      ⇩ {{ t("exportJson") }}
+    </button>
+    <button
+      v-if="false"
+      class="sketch-btn sketch-btn--action"
+      @click="$emit('importJson')"
+    >
+      ⇧ {{ t("importJson") }}
+    </button>
+    <button
+      v-if="false"
+      class="sketch-btn sketch-btn--action"
+      @click="$emit('importBackground')"
+    >
       <IconParkIcon name="AddPic" /> {{ t("importBackground") }}
     </button>
   </div>
@@ -180,7 +288,7 @@ import type { Template } from "@/template";
 import IconParkIcon from "./IconParkIcon.vue";
 import { createZenToggleState } from "./zenMode";
 
-const props = defineProps<{
+defineProps<{
   backgroundFit?: string;
   canRedo: boolean;
   canUndo: boolean;
@@ -275,9 +383,9 @@ function onClearSearch() {
 
 /* ── 统一的悬浮顶栏按钮 ── */
 .sketch-btn {
-  background: rgba(255, 255, 255, 0.05) !important;
-  border: 1px solid rgba(255, 255, 255, 0.08) !important;
-  color: rgba(255, 255, 255, 0.8) !important;
+  background: var(--sketch-toolbar-control-bg) !important;
+  border: 1px solid var(--sketch-toolbar-control-border) !important;
+  color: var(--sketch-toolbar-text) !important;
   border-radius: 8px;
   padding: 4px 10px;
   cursor: pointer;
@@ -291,9 +399,9 @@ function onClearSearch() {
   box-sizing: border-box;
 }
 .sketch-btn:hover {
-  background: rgba(255, 255, 255, 0.15) !important;
-  border-color: rgba(255, 255, 255, 0.18) !important;
-  color: #fff !important;
+  background: var(--sketch-toolbar-hover-bg) !important;
+  border-color: var(--sketch-toolbar-hover-border) !important;
+  color: var(--sketch-toolbar-strong-text) !important;
   transform: scale(1.03);
 }
 .sketch-btn:active {
@@ -301,8 +409,8 @@ function onClearSearch() {
 }
 
 .sketch-btn--back {
-  background: rgba(255, 255, 255, 0.08) !important;
-  border-color: rgba(255, 255, 255, 0.12) !important;
+  background: var(--sketch-toolbar-control-border) !important;
+  border-color: var(--sketch-toolbar-border) !important;
   font-weight: 500;
 }
 
@@ -311,7 +419,7 @@ function onClearSearch() {
   min-width: 78px;
   background: rgba(var(--b3-theme-primary-rgb), 0.18) !important;
   border-color: rgba(var(--b3-theme-primary-rgb), 0.35) !important;
-  color: #fff !important;
+  color: var(--sketch-toolbar-strong-text) !important;
 }
 .sketch-btn--zen:hover {
   background: rgba(var(--b3-theme-primary-rgb), 0.28) !important;
@@ -324,9 +432,9 @@ function onClearSearch() {
 
 /* ── 下拉选择菜单 ── */
 .sketch-select {
-  background: rgba(255, 255, 255, 0.05) !important;
-  border: 1px solid rgba(255, 255, 255, 0.08) !important;
-  color: rgba(255, 255, 255, 0.8) !important;
+  background: var(--sketch-toolbar-control-bg) !important;
+  border: 1px solid var(--sketch-toolbar-control-border) !important;
+  color: var(--sketch-toolbar-text) !important;
   border-radius: 8px;
   padding: 4px 10px;
   font-size: 13px;
@@ -337,13 +445,13 @@ function onClearSearch() {
   box-sizing: border-box;
 }
 .sketch-select:hover {
-  background: rgba(255, 255, 255, 0.12) !important;
-  border-color: rgba(255, 255, 255, 0.18) !important;
-  color: #fff !important;
+  background: var(--sketch-toolbar-border) !important;
+  border-color: var(--sketch-toolbar-hover-border) !important;
+  color: var(--sketch-toolbar-strong-text) !important;
 }
 .sketch-select option {
   background: #1c1c1e;
-  color: #fff;
+  color: var(--sketch-toolbar-strong-text);
 }
 
 /* 恢复损坏提示 */
@@ -358,7 +466,7 @@ function onClearSearch() {
 .sketch-sep {
   width: 1px;
   height: 20px;
-  background: rgba(255, 255, 255, 0.12);
+  background: var(--sketch-toolbar-border);
   margin: 0 4px;
   flex-shrink: 0;
 }
@@ -372,17 +480,17 @@ function onClearSearch() {
   position: relative;
 }
 .sketch-btn--more {
-  background: rgba(255, 255, 255, 0.06) !important;
-  border-color: rgba(255, 255, 255, 0.1) !important;
+  background: var(--sketch-toolbar-control-bg) !important;
+  border-color: var(--sketch-toolbar-separator) !important;
   padding: 3px 8px;
 }
 .sketch-btn--more :deep(.sketch-icon) {
   font-size: 16px;
 }
 .sketch-btn--more-on {
-  background: rgba(255, 255, 255, 0.18) !important;
+  background: var(--sketch-toolbar-hover-border) !important;
   border-color: var(--b3-theme-primary) !important;
-  color: #fff !important;
+  color: var(--sketch-toolbar-strong-text) !important;
 }
 
 /* ── 更多弹出菜单 ── */
@@ -391,13 +499,13 @@ function onClearSearch() {
   top: calc(100% + 6px);
   right: 0;
   min-width: 180px;
-  background: rgba(28, 28, 30, 0.95);
+  background: var(--sketch-toolbar-popover-surface);
   backdrop-filter: blur(14px) saturate(160%);
   -webkit-backdrop-filter: blur(14px) saturate(160%);
-  border: 1px solid rgba(255, 255, 255, 0.12);
+  border: 1px solid var(--sketch-toolbar-border);
   border-radius: 12px;
   padding: 6px 0;
-  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.35), 0 2px 8px rgba(0, 0, 0, 0.15);
+  box-shadow: var(--sketch-toolbar-shadow);
   z-index: 1100;
   animation: sketch-pop-in 0.15s ease-out;
 }
@@ -424,11 +532,11 @@ function onClearSearch() {
   cursor: default;
 }
 .sketch-more-row:hover {
-  background: rgba(255, 255, 255, 0.06);
+  background: var(--sketch-toolbar-control-bg);
 }
 .sketch-more-label {
   font-size: 13px;
-  color: rgba(255, 255, 255, 0.85);
+  color: var(--sketch-toolbar-text);
 }
 .sketch-select--menu {
   width: 100%;
@@ -440,8 +548,8 @@ function onClearSearch() {
   width: 40px;
   height: 24px;
   border-radius: 12px;
-  background: rgba(255, 255, 255, 0.15);
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: var(--sketch-toolbar-hover-bg);
+  border: 1px solid var(--sketch-toolbar-control-border);
   cursor: pointer;
   transition: background 0.25s ease, border-color 0.25s ease;
   flex-shrink: 0;
@@ -457,7 +565,7 @@ function onClearSearch() {
   width: 18px;
   height: 18px;
   border-radius: 50%;
-  background: #fff;
+  background: var(--sketch-toolbar-strong-text);
   box-shadow: 0 1px 4px rgba(0, 0, 0, 0.3);
   transition: transform 0.25s cubic-bezier(0.25, 0.8, 0.25, 1);
 }

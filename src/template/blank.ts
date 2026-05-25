@@ -1,6 +1,6 @@
 export interface Template {
   id: string;
-  nameKey: string;  // i18n key
+  nameKey: string; // i18n key
   render: (ctx: CanvasRenderingContext2D, width: number, height: number) => void;
 }
 

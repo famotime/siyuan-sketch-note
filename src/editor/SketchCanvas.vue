@@ -1,10 +1,13 @@
 <template>
   <div
-    class="sketch-canvas-container"
     ref="containerRef"
+    class="sketch-canvas-container"
     :style="{ transform: `translate(${viewportPanX}px, ${viewportPanY}px) scale(${viewportScale})`, transformOrigin: '0 0' }"
   >
-    <canvas ref="bgCanvasRef" class="sketch-canvas sketch-canvas--bg" />
+    <canvas
+      ref="bgCanvasRef"
+      class="sketch-canvas sketch-canvas--bg"
+    />
     <canvas
       ref="strokeCanvasRef"
       class="sketch-canvas sketch-canvas--stroke"
@@ -38,9 +41,16 @@
     </div>
   </div>
   <Transition name="zoom-fade">
-    <div v-if="showIndicator || zoomLocked" class="zoom-indicator" @pointerdown.stop>
+    <div
+      v-if="showIndicator || zoomLocked"
+      class="zoom-indicator"
+      @pointerdown.stop
+    >
       <span class="zoom-indicator__value">{{ Math.round(viewportScale * 100) }}%</span>
-      <button class="zoom-indicator__lock" @click="toggleZoomLock">
+      <button
+        class="zoom-indicator__lock"
+        @click="toggleZoomLock"
+      >
         <IconParkIcon :name="zoomLocked ? 'Lock' : 'Unlock'" />
       </button>
     </div>
@@ -229,7 +239,7 @@ watch(
   ([newTool, newWidth]) => {
     updateCanvasCursor(newTool, newWidth);
   },
-  { immediate: true }
+  { immediate: true },
 );
 
 function updateCanvasCursor(tool: string, eraserWidth: number) {
@@ -359,7 +369,7 @@ function onPointerDown(e: PointerEvent) {
   if (pointers.size >= 2 && !twoFingerActive) {
     // In stylusOnly mode, don't interrupt pen strokes with finger touches
     if (props.inputSettings.stylusOnly) {
-      const hasPen = Array.from(pointers.values()).some(p => p.type === "pen");
+      const hasPen = Array.from(pointers.values()).some((p) => p.type === "pen");
       if (hasPen) { return; }
     }
     twoFingerActive = true;
@@ -1173,7 +1183,7 @@ function startNewTextEditing(x: number, y: number) {
 
   textEditor.value = {
     show: true,
-    x: x,
+    x,
     y: y - fontSize / 2,
     val: "",
     elementId: null,

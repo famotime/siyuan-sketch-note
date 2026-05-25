@@ -6,24 +6,24 @@ import type { CustomBackgroundTemplate } from "@/template/customBackground";
 export interface StrokePoint {
   x: number;
   y: number;
-  pressure: number;    // 0~1, default 0.5 when unavailable
-  timestamp: number;   // ms
+  pressure: number; // 0~1, default 0.5 when unavailable
+  timestamp: number; // ms
 }
 
 export interface Stroke {
   id: string;
   points: StrokePoint[];
-  color: string;       // hex color
-  width: number;       // base line width in px
-  opacity?: number;    // 0~1, default 1 for old data
+  color: string; // hex color
+  width: number; // base line width in px
+  opacity?: number; // 0~1, default 1 for old data
   tool: SketchTool;
-  bounds?: Bounds;     // precomputed bounds for large documents
-  isShape?: boolean;   // 是否为几何形状（跳过贝塞尔平滑）
+  bounds?: Bounds; // precomputed bounds for large documents
+  isShape?: boolean; // 是否为几何形状（跳过贝塞尔平滑）
 }
 
 export interface SketchData {
   version: 1;
-  template: string;         // template id: "blank" | "grid"
+  template: string; // template id: "blank" | "grid"
   canvasWidth: number;
   canvasHeight: number;
   pageMode?: SketchPageMode;

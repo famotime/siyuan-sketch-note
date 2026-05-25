@@ -8,7 +8,7 @@ describe("editor top bar layout", () => {
     const editor = readFileSync(resolve(process.cwd(), "src/editor/SketchEditor.vue"), "utf8");
 
     expect(topBar).toContain("sketch-editor__row--topbar");
-    expect(editor).toMatch(/\.sketch-editor__row--topbar\s*\{[^}]*overflow:\s*visible/s);
+    expect(editor).toMatch(/\.sketch-editor__row--topbar\s*\{[^}]*overflow:\s*visible/);
   });
 
   it("keeps the two header rows compact", () => {
@@ -17,11 +17,11 @@ describe("editor top bar layout", () => {
     const editor = readFileSync(resolve(process.cwd(), "src/editor/SketchEditor.vue"), "utf8");
 
     expect(editor).toMatch(/--sketch-editor-header-height:\s*92px/);
-    expect(editor).toMatch(/\.sketch-editor__header\s*\{[^}]*padding:\s*6px 14px/s);
-    expect(editor).toMatch(/\.sketch-editor__header\s*\{[^}]*gap:\s*2px/s);
-    expect(editor).toMatch(/\.sketch-editor__row--tools\s*\{[^}]*margin-top:\s*4px;[^}]*padding-top:\s*4px/s);
-    expect(topBar).toMatch(/\.sketch-editor__row\s*\{[^}]*min-height:\s*36px/s);
-    expect(toolbar).toMatch(/\.sketch-btn--tool\s*\{[^}]*min-height:\s*30px/s);
+    expect(editor).toMatch(/\.sketch-editor__header\s*\{[^}]*padding:\s*6px 14px/);
+    expect(editor).toMatch(/\.sketch-editor__header\s*\{[^}]*gap:\s*2px/);
+    expect(editor).toMatch(/\.sketch-editor__row--tools\s*\{[^}]*margin-top:\s*4px;[^}]*padding-top:\s*4px/);
+    expect(topBar).toMatch(/\.sketch-editor__row\s*\{[^}]*min-height:\s*36px/);
+    expect(toolbar).toMatch(/\.sketch-btn--tool\s*\{[^}]*min-height:\s*30px/);
   });
 
   it("positions the zoom indicator below the compact header", () => {
@@ -39,15 +39,15 @@ describe("editor top bar layout", () => {
   it("keeps the zoom lock icon visible on the dark indicator", () => {
     const canvas = readFileSync(resolve(process.cwd(), "src/editor/SketchCanvas.vue"), "utf8");
 
-    expect(canvas).toMatch(/\.zoom-indicator__lock\s*\{[^}]*color:\s*#fff/s);
+    expect(canvas).toMatch(/\.zoom-indicator__lock\s*\{[^}]*color:\s*#fff/);
   });
 
   it("keeps the zoom indicator sized to its content", () => {
     const canvas = readFileSync(resolve(process.cwd(), "src/editor/SketchCanvas.vue"), "utf8");
 
-    expect(canvas).toMatch(/\.zoom-indicator\s*\{[^}]*width:\s*max-content;[^}]*padding:\s*5px 8px/s);
-    expect(canvas).toMatch(/\.zoom-indicator__value\s*\{[^}]*min-width:\s*4ch/s);
-    expect(canvas).toMatch(/\.zoom-indicator__lock\s*\{[^}]*width:\s*24px;[^}]*height:\s*24px;[^}]*padding:\s*0/s);
+    expect(canvas).toMatch(/\.zoom-indicator\s*\{[^}]*width:\s*max-content;[^}]*padding:\s*5px 8px/);
+    expect(canvas).toMatch(/\.zoom-indicator__value\s*\{[^}]*min-width:\s*4ch/);
+    expect(canvas).toMatch(/\.zoom-indicator__lock\s*\{[^}]*width:\s*24px;[^}]*height:\s*24px;[^}]*padding:\s*0/);
   });
 });
 
@@ -55,9 +55,30 @@ it("keeps active tool highlight visible while the button is hovered", () => {
   const toolbar = readFileSync(resolve(process.cwd(), "src/editor/ToolBar.vue"), "utf8");
   const editor = readFileSync(resolve(process.cwd(), "src/editor/SketchEditor.vue"), "utf8");
 
-  const activeHoverRule = /\.sketch-btn--tool\.sketch-btn--tool-active:hover\s*\{[^}]*background:\s*var\(--b3-theme-primary\)\s*!important/s;
+  const activeHoverRule = /\.sketch-btn--tool\.sketch-btn--tool-active:hover\s*\{[^}]*background:\s*var\(--b3-theme-primary\)\s*!important/;
 
   expect(toolbar).toMatch(activeHoverRule);
   expect(editor).toMatch(activeHoverRule);
+});
+
+it("adapts top and floating toolbars to SiYuan light and dark themes", () => {
+  const editor = readFileSync(resolve(process.cwd(), "src/editor/SketchEditor.vue"), "utf8");
+  const toolbar = readFileSync(resolve(process.cwd(), "src/editor/ToolBar.vue"), "utf8");
+  const floatingToolbar = readFileSync(resolve(process.cwd(), "src/editor/FloatingToolbar.vue"), "utf8");
+
+  expect(editor).toMatch(/color-scheme:\s*light dark/);
+  expect(editor).toMatch(/--sketch-toolbar-surface-dark:/);
+  expect(editor).toMatch(/--sketch-toolbar-surface-light:/);
+  expect(editor).toMatch(/@media\s*\(prefers-color-scheme:\s*light\)/);
+  expect(editor).toMatch(/html\[data-theme[^\]]*light[^\]]*\]\) \.sketch-editor/);
+  expect(editor).toMatch(/html\[data-theme[^\]]*dark[^\]]*\]\) \.sketch-editor/);
+
+  expect(floatingToolbar).toContain("var(--sketch-toolbar-surface)");
+
+  for (const source of [toolbar, floatingToolbar]) {
+    expect(source).toContain("var(--sketch-toolbar-control-bg)");
+    expect(source).toContain("var(--sketch-toolbar-text)");
+    expect(source).toContain("var(--sketch-toolbar-hover-bg)");
+  }
 });
 

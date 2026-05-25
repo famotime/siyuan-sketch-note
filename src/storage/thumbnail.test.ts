@@ -1,4 +1,4 @@
-import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { thumbnailSketchData } from "./thumbnail";
 import type { SketchData } from "@/types/sketch";
 import type { SketchElement } from "@/elements/model";
@@ -7,11 +7,11 @@ describe("thumbnail bounds cropping with eraser", () => {
   let originalDocument: any;
 
   beforeAll(() => {
-    originalDocument = (global as any).document;
+    originalDocument = (globalThis as any).document;
   });
 
   afterAll(() => {
-    (global as any).document = originalDocument;
+    (globalThis as any).document = originalDocument;
   });
 
   it("ignores erased stroke bounds and eraser strokes in crop size calculation", () => {
@@ -95,7 +95,7 @@ describe("thumbnail bounds cropping with eraser", () => {
     const createdCanvases: any[] = [];
 
     // 建立一个完美的 mock document 对象，防止依赖 jsdom 环境
-    (global as any).document = {
+    (globalThis as any).document = {
       createElement: (tagName: string) => {
         if (tagName === "canvas") {
           const canvas = {
@@ -121,7 +121,7 @@ describe("thumbnail bounds cropping with eraser", () => {
                   // 我们构建一个像素数组。只有在 (100, 100) 的位置，它的 alpha > 0 (表示非透明)；
                   // 而 (500, 500) 以及橡皮擦区域的所有像素都是 alpha = 0 (表示已被完全擦除，或者本就是透明的)。
                   const dataArray = new Uint8ClampedArray(w * h * 4);
-                  
+
                   // 我们在 100 x 100 坐标处标记一个可见像素
                   const targetX = 100;
                   const targetY = 100;
@@ -161,7 +161,7 @@ describe("thumbnail bounds cropping with eraser", () => {
     // 而 elements 里的 stroke 类型的元素会被过滤掉，不参与 elBounds 计算。
     // 所以最终的 crop 应该是在 (100, 100) 附近，加上 padding 40，裁剪宽度应该大约是 100-200 左右，远小于 500。
     console.log("Captured final canvas dimensions under node mock:", finalCanvas.width, "x", finalCanvas.height);
-    
+
     // 预期裁剪区域的尺寸应该是比较小的（应该小于 400，精确计算应为 Math.max(width, MIN_WIDTH) 等）
     expect(finalCanvas.width).toBeLessThan(400);
     expect(finalCanvas.height).toBeLessThan(400);

@@ -30,10 +30,10 @@ function compositeStrokes(ctx: CanvasRenderingContext2D, strokes: Stroke[]): voi
 function scanVisibleBounds(
   imageData: ImageData,
   width: number,
-  height: number
+  height: number,
 ): { x: number; y: number; w: number; h: number } | null {
   const data = imageData.data;
-  let minX = width, minY = height, maxX = 0, maxY = 0;
+  let minX = width; let minY = height; let maxX = 0; let maxY = 0;
   let found = false;
 
   for (let y = 0; y < height; y++) {
@@ -66,7 +66,7 @@ function scanVisibleBounds(
  */
 function findStrokeVisibleBounds(strokes: Stroke[]): { x: number; y: number; w: number; h: number } | null {
   // Compute canvas size from content strokes only (exclude eraser)
-  let maxX = 0, maxY = 0;
+  let maxX = 0; let maxY = 0;
   for (const stroke of strokes) {
     if (stroke.tool === "eraser") continue;
     const halfW = stroke.width / 2;
@@ -96,7 +96,7 @@ function findStrokeVisibleBounds(strokes: Stroke[]): { x: number; y: number; w: 
 function computeElementBounds(
   elements: SketchElement[],
 ): { minX: number; minY: number; maxX: number; maxY: number } | null {
-  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+  let minX = Infinity; let minY = Infinity; let maxX = -Infinity; let maxY = -Infinity;
   let found = false;
 
   for (const el of elements) {

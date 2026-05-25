@@ -11,7 +11,10 @@
       >
       <output>{{ preset.width }}</output>
     </label>
-    <label v-if="visibility.opacity" class="sketch-range">
+    <label
+      v-if="visibility.opacity"
+      class="sketch-range"
+    >
       <span>{{ t("opacity") }}</span>
       <input
         :value="preset.opacity"
@@ -23,16 +26,28 @@
       >
       <output>{{ Math.round(preset.opacity * 100) }}%</output>
     </label>
-    <label v-if="visibility.eraserMode" class="sketch-mode">
+    <label
+      v-if="visibility.eraserMode"
+      class="sketch-mode"
+    >
       <span>{{ t("eraserMode") }}</span>
-      <select :value="preset.mode" @change="$emit('updatePreset', { mode: ($event.target as HTMLSelectElement).value as ToolPreset['mode'] })">
+      <select
+        :value="preset.mode"
+        @change="$emit('updatePreset', { mode: ($event.target as HTMLSelectElement).value as ToolPreset['mode'] })"
+      >
         <option value="pixel">{{ t("eraserModePixel") }}</option>
         <option value="stroke">{{ t("eraserModeStroke") }}</option>
       </select>
     </label>
-    <label v-if="visibility.lassoMode" class="sketch-mode">
+    <label
+      v-if="visibility.lassoMode"
+      class="sketch-mode"
+    >
       <span>{{ t("lassoMode") }}</span>
-      <select :value="lassoMode" @change="$emit('update:lassoMode', ($event.target as HTMLSelectElement).value as 'freehand' | 'box')">
+      <select
+        :value="lassoMode"
+        @change="$emit('update:lassoMode', ($event.target as HTMLSelectElement).value as 'freehand' | 'box')"
+      >
         <option value="freehand">{{ t("lassoModeFreehand") }}</option>
         <option value="box">{{ t("lassoModeBox") }}</option>
       </select>

@@ -52,7 +52,7 @@ export interface EngineSnapshot {
 export function createEngineState(
   templateId: string,
   canvasWidth = CANVAS_LOGICAL_WIDTH,
-  canvasHeight = 1200
+  canvasHeight = 1200,
 ): EngineState {
   return {
     strokes: [],
@@ -137,7 +137,7 @@ function restoreSnapshot(state: EngineState, snapshot: EngineSnapshot): void {
 
 export function setupBackgroundCanvas(
   canvas: HTMLCanvasElement,
-  state: EngineState
+  state: EngineState,
 ): void {
   const dpr = window.devicePixelRatio || 1;
   canvas.width = state.canvasWidth * dpr;
@@ -181,7 +181,7 @@ export function setupBackgroundCanvas(
 
 export function setupStrokeCanvas(
   canvas: HTMLCanvasElement,
-  state: EngineState
+  state: EngineState,
 ): void {
   const dpr = window.devicePixelRatio || 1;
   canvas.width = state.canvasWidth * dpr;
@@ -201,7 +201,7 @@ export function setupStrokeCanvas(
 export function handlePointerDown(
   state: EngineState,
   e: Pick<PointerEvent, "pressure" | "timeStamp"> & { canvasX?: number; canvasY?: number; clientX?: number; clientY?: number },
-  canvas: HTMLCanvasElement
+  canvas: HTMLCanvasElement,
 ): void {
   const rect = canvas.getBoundingClientRect();
   const x = e.canvasX ?? ((e.clientX ?? 0) - rect.left);
@@ -221,7 +221,7 @@ export function handlePointerDown(
 export function handlePointerMove(
   state: EngineState,
   e: Pick<PointerEvent, "pressure" | "timeStamp"> & { canvasX?: number; canvasY?: number; clientX?: number; clientY?: number },
-  canvas: HTMLCanvasElement
+  canvas: HTMLCanvasElement,
 ): boolean {
   if (!state.currentStroke) return false;
   const rect = canvas.getBoundingClientRect();
@@ -303,7 +303,7 @@ export function clearAll(state: EngineState): void {
 
 export function fullRedrawStrokeCanvas(
   canvas: HTMLCanvasElement,
-  state: EngineState
+  state: EngineState,
 ): void {
   const ctx = canvas.getContext("2d")!;
   ctx.save();
@@ -321,7 +321,7 @@ export function fullRedrawStrokeCanvas(
 export function resizeCanvases(
   bgCanvas: HTMLCanvasElement,
   strokeCanvas: HTMLCanvasElement,
-  state: EngineState
+  state: EngineState,
 ): void {
   setupBackgroundCanvas(bgCanvas, state);
   setupStrokeCanvas(strokeCanvas, state);

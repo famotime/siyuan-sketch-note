@@ -3,7 +3,10 @@
     v-if="visible"
     class="sketch-editor"
   >
-    <div v-show="!isZenMode" class="sketch-editor__header">
+    <div
+      v-show="!isZenMode"
+      class="sketch-editor__header"
+    >
       <EditorTopBar
         :backgroundFit="activeCustomBackground?.fit"
         :canRedo="canRedo"
@@ -143,7 +146,6 @@ import { createCurrentPagePngExportPlan, createExportPngFileName, dataUrlToBlob,
 import { createExportPdfFileName, createPdfExportPlanFromSketch, exportPdf as exportPdfBlob } from "@/export/pdf";
 import { createExportJsonFileName, exportSketchJson, importSketchJson } from "@/export/json";
 import { SaveQueue } from "@/storage/saveQueue";
-import { createSaveStatusLabel } from "@/storage/saveStatus";
 import type { SaveStatus } from "@/storage/saveStatus";
 import { normalizeInputSettings } from "./inputMode";
 import { createCustomBackgroundTemplate, getCustomBackgroundTemplate, updateCustomBackgroundFit } from "@/template/customBackground";
@@ -248,8 +250,6 @@ const searchResultIndex = ref(0);
 
 let autoSaveTimer: ReturnType<typeof setTimeout> | null = null;
 const saveQueue = new SaveQueue();
-
-const statusLabel = computed(() => createSaveStatusLabel(saveStatus.value, t, lastSavedAt.value));
 
 const activePreset = computed(() => {
   if (activeTool.value === "text") {
@@ -440,13 +440,6 @@ function updateActivePreset(patch: Partial<Omit<ToolPreset, "tool">>) {
   toolPresets.value = updateToolPreset(toolPresets.value, getDrawingToolForEditorTool(activeTool.value), patch);
 }
 
-function toggleAutoSave() {
-  autoSave.value = !autoSave.value;
-  if (!autoSave.value && autoSaveTimer) {
-    clearTimeout(autoSaveTimer);
-    autoSaveTimer = null;
-  }
-}
 
 function toggleStylusOnly() {
   inputSettings.value = {
@@ -756,11 +749,6 @@ async function onBackgroundSelected(event: Event) {
   onStroke();
 }
 
-function insertTextElement() {
-  activeTool.value = "text";
-  canvasRef.value?.insertText();
-  onStroke();
-}
 
 function triggerImageImport() {
   activeTool.value = "image";
@@ -875,9 +863,70 @@ function onHeightChanged(_h: number) {}
   position: fixed; inset: 0; z-index: 999;
   background: var(--b3-theme-background);
   overflow: hidden;
+  color-scheme: light dark;
   --sketch-editor-header-top: 12px;
   --sketch-editor-header-height: 92px;
   --sketch-editor-floating-gap: 16px;
+  --sketch-toolbar-surface-dark: rgba(28, 28, 30, 0.88);
+  --sketch-toolbar-surface-light: rgba(255, 255, 255, 0.88);
+  --sketch-toolbar-surface: var(--sketch-toolbar-surface-dark);
+  --sketch-toolbar-popover-surface: rgba(28, 28, 30, 0.95);
+  --sketch-toolbar-border: rgba(255, 255, 255, 0.12);
+  --sketch-toolbar-control-bg: rgba(255, 255, 255, 0.05);
+  --sketch-toolbar-control-border: rgba(255, 255, 255, 0.08);
+  --sketch-toolbar-hover-bg: rgba(255, 255, 255, 0.15);
+  --sketch-toolbar-hover-border: rgba(255, 255, 255, 0.18);
+  --sketch-toolbar-text: rgba(255, 255, 255, 0.8);
+  --sketch-toolbar-muted-text: rgba(255, 255, 255, 0.58);
+  --sketch-toolbar-strong-text: #fff;
+  --sketch-toolbar-separator: rgba(255, 255, 255, 0.12);
+  --sketch-toolbar-shadow: 0 10px 30px rgba(0, 0, 0, 0.25), 0 2px 8px rgba(0, 0, 0, 0.12);
+  --sketch-toolbar-hover-shadow: 0 12px 35px rgba(0, 0, 0, 0.35), 0 4px 12px rgba(0, 0, 0, 0.15);
+  --sketch-toolbar-active-shadow: 0 4px 12px rgba(0, 0, 0, 0.18);
+}
+
+@media (prefers-color-scheme: light) {
+  .sketch-editor {
+    --sketch-toolbar-surface: var(--sketch-toolbar-surface-light);
+    --sketch-toolbar-popover-surface: rgba(255, 255, 255, 0.96);
+    --sketch-toolbar-border: rgba(15, 23, 42, 0.1);
+    --sketch-toolbar-control-bg: rgba(15, 23, 42, 0.045);
+    --sketch-toolbar-control-border: rgba(15, 23, 42, 0.08);
+    --sketch-toolbar-hover-bg: rgba(15, 23, 42, 0.09);
+    --sketch-toolbar-hover-border: rgba(15, 23, 42, 0.14);
+    --sketch-toolbar-text: rgba(15, 23, 42, 0.78);
+    --sketch-toolbar-muted-text: rgba(15, 23, 42, 0.52);
+    --sketch-toolbar-strong-text: rgba(15, 23, 42, 0.94);
+    --sketch-toolbar-separator: rgba(15, 23, 42, 0.1);
+    --sketch-toolbar-shadow: 0 12px 32px rgba(15, 23, 42, 0.12), 0 2px 8px rgba(15, 23, 42, 0.06);
+    --sketch-toolbar-hover-shadow: 0 14px 36px rgba(15, 23, 42, 0.16), 0 4px 12px rgba(15, 23, 42, 0.08);
+    --sketch-toolbar-active-shadow: 0 4px 12px rgba(var(--b3-theme-primary-rgb), 0.24);
+  }
+}
+
+:global(html[data-theme="light"]) .sketch-editor,
+:global(html[data-theme-mode="light"]) .sketch-editor,
+:global(body[data-theme="light"]) .sketch-editor {
+  --sketch-toolbar-surface: var(--sketch-toolbar-surface-light);
+  --sketch-toolbar-popover-surface: rgba(255, 255, 255, 0.96);
+  --sketch-toolbar-border: rgba(15, 23, 42, 0.1);
+  --sketch-toolbar-control-bg: rgba(15, 23, 42, 0.045);
+  --sketch-toolbar-control-border: rgba(15, 23, 42, 0.08);
+  --sketch-toolbar-hover-bg: rgba(15, 23, 42, 0.09);
+  --sketch-toolbar-hover-border: rgba(15, 23, 42, 0.14);
+  --sketch-toolbar-text: rgba(15, 23, 42, 0.78);
+  --sketch-toolbar-muted-text: rgba(15, 23, 42, 0.52);
+  --sketch-toolbar-strong-text: rgba(15, 23, 42, 0.94);
+  --sketch-toolbar-separator: rgba(15, 23, 42, 0.1);
+  --sketch-toolbar-shadow: 0 12px 32px rgba(15, 23, 42, 0.12), 0 2px 8px rgba(15, 23, 42, 0.06);
+  --sketch-toolbar-hover-shadow: 0 14px 36px rgba(15, 23, 42, 0.16), 0 4px 12px rgba(15, 23, 42, 0.08);
+  --sketch-toolbar-active-shadow: 0 4px 12px rgba(var(--b3-theme-primary-rgb), 0.24);
+}
+
+:global(html[data-theme="dark"]) .sketch-editor,
+:global(html[data-theme-mode="dark"]) .sketch-editor,
+:global(body[data-theme="dark"]) .sketch-editor {
+  --sketch-toolbar-surface: var(--sketch-toolbar-surface-dark);
 }
 
 /* ── 凌空悬浮的磨砂中控顶部卡片 ── */
@@ -887,12 +936,12 @@ function onHeightChanged(_h: number) {}
   left: 12px;
   right: 12px;
   z-index: 1000;
-  background: rgba(28, 28, 30, 0.88);
+  background: var(--sketch-toolbar-surface);
   backdrop-filter: blur(14px) saturate(160%);
   -webkit-backdrop-filter: blur(14px) saturate(160%);
-  border: 1px solid rgba(255, 255, 255, 0.12);
+  border: 1px solid var(--sketch-toolbar-border);
   border-radius: 16px;
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.25), 0 2px 8px rgba(0, 0, 0, 0.12);
+  box-shadow: var(--sketch-toolbar-shadow);
   padding: 6px 14px;
   box-sizing: border-box;
   display: flex;
@@ -916,10 +965,10 @@ function onHeightChanged(_h: number) {}
 .sketch-editor__row--tools {
   margin-top: 4px;
   padding-top: 4px;
-  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  border-top: 1px solid var(--sketch-toolbar-separator);
 }
 .sketch-editor__title {
-  font-weight: 500; font-size: 14px; color: #fff;
+  font-weight: 500; font-size: 14px; color: var(--sketch-toolbar-strong-text);
   white-space: nowrap;
 }
 .sketch-spacer { flex: 1; }
@@ -930,9 +979,9 @@ function onHeightChanged(_h: number) {}
   box-sizing: border-box;
   display: inline-flex; align-items: center; justify-content: center;
   padding: 4px 10px; border-radius: 8px;
-  border: 1px solid rgba(255, 255, 255, 0.08) !important;
-  background: rgba(255, 255, 255, 0.05) !important;
-  color: rgba(255, 255, 255, 0.8) !important;
+  border: 1px solid var(--sketch-toolbar-control-border) !important;
+  background: var(--sketch-toolbar-control-bg) !important;
+  color: var(--sketch-toolbar-text) !important;
   cursor: pointer; font-size: 13px;
   white-space: nowrap; user-select: none;
   -webkit-tap-highlight-color: transparent;
@@ -940,9 +989,9 @@ function onHeightChanged(_h: number) {}
   transition: all 0.2s cubic-bezier(0.25, 0.8, 0.25, 1);
 }
 .sketch-btn:hover {
-  background: rgba(255, 255, 255, 0.15) !important;
-  border-color: rgba(255, 255, 255, 0.18) !important;
-  color: #fff !important;
+  background: var(--sketch-toolbar-hover-bg) !important;
+  border-color: var(--sketch-toolbar-hover-border) !important;
+  color: var(--sketch-toolbar-strong-text) !important;
   transform: scale(1.03);
 }
 .sketch-btn:active {
@@ -958,7 +1007,7 @@ function onHeightChanged(_h: number) {}
 .sketch-btn--save   {
   background: var(--b3-theme-primary) !important;
   border-color: transparent !important;
-  color: #fff !important;
+  color: var(--sketch-toolbar-strong-text) !important;
   font-weight: 500;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
 }
@@ -969,12 +1018,12 @@ function onHeightChanged(_h: number) {}
 }
 
 .sketch-btn--toggle {
-  color: rgba(255, 255, 255, 0.65) !important;
+  color: var(--sketch-toolbar-muted-text) !important;
 }
 .sketch-btn--toggle-on {
-  background: rgba(255, 255, 255, 0.18) !important;
+  background: var(--sketch-toolbar-hover-bg) !important;
   border-color: var(--b3-theme-primary) !important;
-  color: #fff !important;
+  color: var(--sketch-toolbar-strong-text) !important;
 }
 
 /* 主绘图工具按钮（极致精炼磨砂风） */
@@ -983,20 +1032,20 @@ function onHeightChanged(_h: number) {}
   min-width: 44px;
   background: transparent !important;
   border: 1px solid transparent !important;
-  color: rgba(255, 255, 255, 0.65) !important;
+  color: var(--sketch-toolbar-muted-text) !important;
   border-radius: 8px;
 }
 .sketch-btn--tool:hover {
-  background: rgba(255, 255, 255, 0.08) !important;
-  color: #fff !important;
+  background: var(--sketch-toolbar-hover-bg) !important;
+  color: var(--sketch-toolbar-strong-text) !important;
   border-color: transparent !important;
 }
 .sketch-btn--tool-active,
 .sketch-btn--tool.sketch-btn--tool-active:hover {
   background: var(--b3-theme-primary) !important;
-  color: #fff !important;
+  color: var(--sketch-toolbar-strong-text) !important;
   border-color: transparent !important;
-  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.15);
+  box-shadow: var(--sketch-toolbar-active-shadow);
 }
 .sketch-btn--icon-tool {
   gap: 4px;
@@ -1017,14 +1066,14 @@ function onHeightChanged(_h: number) {}
 .sketch-btn--action {
   font-size: 13px;
   min-width: 52px;
-  background: rgba(255, 255, 255, 0.04) !important;
-  border: 1px solid rgba(255, 255, 255, 0.06) !important;
-  color: rgba(255, 255, 255, 0.75) !important;
+  background: var(--sketch-toolbar-control-bg) !important;
+  border: 1px solid var(--sketch-toolbar-control-border) !important;
+  color: var(--sketch-toolbar-text) !important;
 }
 .sketch-btn--action:hover {
-  background: rgba(255, 255, 255, 0.12) !important;
-  border-color: rgba(255, 255, 255, 0.15) !important;
-  color: #fff !important;
+  background: var(--sketch-toolbar-hover-bg) !important;
+  border-color: var(--sketch-toolbar-hover-border) !important;
+  color: var(--sketch-toolbar-strong-text) !important;
 }
 
 .sketch-tool-options {

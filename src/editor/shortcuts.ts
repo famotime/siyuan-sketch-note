@@ -9,15 +9,15 @@ export type EditorShortcut =
   | { type: "tool"; tool: EditorTool };
 
 const numberToolMap: Record<string, EditorTool> = {
-  "1": "pen",
-  "2": "highlighter",
-  "3": "eraser",
-  "4": "lasso",
-  "5": "arrow",
-  "6": "triangle",
-  "7": "line",
-  "8": "rectangle",
-  "9": "ellipse",
+  1: "pen",
+  2: "highlighter",
+  3: "eraser",
+  4: "lasso",
+  5: "arrow",
+  6: "triangle",
+  7: "line",
+  8: "rectangle",
+  9: "ellipse",
 };
 
 const letterToolMap: Record<string, EditorTool> = {
