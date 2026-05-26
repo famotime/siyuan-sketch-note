@@ -13,6 +13,77 @@ const MIN_WIDTH = 200;
 const MIN_HEIGHT = 150;
 const SAFE_MARGIN = 60;
 
+interface RenderViewport {
+  width: number;
+  height: number;
+  tx: number;
+  ty: number;
+}
+
+function getViewportSourceRect(viewport: RenderViewport): { x: number; y: number; width: number; height: number } {
+  return {
+    x: -viewport.tx,
+    y: -viewport.ty,
+    width: viewport.width,
+    height: viewport.height,
+  };
+}
+
+function renderTemplateViewport(
+  ctx: CanvasRenderingContext2D,
+  templateId: string,
+  viewport: RenderViewport,
+): void {
+  const template = getTemplate(templateId);
+  ctx.save();
+  ctx.translate(viewport.tx, viewport.ty);
+  template.render(
+    ctx,
+    viewport.width + Math.max(0, -viewport.tx),
+    viewport.height + Math.max(0, -viewport.ty),
+  );
+  ctx.restore();
+}
+
+function getCustomBackgroundViewportDrawRect(options: {
+  imageWidth: number;
+  imageHeight: number;
+  targetWidth: number;
+  targetHeight: number;
+  fit: NonNullable<SketchData["customBackgrounds"]>[number]["fit"];
+  viewport: RenderViewport;
+}) {
+  const rect = getCustomBackgroundDrawRect({
+    imageWidth: options.imageWidth,
+    imageHeight: options.imageHeight,
+    targetWidth: options.targetWidth,
+    targetHeight: options.targetHeight,
+    fit: options.fit,
+  });
+  const source = getViewportSourceRect(options.viewport);
+  const scaleX = rect.sw / rect.dw;
+  const scaleY = rect.sh / rect.dh;
+  const left = Math.max(source.x, rect.dx);
+  const top = Math.max(source.y, rect.dy);
+  const right = Math.min(source.x + source.width, rect.dx + rect.dw);
+  const bottom = Math.min(source.y + source.height, rect.dy + rect.dh);
+
+  if (right <= left || bottom <= top) {
+    return null;
+  }
+
+  return {
+    sx: rect.sx + (left - rect.dx) * scaleX,
+    sy: rect.sy + (top - rect.dy) * scaleY,
+    sw: (right - left) * scaleX,
+    sh: (bottom - top) * scaleY,
+    dx: left - source.x,
+    dy: top - source.y,
+    dw: right - left,
+    dh: bottom - top,
+  };
+}
+
 /**
  * Render all strokes onto a canvas in order, with correct compositing.
  * Eraser strokes use destination-out to truly erase pixels from earlier strokes.
@@ -317,8 +388,7 @@ function renderToDataUrl(
   canvas.height = height;
   const ctx = canvas.getContext("2d")!;
 
-  const template = getTemplate(templateId);
-  template.render(ctx, width, height);
+  renderTemplateViewport(ctx, templateId, { width, height, tx, ty });
 
   const translatedElements = translateElementsForRender(elements, tx, ty);
   const layers = splitElementsForRender(translatedElements);
@@ -368,27 +438,29 @@ async function renderToDataUrlAsync(
     const customBackground = data ? getCustomBackgroundTemplate(data) : null;
     if (customBackground) {
       const image = await loadImage(customBackground.src);
-      const rect = getCustomBackgroundDrawRect({
+      const rect = getCustomBackgroundViewportDrawRect({
         imageWidth: image.naturalWidth,
         imageHeight: image.naturalHeight,
-        targetWidth: width,
-        targetHeight: height,
+        targetWidth: data?.canvasWidth || width,
+        targetHeight: data?.canvasHeight || height,
         fit: customBackground.fit,
+        viewport: { width, height, tx, ty },
       });
-      ctx.drawImage(
-        image,
-        rect.sx,
-        rect.sy,
-        rect.sw,
-        rect.sh,
-        rect.dx,
-        rect.dy,
-        rect.dw,
-        rect.dh,
-      );
+      if (rect) {
+        ctx.drawImage(
+          image,
+          rect.sx,
+          rect.sy,
+          rect.sw,
+          rect.sh,
+          rect.dx,
+          rect.dy,
+          rect.dw,
+          rect.dh,
+        );
+      }
     } else {
-      const template = getTemplate(templateId);
-      template.render(ctx, width, height);
+      renderTemplateViewport(ctx, templateId, { width, height, tx, ty });
     }
   } else {
     ctx.clearRect(0, 0, width, height);

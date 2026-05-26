@@ -167,3 +167,116 @@ describe("thumbnail bounds cropping with eraser", () => {
     expect(finalCanvas.height).toBeLessThan(400);
   });
 });
+
+
+describe("thumbnail background alignment", () => {
+  let originalDocument: any;
+
+  beforeAll(() => {
+    originalDocument = (globalThis as any).document;
+  });
+
+  afterAll(() => {
+    (globalThis as any).document = originalDocument;
+  });
+
+  it("renders the template background with the same crop translation as handwriting content", () => {
+    const operations: Array<{ type: string; args: any[] }> = [];
+
+    const createContext = () => {
+      let strokeStyle = "";
+      let tx = 0;
+      let ty = 0;
+      const transformStack: Array<{ tx: number; ty: number }> = [];
+      return {
+        save: () => {
+          transformStack.push({ tx, ty });
+          operations.push({ type: "save", args: [] });
+        },
+        restore: () => {
+          const prev = transformStack.pop();
+          tx = prev?.tx ?? 0;
+          ty = prev?.ty ?? 0;
+          operations.push({ type: "restore", args: [] });
+        },
+        translate: (x: number, y: number) => {
+          tx += x;
+          ty += y;
+          operations.push({ type: "translate", args: [x, y] });
+        },
+        drawImage: (...args: any[]) => operations.push({ type: "drawImage", args }),
+        beginPath: () => operations.push({ type: "beginPath", args: [] }),
+        moveTo: (x: number, y: number) => operations.push({ type: "moveTo", args: [x + tx, y + ty] }),
+        lineTo: (x: number, y: number) => operations.push({ type: "lineTo", args: [x + tx, y + ty] }),
+        quadraticCurveTo: (...args: any[]) => operations.push({ type: "quadraticCurveTo", args }),
+        stroke: () => operations.push({ type: "stroke", args: [] }),
+        fillRect: (x: number, y: number, w: number, h: number) => operations.push({ type: "fillRect", args: [x + tx, y + ty, w, h] }),
+        strokeRect: (x: number, y: number, w: number, h: number) => operations.push({ type: "strokeRect", args: [x + tx, y + ty, w, h] }),
+        fillText: (text: string, x: number, y: number, maxWidth?: number) => operations.push({ type: "fillText", args: [text, x + tx, y + ty, maxWidth] }),
+        getImageData: (_x: number, _y: number, w: number, h: number) => {
+          const dataArray = new Uint8ClampedArray(w * h * 4);
+          const targetX = 120;
+          const targetY = 120;
+          if (targetX < w && targetY < h) {
+            dataArray[(targetY * w + targetX) * 4 + 3] = 255;
+          }
+          return { data: dataArray, width: w, height: h };
+        },
+        arc: (...args: any[]) => operations.push({ type: "arc", args }),
+        fill: () => operations.push({ type: "fill", args: [] }),
+        set fillStyle(value: string) { operations.push({ type: "setFillStyle", args: [value] }); },
+        set strokeStyle(value: string) { strokeStyle = value; operations.push({ type: "setStrokeStyle", args: [value] }); },
+        get strokeStyle() { return strokeStyle; },
+        set lineWidth(value: number) { operations.push({ type: "setLineWidth", args: [value] }); },
+        set lineJoin(value: string) { operations.push({ type: "setLineJoin", args: [value] }); },
+        set lineCap(value: string) { operations.push({ type: "setLineCap", args: [value] }); },
+        set globalCompositeOperation(value: string) { operations.push({ type: "setGlobalCompositeOperation", args: [value] }); },
+        set globalAlpha(value: number) { operations.push({ type: "setGlobalAlpha", args: [value] }); },
+      };
+    };
+
+    (globalThis as any).document = {
+      createElement: (tagName: string) => {
+        if (tagName !== "canvas") return {};
+        return {
+          width: 0,
+          height: 0,
+          style: {},
+          getContext: () => createContext(),
+          toDataURL: () => "data:image/png;base64,mocked",
+        };
+      },
+    } as any;
+
+    const data: SketchData = {
+      version: 1,
+      template: "grid",
+      canvasWidth: 800,
+      canvasHeight: 1200,
+      strokes: [
+        {
+          id: "stroke-1",
+          tool: "pen",
+          color: "#111111",
+          width: 10,
+          opacity: 1,
+          points: [
+            { x: 120, y: 120, pressure: 0.5, timestamp: 1 },
+            { x: 130, y: 130, pressure: 0.5, timestamp: 2 },
+          ],
+        },
+      ],
+      elements: [],
+    };
+
+    thumbnailSketchData(data);
+
+    const gridStyleIndex = operations.findIndex(
+      (op) => op.type === "setStrokeStyle" && op.args[0] === "#e0e0e0",
+    );
+    expect(gridStyleIndex).toBeGreaterThanOrEqual(0);
+
+    const firstGridMove = operations.slice(gridStyleIndex).find((op) => op.type === "moveTo");
+    expect(firstGridMove?.args).toEqual([-61, -80]);
+  });
+});
