@@ -143,11 +143,12 @@
           :class="{ 'sketch-float-color--active': preset.color === c }"
           :style="{ backgroundColor: c }"
           :title="`${c} (${t('deleteColorHint')})`"
-          @click="onColorClick(c)"
-          @touchstart.stop.prevent="onColorTouchStart(c, $event)"
-          @touchend.stop.prevent="onColorTouchEnd"
-          @touchcancel="onColorTouchEnd"
-          @touchmove.stop.prevent="onColorTouchMove"
+          @click="onColorClick(c, $event)"
+          @pointerdown.stop.prevent="onColorPointerDown(c, $event)"
+          @pointerup.stop.prevent="onColorPointerEnd"
+          @pointercancel="onColorPointerEnd"
+          @pointerleave="onColorPointerEnd"
+          @pointermove.stop.prevent="onColorPointerMove"
           @contextmenu.prevent="$emit('deleteColor', c)"
         >
           <span
@@ -284,7 +285,7 @@ import type { EditorTool } from "./tools";
 import IconParkIcon from "./IconParkIcon.vue";
 import ColorPickerPopup from "./ColorPickerPopup.vue";
 import type { IconParkName } from "./iconParkIcons";
-import { shouldCancelColorLongPress } from "./colorLongPress";
+import { createColorLongPressState, shouldCancelColorLongPress, shouldSwallowColorClick } from "./colorLongPress";
 import { isShapeEditorTool } from "./tools";
 
 const props = defineProps<{
@@ -393,46 +394,49 @@ watch(
 );
 
 // ── 移动端长按手势删除颜色 ──
-let touchTimer: ReturnType<typeof setTimeout> | null = null;
-let touchStartPoint: { x: number; y: number } | null = null;
-let preventClick = false;
+let colorLongPressTimer: ReturnType<typeof setTimeout> | null = null;
+let colorLongPressStartPoint: { x: number; y: number } | null = null;
+let activeColorPointerId: number | null = null;
+const colorLongPressState = createColorLongPressState();
 
-function onColorTouchStart(c: string, e: TouchEvent) {
-  preventClick = false;
-  const touch = e.touches[0];
-  touchStartPoint = touch ? { x: touch.clientX, y: touch.clientY } : null;
-  if (touchTimer) {
-    clearTimeout(touchTimer);
+function onColorPointerDown(c: string, e: PointerEvent) {
+  if (e.pointerType === "mouse" && e.button !== 0) return;
+  colorLongPressState.didLongPressDelete = false;
+  activeColorPointerId = e.pointerId;
+  colorLongPressStartPoint = { x: e.clientX, y: e.clientY };
+  if (colorLongPressTimer) {
+    clearTimeout(colorLongPressTimer);
   }
-  touchTimer = setTimeout(() => {
+  colorLongPressTimer = setTimeout(() => {
     emit("deleteColor", c);
-    preventClick = true;
-    touchTimer = null;
+    colorLongPressState.didLongPressDelete = true;
+    colorLongPressTimer = null;
   }, 600);
 }
 
-function onColorTouchEnd() {
-  if (touchTimer) {
-    clearTimeout(touchTimer);
-    touchTimer = null;
+function onColorPointerEnd() {
+  if (colorLongPressTimer) {
+    clearTimeout(colorLongPressTimer);
+    colorLongPressTimer = null;
   }
-  touchStartPoint = null;
+  colorLongPressStartPoint = null;
+  activeColorPointerId = null;
 }
 
-function onColorTouchMove(e: TouchEvent) {
-  if (!touchTimer || !touchStartPoint) return;
-  const touch = e.touches[0];
-  if (!touch) return;
-  if (shouldCancelColorLongPress(touchStartPoint, { x: touch.clientX, y: touch.clientY })) {
-    clearTimeout(touchTimer);
-    touchTimer = null;
-    touchStartPoint = null;
+function onColorPointerMove(e: PointerEvent) {
+  if (!colorLongPressTimer || !colorLongPressStartPoint || activeColorPointerId !== e.pointerId) return;
+  if (shouldCancelColorLongPress(colorLongPressStartPoint, { x: e.clientX, y: e.clientY })) {
+    clearTimeout(colorLongPressTimer);
+    colorLongPressTimer = null;
+    colorLongPressStartPoint = null;
+    activeColorPointerId = null;
   }
 }
 
-function onColorClick(c: string) {
-  if (preventClick) {
-    preventClick = false;
+function onColorClick(c: string, e: MouseEvent) {
+  if (shouldSwallowColorClick(colorLongPressState)) {
+    e.preventDefault();
+    e.stopPropagation();
     return;
   }
   emit("selectColor", c);
