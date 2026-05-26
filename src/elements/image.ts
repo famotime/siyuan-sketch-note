@@ -1,4 +1,5 @@
 import type { Bounds, Transform } from "./model";
+import { defaultTransform } from "./model";
 
 export interface ImageElement {
   id: string;
@@ -17,16 +18,6 @@ interface CreateImageElementInput {
   alt?: string;
   width?: number;
   height?: number;
-}
-
-function defaultTransform(): Transform {
-  return {
-    x: 0,
-    y: 0,
-    scaleX: 1,
-    scaleY: 1,
-    rotation: 0,
-  };
 }
 
 export function createImageElement(id: string, input: CreateImageElementInput): ImageElement {

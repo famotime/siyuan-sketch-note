@@ -58,7 +58,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, watch } from "vue";
+import { ref, computed, onMounted, watch } from "vue";
 import type { SketchData, Stroke, StrokePoint, ToolPresetCollection, SketchTool } from "@/types/sketch";
 import {
   createEngineState,
@@ -88,10 +88,6 @@ import {
   createTriangleStroke,
 } from "@/elements/shapes";
 import { createImageElement } from "@/elements/image";
-import {
-  createTextElement,
-  updateTextElement,
-} from "@/elements/text";
 import {
   hitTestElement,
   isInResizeCorner,
@@ -133,6 +129,8 @@ import IconParkIcon from "./IconParkIcon.vue";
 import type { OcrSearchResult } from "@/search/ocrIndex";
 import { isShapeEditorTool } from "./tools";
 import type { EditorTool } from "./tools";
+import { useViewport } from "@/composables/useViewport";
+import { useTextEditing } from "@/composables/useTextEditing";
 
 const props = defineProps<{
   initialData: SketchData | null;
@@ -151,73 +149,46 @@ const emit = defineEmits<{
   (e: "stroke"): void;
 }>();
 
-const textEditor = ref({
-  show: false,
-  x: 0,
-  y: 0,
-  val: "",
-  elementId: null as string | null,
-});
-const textEditorInputRef = ref<HTMLInputElement>();
-
 const containerRef = ref<HTMLDivElement>();
 const bgCanvasRef = ref<HTMLCanvasElement>();
 const strokeCanvasRef = ref<HTMLCanvasElement>();
 
-// ── Viewport zoom/pan state ──
-const viewportScale = ref(1);
-const viewportPanX = ref(0);
-const viewportPanY = ref(0);
-const showIndicator = ref(false);
-const zoomLocked = ref(loadZoomLock());
-let indicatorHideTimer: ReturnType<typeof setTimeout> | null = null;
+// ── Composables ──
+const viewport = useViewport({ containerRef });
+const { viewportScale, viewportPanX, viewportPanY, showIndicator, zoomLocked, toggleZoomLock, resetViewport, handleWheelZoom } = viewport;
 
-// ── Two-finger gesture tracking ──
-const pointers = new Map<number, { x: number; y: number; type: string }>();
-let pinchStartDist = 0;
-let pinchStartScale = 1;
-let pinchStartMidX = 0;
-let pinchStartMidY = 0;
-let pinchStartPanX = 0;
-let pinchStartPanY = 0;
-let twoFingerActive = false;
-let postPinchGuard = 0;
-let pinchPrevMidX = 0;
-let pinchPrevMidY = 0;
-
-// ── Right-click pan tracking ──
-let rightPanActive = false;
-let rightPanLastX = 0;
-let rightPanLastY = 0;
-
+// ── Interaction state ──
 let state: EngineState;
-let shapeStart: StrokePoint | null = null;
-let imageTransform: {
-  elementId: string;
-  lastPoint: StrokePoint;
-  mode: "move" | "resize";
-} | null = null;
-let elementTransform: {
-  elementId: string;
-  lastPoint: StrokePoint;
-  mode: "move" | "resize";
-} | null = null;
-let selectedElementId: string | null = null;
-let lassoPath: LassoPoint[] = [];
-let selectedLassoIds: string[] = [];
-let lassoBox: {
-  start: LassoPoint;
-  current: LassoPoint;
-} | null = null;
-let lassoMove: {
-  lastPoint: StrokePoint;
-} | null = null;
-let lassoResize: {
-  anchor: { x: number; y: number };
-  initialBounds: Bounds;
-  elements: SketchElement[];
-  strokes: SketchData["strokes"];
-} | null = null;
+
+const textEditing = useTextEditing({
+  state: () => state,
+  getCanvas: () => strokeCanvasRef.value!,
+  toolPresets: computed(() => props.toolPresets),
+  updateUndoRedoState: () => updateUndoRedoState(),
+  emit: (e) => emit(e),
+});
+const { textEditor, textEditorInputRef, startNewTextEditing, insertText, startEditText, finishTextEditing, cancelTextEditing } = textEditing;
+// Element interaction state
+const interaction = {
+  shapeStart: null as StrokePoint | null,
+  imageTransform: null as { elementId: string; lastPoint: StrokePoint; mode: "move" | "resize" } | null,
+  elementTransform: null as { elementId: string; lastPoint: StrokePoint; mode: "move" | "resize" } | null,
+  selectedElementId: null as string | null,
+};
+
+// Lasso selection state
+const lasso = {
+  path: [] as LassoPoint[],
+  selectedIds: [] as string[],
+  box: null as { start: LassoPoint; current: LassoPoint } | null,
+  move: null as { lastPoint: StrokePoint } | null,
+  resize: null as {
+    anchor: { x: number; y: number };
+    initialBounds: Bounds;
+    elements: SketchElement[];
+    strokes: SketchData["strokes"];
+  } | null,
+};
 const LASSO_DUPLICATE_OFFSET = 24;
 const LASSO_RESIZE_HANDLE_SIZE = 14;
 const LASSO_MIN_RESIZE_SIZE = 16;
@@ -245,7 +216,6 @@ watch(
 function updateCanvasCursor(tool: string, eraserWidth: number) {
   const canvas = strokeCanvasRef.value;
   if (!canvas) return;
-
   if (tool === "eraser") {
     const w = Math.max(16, eraserWidth);
     const r = eraserWidth / 2;
@@ -256,10 +226,7 @@ function updateCanvasCursor(tool: string, eraserWidth: number) {
         <circle cx="${center}" cy="${center}" r="${r}" stroke="rgba(223, 76, 60, 0.9)" stroke-width="1" fill="rgba(223, 76, 60, 0.15)"/>
       </svg>
     `.trim().replace(/\s+/g, " ");
-
-    const encodedSvg = encodeURIComponent(svg);
-    const dataUrl = `data:image/svg+xml;utf8,${encodedSvg}`;
-    canvas.style.cursor = `url("${dataUrl}") ${center} ${center}, auto`;
+    canvas.style.cursor = `url("data:image/svg+xml;utf8,${encodeURIComponent(svg)}") ${center} ${center}, auto`;
   } else {
     canvas.style.cursor = "crosshair";
   }
@@ -271,15 +238,9 @@ function getEngineTool(tool: EditorTool): SketchTool {
   return "pen";
 }
 
-watch(() => props.tool, (t) => {
-  if (state) state.tool = getEngineTool(t);
-});
-watch(() => props.toolPresets, (presets) => {
-  if (state) state.toolPresets = presets;
-}, { deep: true });
-watch(() => props.inputSettings?.enablePressure, (val) => {
-  if (state) state.enablePressure = val ?? true;
-}, { immediate: true });
+watch(() => props.tool, (t) => { if (state) state.tool = getEngineTool(t); });
+watch(() => props.toolPresets, (presets) => { if (state) state.toolPresets = presets; }, { deep: true });
+watch(() => props.inputSettings?.enablePressure, (val) => { if (state) state.enablePressure = val ?? true; }, { immediate: true });
 watch(() => props.templateId, (tpl) => {
   if (state && bgCanvasRef.value && strokeCanvasRef.value) {
     state.templateId = tpl;
@@ -289,56 +250,6 @@ watch(() => props.templateId, (tpl) => {
 });
 
 function getCanvas(): HTMLCanvasElement { return strokeCanvasRef.value!; }
-
-// ── Zoom/pan helpers ──
-const ZOOM_LOCK_KEY = "sketch-note-zoom-lock";
-function loadZoomLock(): boolean {
-  try { return localStorage.getItem(ZOOM_LOCK_KEY) === "true"; }
-  catch { return false; }
-}
-function saveZoomLock(locked: boolean) {
-  try { localStorage.setItem(ZOOM_LOCK_KEY, String(locked)); }
-  catch { /* ignore */ }
-}
-function showZoomIndicator() {
-  showIndicator.value = true;
-  if (indicatorHideTimer) { clearTimeout(indicatorHideTimer); indicatorHideTimer = null; }
-}
-function scheduleHideZoomIndicator() {
-  if (zoomLocked.value) return;
-  if (indicatorHideTimer) clearTimeout(indicatorHideTimer);
-  indicatorHideTimer = setTimeout(() => { showIndicator.value = false; }, 1500);
-}
-function toggleZoomLock() {
-  zoomLocked.value = !zoomLocked.value;
-  saveZoomLock(zoomLocked.value);
-  if (zoomLocked.value) {
-    showZoomIndicator();
-    if (indicatorHideTimer) { clearTimeout(indicatorHideTimer); indicatorHideTimer = null; }
-  } else {
-    scheduleHideZoomIndicator();
-  }
-}
-function resetViewport() {
-  viewportScale.value = 1;
-  viewportPanX.value = 0;
-  viewportPanY.value = 0;
-}
-function handleWheelZoom(e: WheelEvent) {
-  if (zoomLocked.value) return;
-  const rect = containerRef.value!.getBoundingClientRect();
-  const cursorScreenX = e.clientX - rect.left;
-  const cursorScreenY = e.clientY - rect.top;
-  const canvasX = cursorScreenX / viewportScale.value;
-  const canvasY = cursorScreenY / viewportScale.value;
-  const zoomFactor = e.deltaY > 0 ? 0.9 : 1.1;
-  const newScale = Math.min(5, Math.max(1, viewportScale.value * zoomFactor));
-  viewportScale.value = newScale;
-  viewportPanX.value = cursorScreenX - canvasX * newScale;
-  viewportPanY.value = cursorScreenY - canvasY * newScale;
-  showZoomIndicator();
-  scheduleHideZoomIndicator();
-}
 
 function canvasPoint(e: PointerEvent) {
   const rect = getCanvas().getBoundingClientRect();
@@ -351,56 +262,24 @@ function canvasPoint(e: PointerEvent) {
 
 function eventPoint(e: PointerEvent): StrokePoint {
   const point = canvasPoint(e);
-  return {
-    x: point.x,
-    y: point.y,
-    pressure: e.pressure || 0.5,
-    timestamp: e.timeStamp,
-  };
+  return { x: point.x, y: point.y, pressure: e.pressure || 0.5, timestamp: e.timeStamp };
 }
+
+// ── Pointer event handlers ──
 
 function onPointerDown(e: PointerEvent) {
   e.preventDefault();
 
-  // Track all active pointers for two-finger detection
-  pointers.set(e.pointerId, { x: e.clientX, y: e.clientY, type: e.pointerType });
-
-  // Two-finger gesture detection
-  if (pointers.size >= 2 && !twoFingerActive) {
-    // In stylusOnly mode, don't interrupt pen strokes with finger touches
-    if (props.inputSettings.stylusOnly) {
-      const hasPen = Array.from(pointers.values()).some((p) => p.type === "pen");
-      if (hasPen) { return; }
+  const vpResult = viewport.handlePointerDown(e);
+  if (vpResult === "two-finger") {
+    if (viewport.startTwoFingerGesture(props.inputSettings.stylusOnly)) {
+      if (cancelCurrentStroke(state)) fullRedrawStrokeCanvas(getCanvas(), state);
     }
-    twoFingerActive = true;
-    if (cancelCurrentStroke(state)) {
-      fullRedrawStrokeCanvas(getCanvas(), state);
-    }
-    const pts = Array.from(pointers.values());
-    pinchStartDist = Math.hypot(pts[1].x - pts[0].x, pts[1].y - pts[0].y);
-    pinchStartScale = viewportScale.value;
-    pinchStartMidX = (pts[0].x + pts[1].x) / 2;
-    pinchStartMidY = (pts[0].y + pts[1].y) / 2;
-    pinchStartPanX = viewportPanX.value;
-    pinchStartPanY = viewportPanY.value;
-    pinchPrevMidX = pinchStartMidX;
-    pinchPrevMidY = pinchStartMidY;
     return;
   }
-  if (twoFingerActive) return;
+  if (vpResult === "right-pan") return;
 
-  // Right-click pan (desktop)
-  if (e.button === 2) {
-    rightPanActive = true;
-    rightPanLastX = e.clientX;
-    rightPanLastY = e.clientY;
-    (e.target as HTMLElement).setPointerCapture(e.pointerId);
-    return;
-  }
-
-  // Guard against drawing immediately after a pinch ends
-  if (Date.now() < postPinchGuard) return;
-
+  if (viewport.isPostPinchGuard()) return;
   if (!shouldDrawFromPointer(e, props.inputSettings)) return;
   (e.target as HTMLElement).setPointerCapture(e.pointerId);
 
@@ -414,9 +293,7 @@ function onPointerDown(e: PointerEvent) {
         point.x,
         point.y,
       );
-      if (!hit) {
-        startNewTextEditing(point.x, point.y);
-      }
+      if (!hit) startNewTextEditing(point.x, point.y);
     }
     return;
   }
@@ -425,11 +302,8 @@ function onPointerDown(e: PointerEvent) {
     const point = eventPoint(e);
     const selectionBounds = getLassoSelectionBounds();
     if (selectionBounds && isPointInLassoResizeHandle(selectionBounds, point)) {
-      lassoResize = {
-        anchor: {
-          x: selectionBounds.x,
-          y: selectionBounds.y,
-        },
+      lasso.resize = {
+        anchor: { x: selectionBounds.x, y: selectionBounds.y },
         initialBounds: selectionBounds,
         elements: state.elements,
         strokes: state.strokes,
@@ -438,32 +312,27 @@ function onPointerDown(e: PointerEvent) {
       return;
     }
     const selectedElement = hitTestElement(
-      getSelectableElements().filter((element) => selectedLassoIds.includes(element.id)),
+      getSelectableElements().filter((element) => lasso.selectedIds.includes(element.id)),
       point.x,
       point.y,
     );
     if (selectedElement) {
-      lassoMove = { lastPoint: point };
+      lasso.move = { lastPoint: point };
       pushHistorySnapshot(state);
       return;
     }
     if (props.lassoMode === "box") {
-      lassoBox = {
-        start: point,
-        current: point,
-      };
+      lasso.box = { start: point, current: point };
     } else {
-      lassoPath = [point];
+      lasso.path = [point];
     }
-    selectedLassoIds = [];
+    lasso.selectedIds = [];
     fullRedrawStrokeCanvas(getCanvas(), state);
-    if (props.lassoMode === "box") {
-      drawLassoBox();
-    } else {
-      drawLassoPath();
-    }
+    if (props.lassoMode === "box") drawLassoBox();
+    else drawLassoPath();
     return;
   }
+
   if (props.tool === "image") {
     const point = eventPoint(e);
     const element = hitTestElement(
@@ -471,9 +340,9 @@ function onPointerDown(e: PointerEvent) {
       point.x,
       point.y,
     );
-    selectedElementId = element?.id ?? null;
+    interaction.selectedElementId = element?.id ?? null;
     if (element) {
-      imageTransform = {
+      interaction.imageTransform = {
         elementId: element.id,
         lastPoint: point,
         mode: isInResizeCorner(element, point.x, point.y) ? "resize" : "move",
@@ -484,6 +353,7 @@ function onPointerDown(e: PointerEvent) {
     drawSelectionOutline();
     return;
   }
+
   if (props.tool === "text") {
     const point = eventPoint(e);
     const element = hitTestElement(
@@ -491,9 +361,9 @@ function onPointerDown(e: PointerEvent) {
       point.x,
       point.y,
     );
-    selectedElementId = element?.id ?? null;
+    interaction.selectedElementId = element?.id ?? null;
     if (element) {
-      elementTransform = {
+      interaction.elementTransform = {
         elementId: element.id,
         lastPoint: point,
         mode: isInResizeCorner(element, point.x, point.y) ? "resize" : "move",
@@ -504,10 +374,12 @@ function onPointerDown(e: PointerEvent) {
     drawSelectionOutline();
     return;
   }
+
   if (isShapeEditorTool(props.tool)) {
-    shapeStart = eventPoint(e);
+    interaction.shapeStart = eventPoint(e);
     return;
   }
+
   const point = eventPoint(e);
   enginePointerDown(state, { ...point, canvasX: point.x, canvasY: point.y }, getCanvas());
 }
@@ -515,128 +387,83 @@ function onPointerDown(e: PointerEvent) {
 function onPointerMove(e: PointerEvent) {
   e.preventDefault();
 
-  // Update tracked pointer position
-  if (pointers.has(e.pointerId)) {
-    pointers.set(e.pointerId, { x: e.clientX, y: e.clientY, type: e.pointerType });
-  }
+  const vpResult = viewport.handlePointerMove(e);
+  if (vpResult) return;
 
-  // Two-finger pinch/pan
-  if (twoFingerActive && pointers.size >= 2) {
-    const pts = Array.from(pointers.values());
-    const newDist = Math.hypot(pts[1].x - pts[0].x, pts[1].y - pts[0].y);
-    const midX = (pts[0].x + pts[1].x) / 2;
-    const midY = (pts[0].y + pts[1].y) / 2;
-    if (zoomLocked.value) {
-      // Locked: only pan, no zoom
-      viewportPanX.value += midX - pinchPrevMidX;
-      viewportPanY.value += midY - pinchPrevMidY;
-    } else {
-      // Unlocked: zoom + pan
-      const rawScale = pinchStartScale * (newDist / pinchStartDist);
-      const newScale = Math.min(5, Math.max(1, rawScale));
-      viewportScale.value = newScale;
-      viewportPanX.value = midX - (pinchStartMidX - pinchStartPanX) * (newScale / pinchStartScale);
-      viewportPanY.value = midY - (pinchStartMidY - pinchStartPanY) * (newScale / pinchStartScale);
-    }
-    pinchPrevMidX = midX;
-    pinchPrevMidY = midY;
-    showZoomIndicator();
-    return;
-  }
-  if (twoFingerActive) return;
-
-  // Right-click pan
-  if (rightPanActive) {
-    viewportPanX.value += e.clientX - rightPanLastX;
-    viewportPanY.value += e.clientY - rightPanLastY;
-    rightPanLastX = e.clientX;
-    rightPanLastY = e.clientY;
-    showZoomIndicator();
-    return;
-  }
   if (props.tool === "lasso") {
     const point = eventPoint(e);
-    if (lassoResize) {
-      const width = Math.max(LASSO_MIN_RESIZE_SIZE, point.x - lassoResize.anchor.x);
-      const height = Math.max(LASSO_MIN_RESIZE_SIZE, point.y - lassoResize.anchor.y);
-      const scaleX = width / Math.max(1, lassoResize.initialBounds.width);
-      const scaleY = height / Math.max(1, lassoResize.initialBounds.height);
-      state.elements = resizeLassoSelection(
-        lassoResize.elements,
-        selectedLassoIds,
-        lassoResize.anchor,
-        scaleX,
-        scaleY,
-      );
-      state.strokes = resizeStrokeSelection(
-        lassoResize.strokes,
-        selectedLassoIds,
-        lassoResize.anchor,
-        scaleX,
-        scaleY,
-      );
+    if (lasso.resize) {
+      const width = Math.max(LASSO_MIN_RESIZE_SIZE, point.x - lasso.resize.anchor.x);
+      const height = Math.max(LASSO_MIN_RESIZE_SIZE, point.y - lasso.resize.anchor.y);
+      const scaleX = width / Math.max(1, lasso.resize.initialBounds.width);
+      const scaleY = height / Math.max(1, lasso.resize.initialBounds.height);
+      state.elements = resizeLassoSelection(lasso.resize.elements, lasso.selectedIds, lasso.resize.anchor, scaleX, scaleY);
+      state.strokes = resizeStrokeSelection(lasso.resize.strokes, lasso.selectedIds, lasso.resize.anchor, scaleX, scaleY);
       state.isDirty = true;
       fullRedrawStrokeCanvas(getCanvas(), state);
       drawLassoSelectionOutline();
       return;
     }
-    if (lassoMove) {
-      const dx = point.x - lassoMove.lastPoint.x;
-      const dy = point.y - lassoMove.lastPoint.y;
-      state.elements = translateLassoSelection(state.elements, selectedLassoIds, dx, dy);
-      state.strokes = translateStrokeSelection(state.strokes, selectedLassoIds, dx, dy);
-      lassoMove.lastPoint = point;
+    if (lasso.move) {
+      const dx = point.x - lasso.move.lastPoint.x;
+      const dy = point.y - lasso.move.lastPoint.y;
+      state.elements = translateLassoSelection(state.elements, lasso.selectedIds, dx, dy);
+      state.strokes = translateStrokeSelection(state.strokes, lasso.selectedIds, dx, dy);
+      lasso.move.lastPoint = point;
       state.isDirty = true;
       fullRedrawStrokeCanvas(getCanvas(), state);
       drawLassoSelectionOutline();
       return;
     }
-    if (lassoPath.length > 0) {
-      lassoPath.push(point);
+    if (lasso.path.length > 0) {
+      lasso.path.push(point);
       fullRedrawStrokeCanvas(getCanvas(), state);
       drawLassoPath();
       return;
     }
-    if (lassoBox) {
-      lassoBox.current = point;
+    if (lasso.box) {
+      lasso.box.current = point;
       fullRedrawStrokeCanvas(getCanvas(), state);
       drawLassoBox();
       return;
     }
   }
-  if (imageTransform) {
+
+  if (interaction.imageTransform) {
     const point = eventPoint(e);
-    const dx = point.x - imageTransform.lastPoint.x;
-    const dy = point.y - imageTransform.lastPoint.y;
+    const dx = point.x - interaction.imageTransform.lastPoint.x;
+    const dy = point.y - interaction.imageTransform.lastPoint.y;
     state.elements = state.elements.map((element) => {
-      if (element.id !== imageTransform?.elementId) return element;
-      return imageTransform.mode === "move"
+      if (element.id !== interaction.imageTransform?.elementId) return element;
+      return interaction.imageTransform.mode === "move"
         ? moveElement(element, dx, dy)
         : resizeElementFromCorner(element, "se", dx, dy);
     });
-    imageTransform.lastPoint = point;
+    interaction.imageTransform.lastPoint = point;
     state.isDirty = true;
     fullRedrawStrokeCanvas(getCanvas(), state);
     drawSelectionOutline();
     return;
   }
-  if (elementTransform) {
+
+  if (interaction.elementTransform) {
     const point = eventPoint(e);
-    const dx = point.x - elementTransform.lastPoint.x;
-    const dy = point.y - elementTransform.lastPoint.y;
+    const dx = point.x - interaction.elementTransform.lastPoint.x;
+    const dy = point.y - interaction.elementTransform.lastPoint.y;
     state.elements = state.elements.map((element) => {
-      if (element.id !== elementTransform?.elementId) return element;
-      return elementTransform.mode === "move"
+      if (element.id !== interaction.elementTransform?.elementId) return element;
+      return interaction.elementTransform.mode === "move"
         ? moveElement(element, dx, dy)
         : resizeElementFromCorner(element, "se", dx, dy);
     });
-    elementTransform.lastPoint = point;
+    interaction.elementTransform.lastPoint = point;
     state.isDirty = true;
     fullRedrawStrokeCanvas(getCanvas(), state);
     drawSelectionOutline();
     return;
   }
-  if (shapeStart && isShapeEditorTool(props.tool)) {
+
+  if (interaction.shapeStart && isShapeEditorTool(props.tool)) {
     const point = eventPoint(e);
     fullRedrawStrokeCanvas(getCanvas(), state);
     const ctx = getCanvas().getContext("2d")!;
@@ -647,11 +474,13 @@ function onPointerMove(e: PointerEvent) {
     ctx.globalAlpha = preset.opacity ?? 1;
     ctx.lineCap = "round";
     ctx.lineJoin = "round";
-    drawShapePreview(ctx, props.tool, shapeStart, point);
+    drawShapePreview(ctx, props.tool, interaction.shapeStart, point);
     ctx.restore();
     return;
   }
-  if (shapeStart) return;
+
+  if (interaction.shapeStart) return;
+
   const point = eventPoint(e);
   const heightChanged = enginePointerMove(state, { ...point, canvasX: point.x, canvasY: point.y }, getCanvas());
   if (heightChanged) {
@@ -662,92 +491,53 @@ function onPointerMove(e: PointerEvent) {
 }
 
 function onPointerUp(e: PointerEvent) {
-  pointers.delete(e.pointerId);
-
-  // End two-finger gesture
-  if (twoFingerActive) {
-    if (pointers.size < 2) {
-      twoFingerActive = false;
-      postPinchGuard = Date.now() + 300;
-      scheduleHideZoomIndicator();
-    }
-    if (pointers.size === 0) {
-      (e.target as HTMLElement)?.releasePointerCapture?.(e.pointerId);
-    }
-    return;
-  }
-  if (Date.now() < postPinchGuard) return;
-
-  // End right-click pan
-  if (rightPanActive) {
-    rightPanActive = false;
-    (e.target as HTMLElement)?.releasePointerCapture?.(e.pointerId);
-    scheduleHideZoomIndicator();
-    return;
-  }
+  const vpResult = viewport.handlePointerUp(e);
+  if (vpResult) return;
 
   if (props.tool === "lasso") {
-    if (lassoResize) {
-      lassoResize = null;
-      updateUndoRedoState();
-      emit("stroke");
-      return;
-    }
-    if (lassoMove) {
-      lassoMove = null;
-      updateUndoRedoState();
-      emit("stroke");
-      return;
-    }
-    if (lassoPath.length > 0) {
-      selectedLassoIds = findElementsInLasso(getSelectableElements(), lassoPath).map((element) => element.id);
-      lassoPath = [];
+    if (lasso.resize) { lasso.resize = null; updateUndoRedoState(); emit("stroke"); return; }
+    if (lasso.move) { lasso.move = null; updateUndoRedoState(); emit("stroke"); return; }
+    if (lasso.path.length > 0) {
+      lasso.selectedIds = findElementsInLasso(getSelectableElements(), lasso.path).map((el) => el.id);
+      lasso.path = [];
       fullRedrawStrokeCanvas(getCanvas(), state);
       drawLassoSelectionOutline();
       updateUndoRedoState();
       return;
     }
-    if (lassoBox) {
-      selectedLassoIds = findElementsInBoxSelection(getSelectableElements(), {
-        x: lassoBox.start.x,
-        y: lassoBox.start.y,
-        width: lassoBox.current.x - lassoBox.start.x,
-        height: lassoBox.current.y - lassoBox.start.y,
-      }).map((element) => element.id);
-      lassoBox = null;
+    if (lasso.box) {
+      lasso.selectedIds = findElementsInBoxSelection(getSelectableElements(), {
+        x: lasso.box.start.x,
+        y: lasso.box.start.y,
+        width: lasso.box.current.x - lasso.box.start.x,
+        height: lasso.box.current.y - lasso.box.start.y,
+      }).map((el) => el.id);
+      lasso.box = null;
       fullRedrawStrokeCanvas(getCanvas(), state);
       drawLassoSelectionOutline();
       updateUndoRedoState();
       return;
     }
   }
-  if (imageTransform) {
-    imageTransform = null;
-    updateUndoRedoState();
-    emit("stroke");
-    return;
-  }
-  if (elementTransform) {
-    elementTransform = null;
-    updateUndoRedoState();
-    emit("stroke");
-    return;
-  }
-  if (shapeStart && isShapeEditorTool(props.tool)) {
+
+  if (interaction.imageTransform) { interaction.imageTransform = null; updateUndoRedoState(); emit("stroke"); return; }
+  if (interaction.elementTransform) { interaction.elementTransform = null; updateUndoRedoState(); emit("stroke"); return; }
+
+  if (interaction.shapeStart && isShapeEditorTool(props.tool)) {
     const preset = props.toolPresets.pen;
     const end = eventPoint(e);
-    const dist = Math.hypot(end.x - shapeStart.x, end.y - shapeStart.y);
-    if (dist > 4) {
-      const stroke = createShapeStrokeForTool(`shape-${Date.now()}`, props.tool, shapeStart, end, preset);
+    if (Math.hypot(end.x - interaction.shapeStart.x, end.y - interaction.shapeStart.y) > 4) {
+      const stroke = createShapeStrokeForTool(`shape-${Date.now()}`, props.tool, interaction.shapeStart, end, preset);
       pushHistorySnapshot(state);
       state.strokes.push(stroke);
     }
-    shapeStart = null;
+    interaction.shapeStart = null;
     fullRedrawStrokeCanvas(getCanvas(), state);
     updateUndoRedoState();
     emit("stroke");
     return;
   }
+
   const completed = enginePointerUp(state);
   if (completed) {
     if (props.tool === "eraser" && props.toolPresets.eraser.mode === "stroke") {
@@ -758,13 +548,9 @@ function onPointerUp(e: PointerEvent) {
   }
 }
 
-function createShapeStrokeForTool(
-  id: string,
-  tool: EditorTool,
-  start: StrokePoint,
-  end: StrokePoint,
-  preset: ToolPresetCollection["pen"],
-): Stroke {
+// ── Shape helpers ──
+
+function createShapeStrokeForTool(id: string, tool: EditorTool, start: StrokePoint, end: StrokePoint, preset: ToolPresetCollection["pen"]): Stroke {
   if (tool === "line") return createLineStroke(id, start, end, preset);
   if (tool === "arrow") return createArrowStroke(id, start, end, preset);
   if (tool === "rectangle") return createRectangleStroke(id, start, end, preset);
@@ -772,12 +558,7 @@ function createShapeStrokeForTool(
   return createEllipseStroke(id, start, end, preset);
 }
 
-function drawShapePreview(
-  ctx: CanvasRenderingContext2D,
-  tool: EditorTool,
-  start: StrokePoint,
-  end: StrokePoint,
-): void {
+function drawShapePreview(ctx: CanvasRenderingContext2D, tool: EditorTool, start: StrokePoint, end: StrokePoint): void {
   ctx.beginPath();
   if (tool === "line") {
     ctx.moveTo(start.x, start.y);
@@ -787,32 +568,15 @@ function drawShapePreview(
     const length = Math.hypot(end.x - start.x, end.y - start.y);
     const headLength = Math.max(12, Math.min(28, length * 0.25));
     const wingAngle = Math.PI / 7;
-    const left = {
-      x: end.x - Math.cos(angle - wingAngle) * headLength,
-      y: end.y - Math.sin(angle - wingAngle) * headLength,
-    };
-    const right = {
-      x: end.x - Math.cos(angle + wingAngle) * headLength,
-      y: end.y - Math.sin(angle + wingAngle) * headLength,
-    };
     ctx.moveTo(start.x, start.y);
     ctx.lineTo(end.x, end.y);
-    ctx.lineTo(left.x, left.y);
+    ctx.lineTo(end.x - Math.cos(angle - wingAngle) * headLength, end.y - Math.sin(angle - wingAngle) * headLength);
     ctx.moveTo(end.x, end.y);
-    ctx.lineTo(right.x, right.y);
+    ctx.lineTo(end.x - Math.cos(angle + wingAngle) * headLength, end.y - Math.sin(angle + wingAngle) * headLength);
   } else if (tool === "rectangle") {
-    ctx.rect(
-      Math.min(start.x, end.x),
-      Math.min(start.y, end.y),
-      Math.abs(end.x - start.x),
-      Math.abs(end.y - start.y),
-    );
+    ctx.rect(Math.min(start.x, end.x), Math.min(start.y, end.y), Math.abs(end.x - start.x), Math.abs(end.y - start.y));
   } else if (tool === "ellipse") {
-    const centerX = (start.x + end.x) / 2;
-    const centerY = (start.y + end.y) / 2;
-    const radiusX = Math.abs(end.x - start.x) / 2;
-    const radiusY = Math.abs(end.y - start.y) / 2;
-    ctx.ellipse(centerX, centerY, radiusX, radiusY, 0, 0, Math.PI * 2);
+    ctx.ellipse((start.x + end.x) / 2, (start.y + end.y) / 2, Math.abs(end.x - start.x) / 2, Math.abs(end.y - start.y) / 2, 0, 0, Math.PI * 2);
   } else if (tool === "triangle") {
     const minX = Math.min(start.x, end.x);
     const maxX = Math.max(start.x, end.x);
@@ -826,6 +590,8 @@ function drawShapePreview(
   ctx.stroke();
 }
 
+// ── Undo/redo/page state ──
+
 function updateUndoRedoState() {
   emit("update:canUndo", state.undoStack.length > 0);
   emit("update:canRedo", state.redoStack.length > 0);
@@ -834,15 +600,14 @@ function updateUndoRedoState() {
 function emitPageState() {
   const navigator = createPageNavigator(serializeState(state));
   const currentIndex = navigator.current?.index ?? 0;
-  emit("pagesChanged", {
-    current: currentIndex + 1,
-    total: Math.max(1, navigator.pages.length),
-  });
+  emit("pagesChanged", { current: currentIndex + 1, total: Math.max(1, navigator.pages.length) });
 }
 
+// ── Lasso drawing helpers ──
+
 function drawSelectionOutline() {
-  if (!selectedElementId) return;
-  const element = state.elements.find((item) => item.id === selectedElementId);
+  if (!interaction.selectedElementId) return;
+  const element = state.elements.find((item) => item.id === interaction.selectedElementId);
   if (!element) return;
   const ctx = getCanvas().getContext("2d")!;
   ctx.save();
@@ -852,37 +617,30 @@ function drawSelectionOutline() {
   ctx.strokeRect(element.bounds.x, element.bounds.y, element.bounds.width, element.bounds.height);
   ctx.setLineDash([]);
   ctx.fillStyle = "#2f80ed";
-  ctx.fillRect(
-    element.bounds.x + element.bounds.width - 10,
-    element.bounds.y + element.bounds.height - 10,
-    10,
-    10,
-  );
+  ctx.fillRect(element.bounds.x + element.bounds.width - 10, element.bounds.y + element.bounds.height - 10, 10, 10);
   ctx.restore();
 }
 
 function drawLassoPath() {
-  if (lassoPath.length === 0) return;
+  if (lasso.path.length === 0) return;
   const ctx = getCanvas().getContext("2d")!;
   ctx.save();
   ctx.strokeStyle = "#2f80ed";
   ctx.lineWidth = 1.5;
   ctx.setLineDash([7, 5]);
   ctx.beginPath();
-  ctx.moveTo(lassoPath[0].x, lassoPath[0].y);
-  for (const point of lassoPath.slice(1)) {
-    ctx.lineTo(point.x, point.y);
-  }
+  ctx.moveTo(lasso.path[0].x, lasso.path[0].y);
+  for (const point of lasso.path.slice(1)) ctx.lineTo(point.x, point.y);
   ctx.stroke();
   ctx.restore();
 }
 
 function drawLassoBox() {
-  if (!lassoBox) return;
-  const x = Math.min(lassoBox.start.x, lassoBox.current.x);
-  const y = Math.min(lassoBox.start.y, lassoBox.current.y);
-  const width = Math.abs(lassoBox.current.x - lassoBox.start.x);
-  const height = Math.abs(lassoBox.current.y - lassoBox.start.y);
+  if (!lasso.box) return;
+  const x = Math.min(lasso.box.start.x, lasso.box.current.x);
+  const y = Math.min(lasso.box.start.y, lasso.box.current.y);
+  const width = Math.abs(lasso.box.current.x - lasso.box.start.x);
+  const height = Math.abs(lasso.box.current.y - lasso.box.start.y);
   const ctx = getCanvas().getContext("2d")!;
   ctx.save();
   ctx.strokeStyle = "#2f80ed";
@@ -895,7 +653,7 @@ function drawLassoBox() {
 }
 
 function drawLassoSelectionOutline() {
-  const selected = getSelectableElements().filter((element) => selectedLassoIds.includes(element.id));
+  const selected = getSelectableElements().filter((el) => lasso.selectedIds.includes(el.id));
   if (selected.length === 0) return;
   const bounds = getBoundsForElements(selected);
   const ctx = getCanvas().getContext("2d")!;
@@ -903,83 +661,61 @@ function drawLassoSelectionOutline() {
   ctx.strokeStyle = "#2f80ed";
   ctx.lineWidth = 1.25;
   ctx.setLineDash([6, 4]);
-  for (const element of selected) {
-    ctx.strokeRect(element.bounds.x, element.bounds.y, element.bounds.width, element.bounds.height);
-  }
+  for (const el of selected) ctx.strokeRect(el.bounds.x, el.bounds.y, el.bounds.width, el.bounds.height);
   ctx.setLineDash([]);
   ctx.fillStyle = "rgba(47, 128, 237, 0.12)";
-  for (const element of selected) {
-    ctx.fillRect(element.bounds.x, element.bounds.y, element.bounds.width, element.bounds.height);
-  }
+  for (const el of selected) ctx.fillRect(el.bounds.x, el.bounds.y, el.bounds.width, el.bounds.height);
   if (bounds) {
     ctx.fillStyle = "#2f80ed";
-    ctx.fillRect(
-      bounds.x + bounds.width - LASSO_RESIZE_HANDLE_SIZE,
-      bounds.y + bounds.height - LASSO_RESIZE_HANDLE_SIZE,
-      LASSO_RESIZE_HANDLE_SIZE,
-      LASSO_RESIZE_HANDLE_SIZE,
-    );
+    ctx.fillRect(bounds.x + bounds.width - LASSO_RESIZE_HANDLE_SIZE, bounds.y + bounds.height - LASSO_RESIZE_HANDLE_SIZE, LASSO_RESIZE_HANDLE_SIZE, LASSO_RESIZE_HANDLE_SIZE);
     ctx.strokeStyle = "#ffffff";
     ctx.lineWidth = 1;
-    ctx.strokeRect(
-      bounds.x + bounds.width - LASSO_RESIZE_HANDLE_SIZE,
-      bounds.y + bounds.height - LASSO_RESIZE_HANDLE_SIZE,
-      LASSO_RESIZE_HANDLE_SIZE,
-      LASSO_RESIZE_HANDLE_SIZE,
-    );
+    ctx.strokeRect(bounds.x + bounds.width - LASSO_RESIZE_HANDLE_SIZE, bounds.y + bounds.height - LASSO_RESIZE_HANDLE_SIZE, LASSO_RESIZE_HANDLE_SIZE, LASSO_RESIZE_HANDLE_SIZE);
   }
   ctx.restore();
 }
 
 function getBoundsForElements(elements: SketchElement[]): Bounds | null {
   if (elements.length === 0) return null;
-  const minX = Math.min(...elements.map((element) => element.bounds.x));
-  const minY = Math.min(...elements.map((element) => element.bounds.y));
-  const maxX = Math.max(...elements.map((element) => element.bounds.x + element.bounds.width));
-  const maxY = Math.max(...elements.map((element) => element.bounds.y + element.bounds.height));
-  return {
-    x: minX,
-    y: minY,
-    width: maxX - minX,
-    height: maxY - minY,
-  };
+  const minX = Math.min(...elements.map((el) => el.bounds.x));
+  const minY = Math.min(...elements.map((el) => el.bounds.y));
+  const maxX = Math.max(...elements.map((el) => el.bounds.x + el.bounds.width));
+  const maxY = Math.max(...elements.map((el) => el.bounds.y + el.bounds.height));
+  return { x: minX, y: minY, width: maxX - minX, height: maxY - minY };
 }
 
 function getLassoSelectionBounds(): Bounds | null {
-  return getBoundsForElements(
-    getSelectableElements().filter((element) => selectedLassoIds.includes(element.id)),
-  );
+  return getBoundsForElements(getSelectableElements().filter((el) => lasso.selectedIds.includes(el.id)));
 }
 
 function isPointInLassoResizeHandle(bounds: Bounds, point: StrokePoint): boolean {
   const left = bounds.x + bounds.width - LASSO_RESIZE_HANDLE_SIZE;
   const top = bounds.y + bounds.height - LASSO_RESIZE_HANDLE_SIZE;
-  return point.x >= left
-    && point.x <= bounds.x + bounds.width
-    && point.y >= top
-    && point.y <= bounds.y + bounds.height;
+  return point.x >= left && point.x <= bounds.x + bounds.width && point.y >= top && point.y <= bounds.y + bounds.height;
 }
 
 function getSelectableElements() {
   const strokeElements = migrateStrokesToElements(state.strokes);
-  const strokeIds = new Set(state.strokes.map((stroke) => stroke.id));
+  const strokeIds = new Set(state.strokes.map((s) => s.id));
   return [
     ...strokeElements,
-    ...state.elements.filter((element) => element.type !== "stroke" || !strokeIds.has(element.id)),
+    ...state.elements.filter((el) => el.type !== "stroke" || !strokeIds.has(el.id)),
   ];
 }
 
 function clearInteractionState() {
-  shapeStart = null;
-  imageTransform = null;
-  elementTransform = null;
-  selectedElementId = null;
-  lassoPath = [];
-  lassoBox = null;
-  selectedLassoIds = [];
-  lassoMove = null;
-  lassoResize = null;
+  interaction.shapeStart = null;
+  interaction.imageTransform = null;
+  interaction.elementTransform = null;
+  interaction.selectedElementId = null;
+  lasso.path = [];
+  lasso.box = null;
+  lasso.selectedIds = [];
+  lasso.move = null;
+  lasso.resize = null;
 }
+
+// ── Canvas double-click for text editing ──
 
 function onCanvasDoubleClick(e: MouseEvent) {
   if (props.tool !== "text") return;
@@ -990,29 +726,18 @@ function onCanvasDoubleClick(e: MouseEvent) {
     point.y,
   );
   if (!element || element.type !== "text") return;
-
-  textEditor.value = {
-    show: true,
-    x: element.bounds.x,
-    y: element.bounds.y,
-    val: element.text,
-    elementId: element.id,
-  };
-
-  setTimeout(() => {
-    if (textEditorInputRef.value) {
-      textEditorInputRef.value.focus();
-      textEditorInputRef.value.select();
-    }
-  }, 50);
+  startEditText(element as any);
 }
 
-function doUndo() { selectedLassoIds = []; engineUndo(state); fullRedrawStrokeCanvas(getCanvas(), state); updateUndoRedoState(); emit("stroke"); }
-function doRedo() { selectedLassoIds = []; engineRedo(state); fullRedrawStrokeCanvas(getCanvas(), state); updateUndoRedoState(); emit("stroke"); }
-function doClear() { selectedLassoIds = []; engineClear(state); fullRedrawStrokeCanvas(getCanvas(), state); updateUndoRedoState(); emit("stroke"); }
+// ── Public API ──
+
+function doUndo() { lasso.selectedIds = []; engineUndo(state); fullRedrawStrokeCanvas(getCanvas(), state); updateUndoRedoState(); emit("stroke"); }
+function doRedo() { lasso.selectedIds = []; engineRedo(state); fullRedrawStrokeCanvas(getCanvas(), state); updateUndoRedoState(); emit("stroke"); }
+function doClear() { lasso.selectedIds = []; engineClear(state); fullRedrawStrokeCanvas(getCanvas(), state); updateUndoRedoState(); emit("stroke"); }
 function getData(): SketchData { return serializeState(state); }
 function getState(): EngineState { return state; }
 function getPageOverviewItems() { return createPageOverviewItems(serializeState(state)); }
+
 async function restoreData(data: SketchData) {
   if (!bgCanvasRef.value || !strokeCanvasRef.value) return;
   clearInteractionState();
@@ -1027,6 +752,7 @@ async function restoreData(data: SketchData) {
   emitPageState();
   resetViewport();
 }
+
 function addPage() {
   const next = addSketchPage(serializeState(state));
   pushHistorySnapshot(state);
@@ -1036,6 +762,7 @@ function addPage() {
   emit("stroke");
   scrollActivePageIntoView();
 }
+
 function duplicateCurrentPage() {
   const current = createPageNavigator(serializeState(state)).current;
   if (!current) return;
@@ -1047,16 +774,13 @@ function duplicateCurrentPage() {
   emit("stroke");
   scrollActivePageIntoView();
 }
+
 function deleteCurrentPage(): boolean {
   const before = serializeState(state);
   const current = createPageNavigator(before).current;
   if (!current) return false;
   let next: SketchData;
-  try {
-    next = removeSketchPage(before, current.id);
-  } catch {
-    return false;
-  }
+  try { next = removeSketchPage(before, current.id); } catch { return false; }
   if (next === before) return false;
   pushHistorySnapshot(state);
   restorePageState(next);
@@ -1066,6 +790,7 @@ function deleteCurrentPage(): boolean {
   scrollActivePageIntoView();
   return true;
 }
+
 function restorePageState(data: SketchData) {
   state.pageMode = data.pageMode;
   state.pages = data.pages ?? getSketchPages(data);
@@ -1076,181 +801,74 @@ function restorePageState(data: SketchData) {
   state.isDirty = true;
   resizeCanvases(bgCanvasRef.value!, strokeCanvasRef.value!, state);
 }
+
 function goToPage(index: number) {
   const next = createPageNavigator(serializeState(state)).goToIndex(index);
   state.activePageId = next.activePageId;
   emitPageState();
   scrollActivePageIntoView();
 }
+
 function goToPreviousPage() {
   const next = createPageNavigator(serializeState(state)).goToPrevious();
   state.activePageId = next.activePageId;
   emitPageState();
   scrollActivePageIntoView();
 }
+
 function goToNextPage() {
   const next = createPageNavigator(serializeState(state)).goToNext();
   state.activePageId = next.activePageId;
   emitPageState();
   scrollActivePageIntoView();
 }
+
 function scrollActivePageIntoView() {
   const page = createPageNavigator(serializeState(state)).current;
   if (!page) return;
-  containerRef.value?.parentElement?.scrollTo({
-    top: page.y,
-    behavior: "smooth",
-  });
+  containerRef.value?.parentElement?.scrollTo({ top: page.y, behavior: "smooth" });
 }
+
 function deleteLassoSelection() {
-  if (selectedLassoIds.length === 0) return;
+  if (lasso.selectedIds.length === 0) return;
   pushHistorySnapshot(state);
-  state.elements = removeLassoSelection(state.elements, selectedLassoIds);
-  state.strokes = removeStrokeSelection(state.strokes, selectedLassoIds);
-  selectedLassoIds = [];
+  state.elements = removeLassoSelection(state.elements, lasso.selectedIds);
+  state.strokes = removeStrokeSelection(state.strokes, lasso.selectedIds);
+  lasso.selectedIds = [];
   state.isDirty = true;
   fullRedrawStrokeCanvas(getCanvas(), state);
   updateUndoRedoState();
   emit("stroke");
 }
+
 function recolorLasso(color: string) {
-  if (selectedLassoIds.length === 0) return;
+  if (lasso.selectedIds.length === 0) return;
   pushHistorySnapshot(state);
-  state.elements = recolorLassoSelection(state.elements, selectedLassoIds, color);
-  state.strokes = recolorStrokeSelection(state.strokes, selectedLassoIds, color);
+  state.elements = recolorLassoSelection(state.elements, lasso.selectedIds, color);
+  state.strokes = recolorStrokeSelection(state.strokes, lasso.selectedIds, color);
   state.isDirty = true;
   fullRedrawStrokeCanvas(getCanvas(), state);
   drawLassoSelectionOutline();
   updateUndoRedoState();
   emit("stroke");
 }
+
 function duplicateLassoSelection() {
-  if (selectedLassoIds.length === 0) return;
-  const copiedIds = selectedLassoIds.map((id) => `copy-${Date.now()}-${id}`);
-  const idByOriginal = new Map(selectedLassoIds.map((id, index) => [id, copiedIds[index]]));
+  if (lasso.selectedIds.length === 0) return;
+  const copiedIds = lasso.selectedIds.map((id) => `copy-${Date.now()}-${id}`);
+  const idByOriginal = new Map(lasso.selectedIds.map((id, index) => [id, copiedIds[index]]));
   const createCopyId = (id: string) => idByOriginal.get(id) ?? `copy-${Date.now()}-${id}`;
-
   pushHistorySnapshot(state);
-  state.elements = duplicateLassoElements(
-    state.elements,
-    selectedLassoIds,
-    LASSO_DUPLICATE_OFFSET,
-    LASSO_DUPLICATE_OFFSET,
-    createCopyId,
-  );
-  state.strokes = duplicateStrokeSelection(
-    state.strokes,
-    selectedLassoIds,
-    LASSO_DUPLICATE_OFFSET,
-    LASSO_DUPLICATE_OFFSET,
-    createCopyId,
-  );
-  selectedLassoIds = copiedIds;
+  state.elements = duplicateLassoElements(state.elements, lasso.selectedIds, LASSO_DUPLICATE_OFFSET, LASSO_DUPLICATE_OFFSET, createCopyId);
+  state.strokes = duplicateStrokeSelection(state.strokes, lasso.selectedIds, LASSO_DUPLICATE_OFFSET, LASSO_DUPLICATE_OFFSET, createCopyId);
+  lasso.selectedIds = copiedIds;
   state.isDirty = true;
   fullRedrawStrokeCanvas(getCanvas(), state);
   drawLassoSelectionOutline();
   updateUndoRedoState();
   emit("stroke");
 }
-function insertText() {
-  const position = createInsertElementPosition({
-    canvasWidth: state.canvasWidth,
-    pageMode: state.pageMode,
-    activePageId: state.activePageId,
-    pages: state.pages,
-    elementWidth: 220,
-    topOffset: 120,
-  });
 
-  textEditor.value = {
-    show: true,
-    x: position.x,
-    y: position.y,
-    val: "",
-    elementId: null,
-  };
-
-  setTimeout(() => {
-    if (textEditorInputRef.value) {
-      textEditorInputRef.value.focus();
-    }
-  }, 50);
-}
-
-function startNewTextEditing(x: number, y: number) {
-  const textStyle = props.toolPresets.text ?? { color: "#000000", width: 20 };
-  const fontSize = textStyle.width;
-
-  textEditor.value = {
-    show: true,
-    x,
-    y: y - fontSize / 2,
-    val: "",
-    elementId: null,
-  };
-
-  setTimeout(() => {
-    if (textEditorInputRef.value) {
-      textEditorInputRef.value.focus();
-    }
-  }, 50);
-}
-
-function finishTextEditing() {
-  if (!textEditor.value.show) return;
-  const { elementId, val, x, y } = textEditor.value;
-  textEditor.value.show = false;
-
-  if (!val.trim()) {
-    if (elementId) {
-      pushHistorySnapshot(state);
-      state.elements = state.elements.filter((item) => item.id !== elementId);
-      state.isDirty = true;
-      fullRedrawStrokeCanvas(getCanvas(), state);
-      updateUndoRedoState();
-      emit("stroke");
-    }
-    return;
-  }
-
-  pushHistorySnapshot(state);
-
-  if (elementId) {
-    state.elements = state.elements.map((item) =>
-      item.id === elementId ? updateTextElement(item as any, { text: val }) : item,
-    );
-  } else {
-    const textStyle = props.toolPresets.text ?? { color: "#000000", width: 20 };
-    const fontSize = textStyle.width;
-    const color = textStyle.color;
-
-    const calculatedWidth = Math.max(150, val.length * fontSize * 0.65);
-    const calculatedHeight = fontSize + 8;
-
-    const element = createTextElement(`text-${Date.now()}`, {
-      x,
-      y,
-      text: val,
-      width: calculatedWidth,
-      height: calculatedHeight,
-      style: {
-        fontSize,
-        color,
-        fontFamily: "Inter, system-ui, sans-serif",
-      },
-    });
-    state.elements = [...state.elements, element];
-  }
-
-  state.isDirty = true;
-  fullRedrawStrokeCanvas(getCanvas(), state);
-  updateUndoRedoState();
-  emit("stroke");
-}
-
-function cancelTextEditing() {
-  textEditor.value.show = false;
-}
 async function insertImage(src: string) {
   await preloadImage(src);
   const position = createInsertElementPosition({
@@ -1261,11 +879,7 @@ async function insertImage(src: string) {
     elementWidth: 320,
     topOffset: 140,
   });
-  const element = createImageElement(`image-${Date.now()}`, {
-    x: position.x,
-    y: position.y,
-    src,
-  });
+  const element = createImageElement(`image-${Date.now()}`, { x: position.x, y: position.y, src });
   pushHistorySnapshot(state);
   state.elements = [...state.elements, element];
   fullRedrawStrokeCanvas(getCanvas(), state);
@@ -1274,15 +888,12 @@ async function insertImage(src: string) {
 
 function highlightSearchResult(result: OcrSearchResult) {
   if (!result.localBounds && !result.bounds) return;
-
   if (result.pageNumber != null) {
     const nav = createPageNavigator(serializeState(state)).goToIndex(result.pageNumber - 1);
     state.activePageId = nav.activePageId;
     emitPageState();
   }
-
   fullRedrawStrokeCanvas(getCanvas(), state);
-
   const bounds = result.localBounds ?? result.bounds;
   const ctx = getCanvas().getContext("2d")!;
   const pad = 4;
@@ -1294,7 +905,6 @@ function highlightSearchResult(result: OcrSearchResult) {
   ctx.fillRect(bounds.x - pad, bounds.y - pad, bounds.width + pad * 2, bounds.height + pad * 2);
   ctx.strokeRect(bounds.x - pad, bounds.y - pad, bounds.width + pad * 2, bounds.height + pad * 2);
   ctx.restore();
-
   scrollActivePageIntoView();
 }
 
@@ -1305,7 +915,7 @@ defineExpose({
   getData,
   getState,
   getPageOverviewItems,
-  insertText,
+  insertText: () => insertText(state),
   insertImage,
   restoreData,
   highlightSearchResult,

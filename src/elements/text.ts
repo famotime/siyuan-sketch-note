@@ -1,4 +1,5 @@
 import type { Bounds, Transform } from "./model";
+import { defaultTransform } from "./model";
 
 export interface TextStyle {
   color: string;
@@ -23,16 +24,6 @@ interface CreateTextElementInput {
   width?: number;
   height?: number;
   style?: Partial<TextStyle>;
-}
-
-function defaultTransform(): Transform {
-  return {
-    x: 0,
-    y: 0,
-    scaleX: 1,
-    scaleY: 1,
-    rotation: 0,
-  };
 }
 
 export function createTextElement(id: string, input: CreateTextElementInput): TextElement {

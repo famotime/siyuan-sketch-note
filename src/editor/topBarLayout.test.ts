@@ -85,7 +85,7 @@ it("adapts top and floating toolbars to SiYuan light and dark themes", () => {
 it("lets explicit dark theme override light media and document theme rules", () => {
   const editor = readFileSync(resolve(process.cwd(), "src/editor/SketchEditor.vue"), "utf8");
   const mediaLightIndex = editor.indexOf("@media (prefers-color-scheme: light)");
-  const explicitDarkIndex = editor.indexOf(".sketch-editor--theme-dark,\n:global(html[data-theme=\"dark\"]) .sketch-editor");
+  const explicitDarkIndex = editor.indexOf(".sketch-editor--theme-dark");
 
   expect(mediaLightIndex).toBeGreaterThan(-1);
   expect(explicitDarkIndex).toBeGreaterThan(mediaLightIndex);
@@ -109,6 +109,7 @@ it("lets explicit light theme override stale dark document theme rules", () => {
 it("uses the SiYuan runtime appearance mode for toolbar theme classes", () => {
   const app = readFileSync(resolve(process.cwd(), "src/App.vue"), "utf8");
   const editor = readFileSync(resolve(process.cwd(), "src/editor/SketchEditor.vue"), "utf8");
+  const composable = readFileSync(resolve(process.cwd(), "src/composables/useThemeDetection.ts"), "utf8");
 
   expect(app).toContain("resolveSiyuanThemeMode");
   expect(app).toContain("MutationObserver");
@@ -126,8 +127,9 @@ it("uses the SiYuan runtime appearance mode for toolbar theme classes", () => {
   expect(app).toContain(':themeMode="themeMode"');
   expect(editor).toContain("themeMode: 'light' | 'dark'");
   expect(editor).toContain("effectiveThemeMode");
-  expect(editor).toContain("resolveEditorBackgroundThemeMode");
-  expect(editor).toContain("propThemeMode: props.themeMode");
+  expect(editor).toContain("useThemeDetection");
+  expect(composable).toContain("resolveEditorBackgroundThemeMode");
+  expect(composable).toContain("propThemeMode");
   expect(editor).toContain("sketch-editor--theme-light");
   expect(editor).toContain("sketch-editor--theme-dark");
 });
@@ -150,10 +152,12 @@ it("closes floating color popups from captured pointer events outside the picker
 });
 
 it("logs applied editor theme variables for runtime diagnosis", () => {
+  const composable = readFileSync(resolve(process.cwd(), "src/composables/useThemeDetection.ts"), "utf8");
   const editor = readFileSync(resolve(process.cwd(), "src/editor/SketchEditor.vue"), "utf8");
 
-  expect(editor).toContain("watch(");
-  expect(editor).toContain("logEditorThemeDiagnostics");
-  expect(editor).toContain("getComputedStyle(editorRootRef.value)");
+  expect(composable).toContain("watch(");
+  expect(composable).toContain("logEditorThemeDiagnostics");
+  expect(composable).toContain("getComputedStyle");
   expect(editor).toContain("--sketch-toolbar-surface");
+  expect(editor).toContain("useThemeDetection");
 });

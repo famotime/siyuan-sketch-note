@@ -1,9 +1,6 @@
 import type { SketchData } from "@/types/sketch";
 import { createPageNavigator } from "@/pages/model";
-
-function pad(value: number): string {
-  return String(value).padStart(2, "0");
-}
+import { pad } from "@/utils/date";
 
 export interface PngExportPlan {
   blockId: string;

@@ -4,17 +4,19 @@
 
 This repository is a SiYuan Note plugin (闲笔) built with Vite, Vue 3, and TypeScript. It provides a vector handwriting editor using HTML5 Canvas.
 
-Core plugin code lives in `src/`: `index.ts` exports the `SketchNotePlugin` class (SiYuan Plugin SDK lifecycle), `main.ts` handles Vue app mount/unmount and API bridge, `App.vue` manages editor visibility. Key modules:
+Core plugin code lives in `src/`: `index.ts` exports the `SketchNotePlugin` class (SiYuan Plugin SDK lifecycle), `main.ts` handles Vue app mount/unmount and API bridge, `App.vue` manages editor visibility and theme detection. Key modules:
 
-- `editor/` — Vue editor components: `SketchEditor.vue` (orchestrator), `SketchCanvas.vue` (canvas surface), `EditorTopBar.vue`, `ToolBar.vue`, `ToolOptionsPopover.vue`, plus `shortcuts.ts`, `clipboard.ts`, `inputMode.ts`
-- `elements/` — Element model system: `SketchElement` discriminated union (StrokeElement | ShapeElement | TextElement | ImageElement), lasso hit-testing and edit operations, transform, render ordering
-- `engine/` — Canvas rendering engine: `canvasEngine.ts` (state machine, pointer events, undo/redo), `strokeSmoothing.ts` (point filtering, Bézier curves)
+- `composables/` — Vue 3 composables extracted from editor components: `useThemeDetection` (shared theme resolution), `useSaveManager`, `useColorPalettes`, `useOcrSearch`, `useExportManager`, `useEditorPreferences`, `useZenMode`, `useViewport`, `useTextEditing`
+- `editor/` — Vue editor components: `SketchEditor.vue` (orchestrator, ~1000 lines), `SketchCanvas.vue` (canvas surface, ~1040 lines), `EditorTopBar.vue`, `ToolBar.vue`, `FloatingToolbar.vue`, `ToolOptionsPopover.vue`, plus `shortcuts.ts`, `clipboard.ts`, `inputMode.ts`
+- `elements/` — Element model system: `SketchElement` discriminated union (StrokeElement | ShapeElement | TextElement | ImageElement), `model.ts` exports `defaultTransform()`, lasso hit-testing and edit operations, transform, render ordering
+- `engine/` — Canvas rendering engine: `canvasEngine.ts` (state machine, pointer events, undo/redo, `clearImageCache()`), `strokeSmoothing.ts` (point filtering, Bézier curves)
 - `storage/` — Data persistence via SiYuan plugin storage API, migration/recovery, thumbnail generation, save queue
 - `template/` — 9 built-in page templates + custom background support
-- `export/` — PNG/PDF/JSON export
+- `export/` — PNG/PDF/JSON export (uses shared `pad()` from `utils/date.ts`)
 - `pages/` — Multi-page model
 - `search/` — OCR provider interface (pluggable) and text indexing
 - `tools/` — Tool presets and recent colors palette
+- `utils/` — Shared utilities: `date.ts` (date formatting `pad()`), `uploadPng.ts` (SiYuan asset upload)
 - `types/` — Shared TypeScript types (`SketchData`, `Stroke`, `SketchTool`, etc.)
 - `i18n/` — Locale JSON files (en_US, zh_CN)
 

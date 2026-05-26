@@ -27,24 +27,36 @@ siyuan-sketch-note（闲笔）是思源笔记的手写插件，使用 HTML5 Canv
 ### Component Hierarchy
 
 ```
-App.vue (编辑器可见性管理)
-  └── SketchEditor.vue (全屏编辑器，业务编排)
-       ├── EditorTopBar.vue (模板、页码、导出、搜索/OCR)
+App.vue (编辑器可见性管理、主题检测)
+  └── SketchEditor.vue (全屏编辑器，业务编排，通过 composables 拆分逻辑)
+       ├── EditorTopBar.vue (模板、撤销/重做、禅模式)
        ├── ToolBar.vue (工具按钮、颜色、撤销/重做)
        ├── ToolOptionsPopover.vue (粗细/透明度滑块)
-       └── SketchCanvas.vue (Canvas 绘制画布)
+       ├── FloatingToolbar.vue (浮动侧栏：颜色/粗细/透明度)
+       └── SketchCanvas.vue (Canvas 绘制画布，通过 composables 拆分逻辑)
 ```
 
 ### Core Modules
 
-- **`elements/`** — 元素模型系统。`SketchElement` 判别联合类型（StrokeElement | ShapeElement | TextElement | ImageElement），包含 `model.ts`（核心类型、边界计算）、`shapes.ts`、`text.ts`、`image.ts`、`lasso.ts`/`lassoEdit.ts`（套索选区）、`transform.ts`、`renderOrder.ts`（z 序分层）
-- **`engine/`** — Canvas 渲染引擎。`canvasEngine.ts` 是状态机，管理指针事件、笔迹渲染、撤销/重做；`strokeSmoothing.ts` 处理点过滤和贝塞尔曲线平滑
+- **`composables/`** — Vue 3 组合式函数，从编辑器组件中提取的可复用逻辑：
+  - `useThemeDetection` — 主题检测（CSS 颜色解析、亮度计算、light/dark 判定），被 App.vue 和 SketchEditor.vue 共享
+  - `useSaveManager` — 保存队列、自动保存、缩略图上传
+  - `useColorPalettes` — 颜色选择、自定义颜色、删除、重置
+  - `useOcrSearch` — OCR 识别、搜索导航
+  - `useExportManager` — PNG/PDF/JSON 导出
+  - `useEditorPreferences` — 触控笔模式、压感、模板持久化
+  - `useZenMode` — 禅模式切换与拖拽定位
+  - `useViewport` — 缩放/平移、双指手势、右键拖拽
+  - `useTextEditing` — 文本元素创建与编辑
+- **`elements/`** — 元素模型系统。`SketchElement` 判别联合类型（StrokeElement | ShapeElement | TextElement | ImageElement），包含 `model.ts`（核心类型、边界计算、`defaultTransform()`）、`shapes.ts`、`text.ts`、`image.ts`、`lasso.ts`/`lassoEdit.ts`（套索选区）、`transform.ts`、`renderOrder.ts`（z 序分层）
+- **`engine/`** — Canvas 渲染引擎。`canvasEngine.ts` 是状态机，管理指针事件、笔迹渲染、撤销/重做、图片缓存（`clearImageCache()`）；`strokeSmoothing.ts` 处理点过滤和贝塞尔曲线平滑
 - **`storage/`** — 数据持久化。通过 `plugin.saveData()`/`plugin.loadData()` 存取，`migrations.ts` 处理数据版本迁移和恢复，`thumbnail.ts` 生成缩略图（自动裁剪+橡皮合成），`saveQueue.ts` 保证顺序写入
 - **`template/`** — 9 种内置稿纸模板 + 自定义背景。每个模板实现 `Template` 接口（id, nameKey, render），新增模板在 `index.ts` 注册
-- **`export/`** — PNG/PDF/JSON 导出
+- **`export/`** — PNG/PDF/JSON 导出，共用 `utils/date.ts` 的 `pad()` 工具函数
 - **`pages/`** — 多页模型
 - **`search/`** — OCR 识别与搜索，`OcrProvider` 可插拔注入
 - **`tools/`** — 工具预设和最近颜色管理
+- **`utils/`** — 通用工具函数：`date.ts`（日期格式化 `pad()`）、`uploadPng.ts`（SiYuan 资源上传）
 - **`types/sketch.ts`** — 核心数据类型：`Stroke`、`SketchData`、`SketchTool`、`ToolPreset`
 
 ### Data Flow

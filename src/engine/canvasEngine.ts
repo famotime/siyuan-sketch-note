@@ -21,6 +21,11 @@ let idCounter = 0;
 const MIN_POINT_DISTANCE = 1.5;
 const ERASER_HIT_PADDING = 2;
 const imageCache = new Map<string, HTMLImageElement>();
+
+export function clearImageCache(): void {
+  imageCache.clear();
+}
+
 function newId(): string {
   return `s${Date.now()}-${++idCounter}`;
 }

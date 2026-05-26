@@ -1,5 +1,5 @@
 import type { Bounds, Transform } from "./model";
-import { withStrokeBounds } from "./model";
+import { defaultTransform, withStrokeBounds } from "./model";
 import type { Stroke, StrokePoint, ToolPreset } from "@/types/sketch";
 
 export interface Point {
@@ -23,16 +23,6 @@ export interface ShapeElement {
   bounds: Bounds;
   transform: Transform;
   zIndex: number;
-}
-
-function defaultTransform(): Transform {
-  return {
-    x: 0,
-    y: 0,
-    scaleX: 1,
-    scaleY: 1,
-    rotation: 0,
-  };
 }
 
 function boundsFromPoints(start: Point, end: Point, strokeWidth: number): Bounds {

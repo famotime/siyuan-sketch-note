@@ -16,6 +16,7 @@ import { showMessage } from "siyuan";
 import { loadSketchData } from "@/storage";
 import { normalizeEditorI18n } from "@/i18n/editorI18n";
 import SketchEditor from "@/editor/SketchEditor.vue";
+import { parseCssColor, getColorLuminance as getLuminance, resolveThemeModeFromColor as resolveColorTheme } from "@/composables/useThemeDetection";
 
 const editorVisible = ref(false);
 const editorBlockId = ref("");
@@ -58,66 +59,18 @@ function resolveDocumentThemeMode(): "light" | "dark" | null {
 function resolveCssVariableThemeMode(): "light" | "dark" | null {
   const background = getComputedStyle(document.body).getPropertyValue("--b3-theme-background")
     || getComputedStyle(document.documentElement).getPropertyValue("--b3-theme-background");
-  const luminance = getColorLuminance(background.trim());
-  if (luminance === null) return null;
+  const rgb = parseCssColor(background.trim());
+  if (!rgb) return null;
+  const luminance = getLuminance(rgb);
   return luminance < 0.5 ? "dark" : "light";
 }
 
 function resolveComputedBackgroundThemeMode(): "light" | "dark" | null {
   const bodyBackground = getComputedStyle(document.body).backgroundColor;
-  const bodyMode = resolveThemeModeFromColor(bodyBackground);
+  const bodyMode = resolveColorTheme(bodyBackground);
   if (bodyMode) return bodyMode;
   const htmlBackground = getComputedStyle(document.documentElement).backgroundColor;
-  return resolveThemeModeFromColor(htmlBackground);
-}
-
-function resolveThemeModeFromColor(color: string): "light" | "dark" | null {
-  if (!color || color === "transparent" || color === "rgba(0, 0, 0, 0)") return null;
-  const luminance = getColorLuminance(color);
-  if (luminance === null) return null;
-  return luminance < 0.5 ? "dark" : "light";
-}
-
-function getColorLuminance(color: string): number | null {
-  const rgb = parseCssColor(color);
-  if (!rgb) return null;
-  const [red, green, blue] = rgb.map((channel) => {
-    const value = channel / 255;
-    return value <= 0.03928
-      ? value / 12.92
-      : ((value + 0.055) / 1.055) ** 2.4;
-  });
-  return 0.2126 * red + 0.7152 * green + 0.0722 * blue;
-}
-
-function parseCssColor(color: string): [number, number, number] | null {
-  const rgbMatch = color.match(/rgba?\(\s*(\d+(?:\.\d+)?)\s*,\s*(\d+(?:\.\d+)?)\s*,\s*(\d+(?:\.\d+)?)/i);
-  if (rgbMatch) {
-    return [
-      clampColorChannel(Number(rgbMatch[1])),
-      clampColorChannel(Number(rgbMatch[2])),
-      clampColorChannel(Number(rgbMatch[3])),
-    ];
-  }
-  const hexMatch = color.match(/^#([0-9a-f]{3}|[0-9a-f]{6})$/i);
-  if (!hexMatch) return null;
-  const hex = hexMatch[1];
-  if (hex.length === 3) {
-    return [
-      Number.parseInt(`${hex[0]}${hex[0]}`, 16),
-      Number.parseInt(`${hex[1]}${hex[1]}`, 16),
-      Number.parseInt(`${hex[2]}${hex[2]}`, 16),
-    ];
-  }
-  return [
-    Number.parseInt(hex.slice(0, 2), 16),
-    Number.parseInt(hex.slice(2, 4), 16),
-    Number.parseInt(hex.slice(4, 6), 16),
-  ];
-}
-
-function clampColorChannel(value: number): number {
-  return Math.max(0, Math.min(255, value));
+  return resolveColorTheme(htmlBackground);
 }
 
 function collectThemeDiagnostics() {

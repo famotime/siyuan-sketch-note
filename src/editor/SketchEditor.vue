@@ -135,43 +135,35 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, nextTick, onMounted, onUnmounted, watch } from "vue";
+import { ref, computed, onMounted, onUnmounted } from "vue";
 import type { SketchData, ToolPreset } from "@/types/sketch";
-import { PRESET_COLORS } from "@/types/sketch";
 import { getAllTemplates } from "@/template";
-import { saveEditorPreferences, storageKey } from "@/storage";
-import { renderSketchPdfPageImages, renderSketchPngPageImage, thumbnailSketchDataAsync } from "@/storage/thumbnail";
 import { showMessage } from "siyuan";
-import { sketchAssetFileName, uploadDataUrlToAssets } from "@/utils/uploadPng";
 import { normalizeToolPresets, updateToolPreset } from "@/tools/presets";
-import { createCurrentPagePngExportPlan, createExportPngFileName, dataUrlToBlob, downloadBlob } from "@/export/png";
-import { createExportPdfFileName, createPdfExportPlanFromSketch, exportPdf as exportPdfBlob } from "@/export/pdf";
-import { createExportJsonFileName, exportSketchJson, importSketchJson } from "@/export/json";
-import { SaveQueue } from "@/storage/saveQueue";
-import type { SaveStatus } from "@/storage/saveStatus";
+import { importSketchJson } from "@/export/json";
 import { normalizeInputSettings } from "./inputMode";
 import { createCustomBackgroundTemplate, getCustomBackgroundTemplate, updateCustomBackgroundFit } from "@/template/customBackground";
 import type { CustomBackgroundTemplate } from "@/template/customBackground";
 import type { PageOverviewItem } from "@/pages/model";
-import {
-  addRecentColor,
-  appendRecentColor,
-  normalizeToolColorPalettes,
-} from "@/tools/palette";
+import { normalizeToolColorPalettes } from "@/tools/palette";
 import { getFirstImageFileFromClipboard } from "./clipboard";
 import { resolveEditorShortcut } from "./shortcuts";
 import { getDrawingToolForEditorTool, isShapeEditorTool } from "./tools";
 import type { EditorTool, ShapeEditorTool } from "./tools";
 import type { OcrProvider } from "@/search/ocrProvider";
-import { createNoopOcrProvider } from "@/search/ocrProvider";
-import { createPageAwareOcrIndex, searchOcrIndex } from "@/search/ocrIndex";
-import type { OcrSearchResult } from "@/search/ocrIndex";
 import EditorTopBar from "./EditorTopBar.vue";
 import SketchCanvas from "./SketchCanvas.vue";
 import ToolBar from "./ToolBar.vue";
 import FloatingToolbar from "./FloatingToolbar.vue";
 import IconParkIcon from "./IconParkIcon.vue";
-import { clampZenTogglePosition, createZenToggleState } from "./zenMode";
+
+import { useThemeDetection } from "@/composables/useThemeDetection";
+import { useSaveManager } from "@/composables/useSaveManager";
+import { useColorPalettes } from "@/composables/useColorPalettes";
+import { useOcrSearch } from "@/composables/useOcrSearch";
+import { useExportManager } from "@/composables/useExportManager";
+import { useEditorPreferences } from "@/composables/useEditorPreferences";
+import { useZenMode } from "@/composables/useZenMode";
 
 const props = defineProps<{
   blockId: string;
@@ -186,9 +178,9 @@ const emit = defineEmits<{ (e: "close"): void }>();
 
 function t(key: string): string { return props.i18n[key] ?? key; }
 
+// ─── Refs ───
 const visible = ref(false);
 const editorRootRef = ref<HTMLDivElement>();
-const effectiveThemeMode = ref<'light' | 'dark'>(props.themeMode);
 const canvasRef = ref<InstanceType<typeof SketchCanvas>>();
 const bodyRef = ref<HTMLDivElement>();
 const imageInputRef = ref<HTMLInputElement>();
@@ -197,33 +189,8 @@ const backgroundInputRef = ref<HTMLInputElement>();
 const activeTool = ref<EditorTool>("pen");
 const lassoMode = ref<"freehand" | "box">("box");
 const lastShapeTool = ref<ShapeEditorTool>("line");
-const activeColor = ref(PRESET_COLORS[0]);
 const toolPresets = ref(normalizeToolPresets(props.initialData?.toolPresets));
-
-// 文本专属预设 (包含字号 width 及 颜色 color)，独立配置并跨文档记忆
-const textPreset = ref({
-  color: "#000000",
-  width: 20, // 默认字号 20px
-  opacity: 1,
-});
-
-onMounted(() => {
-  try {
-    const cachedText = localStorage.getItem("sketch-note-text-preset");
-    if (cachedText) {
-      const parsed = JSON.parse(cachedText);
-      if (parsed && typeof parsed.color === "string" && typeof parsed.width === "number") {
-        textPreset.value = {
-          color: parsed.color,
-          width: parsed.width,
-          opacity: parsed.opacity ?? 1,
-        };
-      }
-    }
-  } catch (e) {
-    console.error("加载文本预设失败:", e);
-  }
-});
+const textPreset = ref({ color: "#000000", width: 20, opacity: 1 });
 const inputSettings = ref(normalizeInputSettings(props.initialData?.inputSettings));
 const customBackgrounds = ref(props.initialData?.customBackgrounds ?? []);
 const colorPalettes = ref(normalizeToolColorPalettes({
@@ -235,301 +202,108 @@ const canRedo = ref(false);
 const pageState = ref({ current: 1, total: 1 });
 const pageOverview = ref<PageOverviewItem[]>([]);
 const currentTemplate = ref(props.initialData?.template ?? "blank");
-const templates = computed(() => [
-  ...getAllTemplates(),
-  ...customBackgrounds.value,
-]);
+const templates = computed(() => [...getAllTemplates(), ...customBackgrounds.value]);
 const loadedData = ref<SketchData | null>(props.initialData);
-const saveStatus = ref<SaveStatus>("idle");
-const lastSavedAt = ref<number | null>(null);
-const autoSave = ref(true);
-const exportIncludeBackground = ref(true);
-const isZenMode = ref(false);
-const zenTogglePos = ref({ left: 24, top: 132 });
-const zenToggleState = computed(() => createZenToggleState(isZenMode.value));
-let zenDragOffset = { x: 0, y: 0 };
-let zenToggleDragging = false;
-let zenToggleMoved = false;
 
-const ocrState = ref<"idle" | "recognizing" | "completed" | "error">("idle");
-const ocrIndex = ref<SketchData["ocrIndex"]>(props.initialData?.ocrIndex ?? undefined);
-const searchResults = ref<OcrSearchResult[]>([]);
-const searchResultIndex = ref(0);
-
-let autoSaveTimer: ReturnType<typeof setTimeout> | null = null;
-let themeProbeTimer: ReturnType<typeof setInterval> | null = null;
-const saveQueue = new SaveQueue();
-
+// ─── Derived state ───
 const activePreset = computed(() => {
   if (activeTool.value === "text") {
-    return {
-      tool: "text",
-      mode: "ink",
-      ...textPreset.value,
-    } as any;
+    return { tool: "text", mode: "ink", ...textPreset.value } as any;
   }
   return toolPresets.value[getDrawingToolForEditorTool(activeTool.value)];
 });
-const colors = computed(() => {
-  if (activeTool.value === "highlighter") {
-    return colorPalettes.value.highlighter;
-  }
-  return colorPalettes.value.pen;
-});
+
 const activeCustomBackground = computed(() => getCustomBackgroundTemplate({
   template: currentTemplate.value,
   customBackgrounds: customBackgrounds.value,
 }));
-let lastEditorThemeDiagnosticKey = "";
 
+// ─── Composables ───
+const { effectiveThemeMode } = useThemeDetection({ editorRootRef, themeMode: computed(() => props.themeMode) });
+
+const { saveStatus, autoSave, doSave, manualSave, onStroke: saveOnStroke, markAndSchedule } = useSaveManager({
+  canvasRef: canvasRef as any,
+  blockId: computed(() => props.blockId),
+  saveData: props.saveData,
+  currentTemplate,
+  toolPresets,
+  inputSettings,
+  customBackgrounds,
+  colorPalettes,
+  ocrIndex: ref(undefined),
+  t,
+  onSaved: () => syncPageOverview(),
+});
+
+const { colors, selectColor, selectCustomColor, recolorSelection, deleteColor, resetDefaultColors } = useColorPalettes({
+  activeTool,
+  colorPalettes,
+  activePreset: computed(() => activePreset.value),
+  canvasRef: canvasRef as any,
+  t,
+  markAndSchedule,
+});
+
+const { ocrState, searchResults, recognizeText, onSearch, onSearchNext, onSearchPrev, onClearSearch } = useOcrSearch({
+  canvasRef: canvasRef as any,
+  ocrProvider: props.ocrProvider,
+  currentTemplate,
+  blockId: computed(() => props.blockId),
+  markDirty,
+  scheduleAutoSave,
+  autoSave,
+});
+
+const { exportIncludeBackground, exportPng, exportPdf, exportJson } = useExportManager({
+  canvasRef: canvasRef as any,
+  currentTemplate,
+  colorPalettes,
+  toolPresets,
+  inputSettings,
+  customBackgrounds,
+  blockId: computed(() => props.blockId),
+});
+
+const { toggleStylusOnly, togglePressure, onTemplateChange, persistEditorPreferences } = useEditorPreferences({
+  inputSettings,
+  currentTemplate,
+  customBackgrounds,
+  saveData: props.saveData,
+  markAndSchedule,
+});
+
+const { isZenMode, zenTogglePos, zenToggleState, enterZenMode, onZenToggleClick, onZenToggleDragStart } = useZenMode();
+
+// ─── Text preset persistence ───
+onMounted(() => {
+  try {
+    const cachedText = localStorage.getItem("sketch-note-text-preset");
+    if (cachedText) {
+      const parsed = JSON.parse(cachedText);
+      if (parsed && typeof parsed.color === "string" && typeof parsed.width === "number") {
+        textPreset.value = { color: parsed.color, width: parsed.width, opacity: parsed.opacity ?? 1 };
+      }
+    }
+  } catch (e) {
+    console.error("加载文本预设失败:", e);
+  }
+});
+
+// ─── Lifecycle ───
 onMounted(() => {
   visible.value = true;
   document.body.style.overflow = "hidden";
   window.addEventListener("paste", onPaste);
   window.addEventListener("keydown", onKeyDown);
-  syncEffectiveThemeMode();
-  themeProbeTimer = setInterval(syncEffectiveThemeMode, 250);
-  nextTick(logEditorThemeDiagnostics);
 });
 
 onUnmounted(() => {
   document.body.style.overflow = "";
-  if (autoSaveTimer) clearTimeout(autoSaveTimer);
-  if (themeProbeTimer) clearInterval(themeProbeTimer);
   window.removeEventListener("paste", onPaste);
   window.removeEventListener("keydown", onKeyDown);
-  removeZenToggleDragListeners();
 });
 
-watch(
-  () => props.themeMode,
-  () => {
-    effectiveThemeMode.value = props.themeMode;
-    syncEffectiveThemeMode();
-    nextTick(logEditorThemeDiagnostics);
-  },
-);
-
-function syncEffectiveThemeMode() {
-  const resolved = resolveEditorBackgroundThemeMode();
-  effectiveThemeMode.value = resolved ?? props.themeMode;
-  nextTick(logEditorThemeDiagnostics);
-}
-
-function resolveEditorBackgroundThemeMode(): 'light' | 'dark' | null {
-  if (!editorRootRef.value) return null;
-  return resolveThemeModeFromColor(getComputedStyle(editorRootRef.value).backgroundColor);
-}
-
-function resolveThemeModeFromColor(color: string): 'light' | 'dark' | null {
-  const rgb = parseCssColor(color);
-  if (!rgb) return null;
-  const luminance = getColorLuminance(rgb);
-  return luminance < 0.5 ? 'dark' : 'light';
-}
-
-function parseCssColor(color: string): [number, number, number] | null {
-  const match = color.match(/rgba?\(\s*(\d+(?:\.\d+)?)\s*,\s*(\d+(?:\.\d+)?)\s*,\s*(\d+(?:\.\d+)?)/i);
-  if (!match) return null;
-  return [
-    clampColorChannel(Number(match[1])),
-    clampColorChannel(Number(match[2])),
-    clampColorChannel(Number(match[3])),
-  ];
-}
-
-function getColorLuminance([redChannel, greenChannel, blueChannel]: [number, number, number]): number {
-  const [red, green, blue] = [redChannel, greenChannel, blueChannel].map((channel) => {
-    const value = channel / 255;
-    return value <= 0.03928
-      ? value / 12.92
-      : ((value + 0.055) / 1.055) ** 2.4;
-  });
-  return 0.2126 * red + 0.7152 * green + 0.0722 * blue;
-}
-
-function clampColorChannel(value: number): number {
-  return Math.max(0, Math.min(255, value));
-}
-
-function logEditorThemeDiagnostics() {
-  if (!editorRootRef.value) return;
-  const style = getComputedStyle(editorRootRef.value);
-  const diagnostics = {
-    propThemeMode: props.themeMode,
-    effectiveThemeMode: effectiveThemeMode.value,
-    className: editorRootRef.value.className,
-    toolbarSurface: style.getPropertyValue("--sketch-toolbar-surface").trim(),
-    toolbarText: style.getPropertyValue("--sketch-toolbar-text").trim(),
-    toolbarBorder: style.getPropertyValue("--sketch-toolbar-border").trim(),
-    toolbarHoverBg: style.getPropertyValue("--sketch-toolbar-hover-bg").trim(),
-    background: style.backgroundColor,
-  };
-  const key = JSON.stringify(diagnostics);
-  if (key === lastEditorThemeDiagnosticKey) return;
-  lastEditorThemeDiagnosticKey = key;
-  console.info("[Sketch Note][Theme][Editor]", diagnostics);
-}
-
 // ─── Toolbar actions ───
-
-function enterZenMode() {
-  isZenMode.value = true;
-  zenTogglePos.value = clampZenTogglePosition(zenTogglePos.value, getZenToggleBounds());
-}
-
-function exitZenMode() {
-  isZenMode.value = false;
-}
-
-function onZenToggleClick() {
-  if (zenToggleMoved) {
-    zenToggleMoved = false;
-    return;
-  }
-  exitZenMode();
-}
-
-function onZenToggleDragStart(e: MouseEvent | TouchEvent) {
-  zenToggleDragging = true;
-  zenToggleMoved = false;
-  const point = getClientPoint(e);
-  zenDragOffset = {
-    x: point.x - zenTogglePos.value.left,
-    y: point.y - zenTogglePos.value.top,
-  };
-  window.addEventListener("mousemove", onZenToggleDragging);
-  window.addEventListener("touchmove", onZenToggleDragging, { passive: false });
-  window.addEventListener("mouseup", onZenToggleDragEnd);
-  window.addEventListener("touchend", onZenToggleDragEnd, { passive: true });
-}
-
-function onZenToggleDragging(e: MouseEvent | TouchEvent) {
-  if (!zenToggleDragging) return;
-  if (e instanceof TouchEvent) {
-    e.preventDefault();
-  }
-  const point = getClientPoint(e);
-  const nextPos = clampZenTogglePosition(
-    {
-      left: point.x - zenDragOffset.x,
-      top: point.y - zenDragOffset.y,
-    },
-    getZenToggleBounds(),
-  );
-  if (Math.abs(nextPos.left - zenTogglePos.value.left) > 2 || Math.abs(nextPos.top - zenTogglePos.value.top) > 2) {
-    zenToggleMoved = true;
-  }
-  zenTogglePos.value = nextPos;
-}
-
-function onZenToggleDragEnd() {
-  zenToggleDragging = false;
-  removeZenToggleDragListeners();
-}
-
-function removeZenToggleDragListeners() {
-  window.removeEventListener("mousemove", onZenToggleDragging);
-  window.removeEventListener("touchmove", onZenToggleDragging);
-  window.removeEventListener("mouseup", onZenToggleDragEnd);
-  window.removeEventListener("touchend", onZenToggleDragEnd);
-}
-
-function getClientPoint(e: MouseEvent | TouchEvent) {
-  if (e instanceof MouseEvent) {
-    return { x: e.clientX, y: e.clientY };
-  }
-  const touch = e.touches[0] ?? e.changedTouches[0];
-  return { x: touch.clientX, y: touch.clientY };
-}
-
-function getZenToggleBounds() {
-  return {
-    width: window.innerWidth,
-    height: window.innerHeight,
-    size: 52,
-    margin: 12,
-  };
-}
-
-function selectColor(c: string) {
-  activeColor.value = c;
-  if (activeTool.value === "eraser") {
-    activeTool.value = "pen";
-  }
-  updateActivePreset({ color: c });
-  // 普通切换颜色不再改变 recentColors 列表的顺序，仅更新选中状态以维持位置恒定
-}
-
-function selectCustomColor(c: string) {
-  activeColor.value = c;
-  if (activeTool.value === "eraser") {
-    activeTool.value = "pen";
-  }
-  updateActivePreset({ color: c });
-  // 自定义颜色选择时，只追加到当前绘制工具的颜色栏，避免画笔和荧光笔互相污染。
-  if (activeTool.value === "highlighter") {
-    colorPalettes.value = {
-      ...colorPalettes.value,
-      highlighter: appendRecentColor(colorPalettes.value.highlighter, c),
-    };
-  } else {
-    colorPalettes.value = {
-      ...colorPalettes.value,
-      pen: appendRecentColor(colorPalettes.value.pen, c),
-    };
-  }
-}
-
-function recolorSelection(c: string) {
-  canvasRef.value?.recolorLasso(c);
-  colorPalettes.value = {
-    ...colorPalettes.value,
-    pen: addRecentColor(colorPalettes.value.pen, c),
-  };
-}
-
-function deleteColor(color: string) {
-  if (activeTool.value === "highlighter") {
-    colorPalettes.value = {
-      ...colorPalettes.value,
-      highlighter: colorPalettes.value.highlighter.filter((c) => c !== color),
-    };
-  } else {
-    colorPalettes.value = {
-      ...colorPalettes.value,
-      pen: colorPalettes.value.pen.filter((c) => c !== color),
-    };
-  }
-  showMessage(t("colorDeleted") || "已删除该颜色", 3000, "info");
-
-  if (activePreset.value.color === color) {
-    const fallback = colors.value[0] ?? PRESET_COLORS[0];
-    selectColor(fallback);
-  }
-  markDirty();
-  if (autoSave.value) scheduleAutoSave();
-}
-
-function resetDefaultColors() {
-  if (activeTool.value === "highlighter") {
-    colorPalettes.value = {
-      ...colorPalettes.value,
-      highlighter: normalizeToolColorPalettes().highlighter,
-    };
-  } else {
-    colorPalettes.value = {
-      ...colorPalettes.value,
-      pen: normalizeToolColorPalettes().pen,
-    };
-  }
-  showMessage(t("colorReset") || "已恢复默认颜色设置", 3000, "info");
-
-  selectColor(colors.value[0] ?? PRESET_COLORS[0]);
-  markDirty();
-  if (autoSave.value) scheduleAutoSave();
-}
-
 function selectTool(tool: EditorTool) {
   if (tool === "image") {
     triggerImageImport();
@@ -543,10 +317,7 @@ function selectTool(tool: EditorTool) {
 
 function updateActivePreset(patch: Partial<Omit<ToolPreset, "tool">>) {
   if (activeTool.value === "text") {
-    textPreset.value = {
-      ...textPreset.value,
-      ...patch,
-    };
+    textPreset.value = { ...textPreset.value, ...patch };
     try {
       localStorage.setItem("sketch-note-text-preset", JSON.stringify(textPreset.value));
     } catch (e) {
@@ -557,253 +328,18 @@ function updateActivePreset(patch: Partial<Omit<ToolPreset, "tool">>) {
   toolPresets.value = updateToolPreset(toolPresets.value, getDrawingToolForEditorTool(activeTool.value), patch);
 }
 
-
-function toggleStylusOnly() {
-  inputSettings.value = {
-    ...inputSettings.value,
-    stylusOnly: !inputSettings.value.stylusOnly,
-  };
-  persistEditorPreferences();
-  markDirty();
-  if (autoSave.value) scheduleAutoSave();
-}
-
-function togglePressure() {
-  inputSettings.value = {
-    ...inputSettings.value,
-    enablePressure: inputSettings.value.enablePressure === undefined ? false : !inputSettings.value.enablePressure,
-  };
-  persistEditorPreferences();
-  markDirty();
-  if (autoSave.value) scheduleAutoSave();
-}
-
-function onTemplateChange(value: string) {
-  currentTemplate.value = value;
-  persistEditorPreferences();
-  markDirty();
-  if (autoSave.value) scheduleAutoSave();
-}
-
-function persistEditorPreferences() {
-  saveEditorPreferences(props.saveData, {
-    template: currentTemplate.value,
-    inputSettings: inputSettings.value,
-    customBackgrounds: customBackgrounds.value,
-  }).catch((e) => {
-    console.error("[Sketch Note] Save editor preferences failed:", e);
-  });
-}
-
-// ─── Save logic ───
-
-function markDirty() {
-  if (saveStatus.value === "saved" || saveStatus.value === "idle") {
-    saveStatus.value = "dirty";
-  }
-}
-
 function onStroke() {
   syncPageOverview();
-  markDirty();
-  if (autoSave.value) scheduleAutoSave();
+  saveOnStroke();
 }
 
-function scheduleAutoSave() {
-  if (autoSaveTimer) clearTimeout(autoSaveTimer);
-  autoSaveTimer = setTimeout(() => {
-    autoSaveTimer = null;
-    if (saveStatus.value === "dirty" || saveStatus.value === "error") doSave();
-  }, 1500);
+function syncPageOverview() {
+  pageOverview.value = canvasRef.value?.getPageOverviewItems() ?? [];
 }
 
-async function doSave(): Promise<boolean> {
-  return saveQueue.enqueue(runSave);
-}
-
-async function runSave(): Promise<boolean> {
-  if (!canvasRef.value) return false;
-  saveStatus.value = "saving";
-  const data = canvasRef.value.getData();
-  data.template = currentTemplate.value;
-  data.toolPresets = toolPresets.value;
-  data.inputSettings = inputSettings.value;
-  data.customBackgrounds = customBackgrounds.value;
-  data.recentColors = colorPalettes.value.pen;
-  data.highlighterRecentColors = colorPalettes.value.highlighter;
-  if (ocrIndex.value) {
-    data.ocrIndex = ocrIndex.value;
-  }
-  delete data.recovery;
-
-  let pngDataUrl: string;
-  try {
-    pngDataUrl = await thumbnailSketchDataAsync(data);
-  } catch (e) {
-    console.error("[Sketch Note] Thumbnail generation failed:", e);
-    pngDataUrl = createFallbackThumbnail();
-  }
-
-  try {
-    const fileName = sketchAssetFileName(props.blockId);
-    await uploadDataUrlToAssets(pngDataUrl, fileName);
-    await props.saveData(storageKey(props.blockId), data);
-    saveStatus.value = "saved";
-    lastSavedAt.value = Date.now();
-    canvasRef.value.getState().isDirty = false;
-    return true;
-  } catch (e) {
-    console.error("[Sketch Note] Save failed:", e);
-    saveStatus.value = "error";
-    showMessage(t("saveFailed"), 5000, "error");
-    return false;
-  }
-}
-
-async function manualSave() {
-  if (autoSaveTimer) { clearTimeout(autoSaveTimer); autoSaveTimer = null; }
-  await doSave();
-}
-
-// ─── OCR & Search ───
-
-async function recognizeText() {
-  if (!canvasRef.value) return;
-  const provider = props.ocrProvider ?? createNoopOcrProvider();
-
-  ocrState.value = "recognizing";
-  try {
-    const data = canvasRef.value.getData();
-    data.template = currentTemplate.value;
-    const plan = createCurrentPagePngExportPlan(props.blockId, data);
-    const pngDataUrl = await renderSketchPngPageImage(data, plan, false);
-    const blob = dataUrlToBlob(pngDataUrl);
-
-    const lines = await provider({
-      imageBlob: blob,
-      canvasWidth: data.canvasWidth,
-      canvasHeight: data.canvasHeight,
-    });
-
-    if (lines.length === 0) {
-      ocrState.value = "completed";
-      return;
-    }
-
-    ocrIndex.value = createPageAwareOcrIndex(props.blockId, lines, data);
-
-    markDirty();
-    if (autoSave.value) scheduleAutoSave();
-
-    ocrState.value = "completed";
-  } catch (e) {
-    console.error("[Sketch Note] OCR failed:", e);
-    ocrState.value = "error";
-  }
-}
-
-function onSearch(query: string) {
-  if (!ocrIndex.value || !query.trim()) {
-    searchResults.value = [];
-    searchResultIndex.value = 0;
-    return;
-  }
-  searchResults.value = searchOcrIndex(ocrIndex.value, query);
-  searchResultIndex.value = 0;
-  if (searchResults.value.length > 0) {
-    navigateToSearchResult(0);
-  }
-}
-
-function onSearchNext() {
-  if (searchResults.value.length === 0) return;
-  searchResultIndex.value = (searchResultIndex.value + 1) % searchResults.value.length;
-  navigateToSearchResult(searchResultIndex.value);
-}
-
-function onSearchPrev() {
-  if (searchResults.value.length === 0) return;
-  searchResultIndex.value = (searchResultIndex.value - 1 + searchResults.value.length) % searchResults.value.length;
-  navigateToSearchResult(searchResultIndex.value);
-}
-
-function navigateToSearchResult(index: number) {
-  const result = searchResults.value[index];
-  if (!result || !canvasRef.value) return;
-  canvasRef.value.highlightSearchResult(result);
-}
-
-function onClearSearch() {
-  searchResults.value = [];
-  searchResultIndex.value = 0;
-}
-
-async function exportPng() {
-  if (!canvasRef.value) return;
-  const data = canvasRef.value.getData();
-  data.template = currentTemplate.value;
-  data.recentColors = colorPalettes.value.pen;
-  data.highlighterRecentColors = colorPalettes.value.highlighter;
-  const plan = createCurrentPagePngExportPlan(props.blockId, data);
-  const pngDataUrl = await renderSketchPngPageImage(data, plan, exportIncludeBackground.value);
-  const blob = dataUrlToBlob(pngDataUrl);
-  downloadBlob(blob, createExportPngFileName(props.blockId, new Date(), plan.pageNumber));
-}
-
-async function exportPdf() {
-  if (!canvasRef.value) return;
-  const data = canvasRef.value.getData();
-  data.template = currentTemplate.value;
-  data.recentColors = colorPalettes.value.pen;
-  data.highlighterRecentColors = colorPalettes.value.highlighter;
-  const plan = createPdfExportPlanFromSketch(
-    props.blockId,
-    data,
-    undefined,
-    exportIncludeBackground.value,
-  );
-  const pageImages = await renderSketchPdfPageImages(data, plan);
-  const blob = await exportPdfBlob(plan, { pageImages });
-  downloadBlob(blob, createExportPdfFileName(props.blockId));
-}
-
-function exportJson() {
-  if (!canvasRef.value) return;
-  const data = canvasRef.value.getData();
-  data.template = currentTemplate.value;
-  data.toolPresets = toolPresets.value;
-  data.inputSettings = inputSettings.value;
-  data.customBackgrounds = customBackgrounds.value;
-  data.recentColors = colorPalettes.value.pen;
-  data.highlighterRecentColors = colorPalettes.value.highlighter;
-  const blob = exportSketchJson(data);
-  downloadBlob(blob, createExportJsonFileName(props.blockId));
-}
-
-function triggerJsonImport() {
-  jsonInputRef.value?.click();
-}
-
-function triggerBackgroundImport() {
-  backgroundInputRef.value?.click();
-}
-
-async function onBackgroundFitChange(value: string) {
-  if (!canvasRef.value || !activeCustomBackground.value) return;
-  const fit = value as CustomBackgroundTemplate["fit"];
-  customBackgrounds.value = updateCustomBackgroundFit(
-    customBackgrounds.value,
-    activeCustomBackground.value.id,
-    fit,
-  );
-  loadedData.value = {
-    ...(canvasRef.value.getData()),
-    template: currentTemplate.value,
-    customBackgrounds: customBackgrounds.value,
-  };
-  persistEditorPreferences();
-  await canvasRef.value.restoreData(loadedData.value);
-  onStroke();
+function onPagesChanged(pages: { current: number; total: number }) {
+  pageState.value = pages;
+  syncPageOverview();
 }
 
 function deleteCurrentPage() {
@@ -814,13 +350,22 @@ function deleteCurrentPage() {
   }
 }
 
-function onPagesChanged(pages: { current: number; total: number }) {
-  pageState.value = pages;
-  syncPageOverview();
-}
+// ─── Import / Background ───
+function triggerJsonImport() { jsonInputRef.value?.click(); }
+function triggerBackgroundImport() { backgroundInputRef.value?.click(); }
 
-function syncPageOverview() {
-  pageOverview.value = canvasRef.value?.getPageOverviewItems() ?? [];
+async function onBackgroundFitChange(value: string) {
+  if (!canvasRef.value || !activeCustomBackground.value) return;
+  const fit = value as CustomBackgroundTemplate["fit"];
+  customBackgrounds.value = updateCustomBackgroundFit(customBackgrounds.value, activeCustomBackground.value.id, fit);
+  loadedData.value = {
+    ...(canvasRef.value.getData()),
+    template: currentTemplate.value,
+    customBackgrounds: customBackgrounds.value,
+  };
+  persistEditorPreferences();
+  await canvasRef.value.restoreData(loadedData.value);
+  onStroke();
 }
 
 async function onJsonSelected(event: Event) {
@@ -828,7 +373,6 @@ async function onJsonSelected(event: Event) {
   const file = input.files?.[0];
   input.value = "";
   if (!file || !canvasRef.value) return;
-
   try {
     const imported = importSketchJson(await file.text());
     const importedPresets = normalizeToolPresets(imported.toolPresets);
@@ -855,13 +399,9 @@ async function onBackgroundSelected(event: Event) {
   const file = input.files?.[0];
   input.value = "";
   if (!file || !canvasRef.value) return;
-
   const dataUrl = await readFileAsDataUrl(file);
   const background = createCustomBackgroundTemplate(`bg-${Date.now()}`, dataUrl);
-  customBackgrounds.value = [
-    ...customBackgrounds.value.filter((item) => item.id !== background.id),
-    background,
-  ];
+  customBackgrounds.value = [...customBackgrounds.value.filter((item) => item.id !== background.id), background];
   currentTemplate.value = background.id;
   loadedData.value = {
     ...(canvasRef.value.getData()),
@@ -872,7 +412,6 @@ async function onBackgroundSelected(event: Event) {
   await canvasRef.value.restoreData(loadedData.value);
   onStroke();
 }
-
 
 function triggerImageImport() {
   activeTool.value = "image";
@@ -894,7 +433,6 @@ async function onPaste(event: ClipboardEvent) {
     ? getFirstImageFileFromClipboard(event.clipboardData.items)
     : null;
   if (!file) return;
-
   event.preventDefault();
   activeTool.value = "image";
   const dataUrl = await readFileAsDataUrl(file);
@@ -902,6 +440,7 @@ async function onPaste(event: ClipboardEvent) {
   onStroke();
 }
 
+// ─── Input handling ───
 function onBodyWheel(e: WheelEvent) {
   if (!e.ctrlKey && !e.metaKey) return;
   e.preventDefault();
@@ -911,33 +450,19 @@ function onBodyWheel(e: WheelEvent) {
 function onKeyDown(event: KeyboardEvent) {
   const shortcut = resolveEditorShortcut(event);
   if (!shortcut) return;
-
   event.preventDefault();
   event.stopPropagation();
-
   switch (shortcut.type) {
     case "deleteSelection":
-      if (activeTool.value === "lasso") {
-        canvasRef.value?.deleteLassoSelection();
-      }
+      if (activeTool.value === "lasso") canvasRef.value?.deleteLassoSelection();
       break;
     case "duplicateSelection":
-      if (activeTool.value === "lasso") {
-        canvasRef.value?.duplicateLassoSelection();
-      }
+      if (activeTool.value === "lasso") canvasRef.value?.duplicateLassoSelection();
       break;
-    case "save":
-      manualSave();
-      break;
-    case "undo":
-      canvasRef.value?.doUndo();
-      break;
-    case "redo":
-      canvasRef.value?.doRedo();
-      break;
-    case "tool":
-      selectTool(shortcut.tool);
-      break;
+    case "save": manualSave(); break;
+    case "undo": canvasRef.value?.doUndo(); break;
+    case "redo": canvasRef.value?.doRedo(); break;
+    case "tool": selectTool(shortcut.tool); break;
   }
 }
 
@@ -950,18 +475,7 @@ function readFileAsDataUrl(file: File): Promise<string> {
   });
 }
 
-function createFallbackThumbnail(): string {
-  const c = document.createElement("canvas");
-  c.width = 800; c.height = 200;
-  const ctx = c.getContext("2d")!;
-  ctx.fillStyle = "#fff"; ctx.fillRect(0, 0, 800, 200);
-  ctx.fillStyle = "#999"; ctx.font = "16px sans-serif"; ctx.textAlign = "center";
-  ctx.fillText("Sketch Note", 400, 105);
-  return c.toDataURL("image/png");
-}
-
 // ─── Back / Close ───
-
 async function goBack() {
   if (autoSave.value) {
     const ok = await doSave();
@@ -1083,8 +597,7 @@ function onHeightChanged(_h: number) {}
   --sketch-toolbar-active-shadow: 0 4px 12px rgba(0, 0, 0, 0.18);
 }
 
-.sketch-editor--theme-dark,
-:global(html[data-theme="dark"]) .sketch-editor {
+.sketch-editor--theme-dark {
   --sketch-toolbar-surface: var(--sketch-toolbar-surface-dark);
   --sketch-toolbar-popover-surface: rgba(28, 28, 30, 0.95);
   --sketch-toolbar-border: rgba(255, 255, 255, 0.12);

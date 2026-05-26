@@ -1,11 +1,8 @@
 import type { SketchData } from "@/types/sketch";
 import { getSketchPages } from "@/pages/model";
+import { pad } from "@/utils/date";
 
 export const DEFAULT_PDF_PAGE_HEIGHT = 1000;
-
-function pad(value: number): string {
-  return String(value).padStart(2, "0");
-}
 
 export interface PdfExportPlanInput {
   blockId: string;

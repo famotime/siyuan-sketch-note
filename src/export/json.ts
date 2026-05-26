@@ -1,10 +1,7 @@
 import type { SketchData } from "@/types/sketch";
 import { migrateSketchData } from "@/storage/migrations";
 import { normalizeToolPresets } from "@/tools/presets";
-
-function pad(value: number): string {
-  return String(value).padStart(2, "0");
-}
+import { pad } from "@/utils/date";
 
 export function createExportJsonFileName(blockId: string, date = new Date()): string {
   const yyyy = date.getUTCFullYear();
