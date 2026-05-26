@@ -92,5 +92,7 @@
   "noResults": "无结果",
   "zenMode": "禅模式",
   "enterZenMode": "进入禅模式",
-  "exitZenMode": "退出禅模式"
+  "exitZenMode": "退出禅模式",
+  "presetColors": "预置颜色",
+  "colorHue": "色相"
 }

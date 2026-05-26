@@ -140,17 +140,6 @@
       </div>
     </div>
     <button
-      class="sketch-btn sketch-btn--zen"
-      :aria-label="t(zenToggleState.ariaLabelKey)"
-      :aria-pressed="zenToggleState.isPressed"
-      :title="t(zenToggleState.titleKey)"
-      @click="$emit('toggleZenMode')"
-    >
-      <IconParkIcon :name="zenToggleState.icon" />
-      <span class="sketch-btn__zen-label">{{ t('zenMode') }}</span>
-    </button>
-    <span class="sketch-sep" />
-    <button
       class="sketch-btn sketch-btn--action"
       :disabled="!canUndo"
       :title="t('undo')"
@@ -174,6 +163,15 @@
       <IconParkIcon name="Clear" />
     </button>
     <span class="sketch-sep" />
+    <button
+      class="sketch-btn sketch-btn--zen"
+      :aria-label="t(zenToggleState.ariaLabelKey)"
+      :aria-pressed="zenToggleState.isPressed"
+      :title="t(zenToggleState.titleKey)"
+      @click="$emit('toggleZenMode')"
+    >
+      <IconParkIcon :name="zenToggleState.icon" />
+    </button>
     <div
       ref="moreWrapRef"
       class="sketch-more-wrap"
@@ -415,8 +413,9 @@ function onClearSearch() {
 }
 
 .sketch-btn--zen {
-  gap: 6px;
-  min-width: 78px;
+  min-width: 30px;
+  width: 30px;
+  padding: 4px 0;
   background: rgba(var(--b3-theme-primary-rgb), 0.18) !important;
   border-color: rgba(var(--b3-theme-primary-rgb), 0.35) !important;
   color: var(--sketch-toolbar-strong-text) !important;
@@ -424,10 +423,6 @@ function onClearSearch() {
 .sketch-btn--zen:hover {
   background: rgba(var(--b3-theme-primary-rgb), 0.28) !important;
   box-shadow: 0 4px 14px rgba(var(--b3-theme-primary-rgb), 0.22);
-}
-.sketch-btn__zen-label {
-  font-size: 12px;
-  font-weight: 500;
 }
 
 /* ── 下拉选择菜单 ── */

@@ -92,5 +92,7 @@
   "noResults": "No results",
   "zenMode": "Zen",
   "enterZenMode": "Enter Zen Mode",
-  "exitZenMode": "Exit Zen Mode"
+  "exitZenMode": "Exit Zen Mode",
+  "presetColors": "Preset colors",
+  "colorHue": "Hue"
 }
