@@ -4,7 +4,7 @@ import { normalizeEditorI18n } from "./editorI18n";
 describe("editor i18n", () => {
   it("fills missing editor tool labels from the Chinese locale when plugin i18n is Chinese", () => {
     const i18n = normalizeEditorI18n({
-      insertSketch: "插入手写块",
+      insertSketch: "闲笔",
     });
 
     expect(i18n.shape).toBe("图形");

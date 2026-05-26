@@ -416,13 +416,6 @@ function onClearSearch() {
   min-width: 30px;
   width: 30px;
   padding: 4px 0;
-  background: rgba(var(--b3-theme-primary-rgb), 0.18) !important;
-  border-color: rgba(var(--b3-theme-primary-rgb), 0.35) !important;
-  color: var(--sketch-toolbar-strong-text) !important;
-}
-.sketch-btn--zen:hover {
-  background: rgba(var(--b3-theme-primary-rgb), 0.28) !important;
-  box-shadow: 0 4px 14px rgba(var(--b3-theme-primary-rgb), 0.22);
 }
 
 /* ── 下拉选择菜单 ── */
