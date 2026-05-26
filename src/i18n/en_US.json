@@ -94,5 +94,6 @@
   "enterZenMode": "Enter Zen Mode",
   "exitZenMode": "Exit Zen Mode",
   "presetColors": "Preset colors",
-  "colorHue": "Hue"
+  "colorHue": "Hue",
+  "eyedropper": "Eyedropper"
 }

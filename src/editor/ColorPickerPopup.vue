@@ -32,53 +32,51 @@
           :style="{ backgroundColor: modelValue }"
         />
         <span class="sketch-color-popup__value">{{ modelValue.toUpperCase() }}</span>
+        <button
+          class="sketch-color-popup__eyedropper"
+          :class="{ 'sketch-color-popup__eyedropper--disabled': !hasEyeDropper }"
+          :disabled="!hasEyeDropper"
+          :title="t('eyedropper')"
+          @click="startEyedropper"
+        >
+          <IconParkIcon name="Eyedropper" />
+        </button>
       </div>
     </div>
 
     <button
       class="sketch-color-popup__preset-toggle"
-      :class="{ 'sketch-color-popup__preset-toggle--open': presetsOpen }"
-      :aria-expanded="presetsOpen"
+      :class="{ 'sketch-color-popup__preset-toggle--open': isPresetsOpen }"
       :aria-label="t('presetColors')"
       :title="t('presetColors')"
-      @click="presetsOpen = !presetsOpen"
+      @click="$emit('togglePresets')"
     >
       <span class="sketch-color-popup__preset-arrow" />
     </button>
-
-    <PresetColorPalette
-      v-if="presetsOpen"
-      :rainbowColors="rainbowColors"
-      :recentColors="recentColors"
-      :activeColor="modelValue"
-      :t="t"
-      @select="$emit('update:modelValue', $event)"
-      @deleteRecent="$emit('deleteRecent', $event)"
-    />
   </div>
 </template>
 
 <script setup lang="ts">
 import { computed, onUnmounted, ref, watch } from "vue";
 import { clampSpectrumPoint, hexToHsv, hsvToHex } from "./colorPickerModel";
-import PresetColorPalette from "./PresetColorPalette.vue";
+import IconParkIcon from "./IconParkIcon.vue";
 
 const props = defineProps<{
   modelValue: string;
-  rainbowColors: readonly string[];
-  recentColors: string[];
   t: (key: string) => string;
+  isPresetsOpen?: boolean;
 }>();
 
 const emit = defineEmits<{
   (e: "update:modelValue", color: string): void;
-  (e: "deleteRecent", color: string): void;
+  (e: "togglePresets"): void;
 }>();
 
 const spectrumRef = ref<HTMLDivElement>();
-const presetsOpen = ref(false);
 const localHue = ref(hexToHsv(props.modelValue).hue);
 let isPickingSpectrum = false;
+
+const hasEyeDropper = typeof window !== "undefined" && "EyeDropper" in window;
 
 const selectedHsv = computed(() => {
   const hsv = hexToHsv(props.modelValue);
@@ -103,6 +101,19 @@ watch(
     }
   },
 );
+
+async function startEyedropper() {
+  if (!hasEyeDropper) return;
+  try {
+    const eyeDropper = new (window as any).EyeDropper();
+    const result = await eyeDropper.open();
+    if (result?.sRGBHex) {
+      emit("update:modelValue", result.sRGBHex.toLowerCase());
+    }
+  } catch {
+    // user cancelled
+  }
+}
 
 function onHueInput(e: Event) {
   localHue.value = Number((e.target as HTMLInputElement).value);
@@ -263,6 +274,38 @@ onUnmounted(removeSpectrumListeners);
   font-size: 11px;
   letter-spacing: 0.08em;
   font-variant-numeric: tabular-nums;
+  flex: 1;
+}
+
+.sketch-color-popup__eyedropper {
+  width: 24px;
+  height: 24px;
+  border: none;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.1);
+  color: rgba(255, 255, 255, 0.78);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  transition: background 0.18s ease, color 0.18s ease;
+  padding: 0;
+}
+
+.sketch-color-popup__eyedropper:hover {
+  background: rgba(255, 255, 255, 0.2);
+  color: #fff;
+}
+
+.sketch-color-popup__eyedropper--disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
+.sketch-color-popup__eyedropper--disabled:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: rgba(255, 255, 255, 0.78);
 }
 
 .sketch-color-popup__preset-toggle {

@@ -75,12 +75,21 @@
         <ColorPickerPopup
           v-if="showRecolorPopup"
           :modelValue="pendingRecolor ?? preset.color"
-          :rainbowColors="rainbowPresetColors"
-          :recentColors="recentPaletteColors"
           :t="t"
+          :isPresetsOpen="showRecolorPresets"
           @update:modelValue="onRecolorPicked"
-          @deleteRecent="$emit('deleteColor', $event)"
+          @togglePresets="showRecolorPresets = !showRecolorPresets"
         />
+        <div v-if="showRecolorPopup && showRecolorPresets" class="sketch-float-presets-below">
+          <PresetColorPalette
+            :rainbowColors="rainbowPresetColors"
+            :recentColors="recentPaletteColors"
+            :activeColor="pendingRecolor ?? preset.color"
+            :t="t"
+            @select="onRecolorPicked"
+            @deleteRecent="$emit('deleteColor', $event)"
+          />
+        </div>
       </div>
       <button
         class="sketch-float-action-btn"
@@ -174,12 +183,21 @@
         <ColorPickerPopup
           v-if="showAddColorPopup"
           :modelValue="pendingAddColor ?? preset.color"
-          :rainbowColors="rainbowPresetColors"
-          :recentColors="recentPaletteColors"
           :t="t"
+          :isPresetsOpen="showAddPresets"
           @update:modelValue="onCustomColorPicked"
-          @deleteRecent="$emit('deleteColor', $event)"
+          @togglePresets="showAddPresets = !showAddPresets"
         />
+        <div v-if="showAddColorPopup && showAddPresets" class="sketch-float-presets-below">
+          <PresetColorPalette
+            :rainbowColors="rainbowPresetColors"
+            :recentColors="recentPaletteColors"
+            :activeColor="pendingAddColor ?? preset.color"
+            :t="t"
+            @select="onCustomColorPicked"
+            @deleteRecent="$emit('deleteColor', $event)"
+          />
+        </div>
         <button
           class="sketch-float-reset-btn"
           :title="t('resetDefaultColors')"
@@ -284,6 +302,7 @@ import type { ToolPreset } from "@/types/sketch";
 import type { EditorTool } from "./tools";
 import IconParkIcon from "./IconParkIcon.vue";
 import ColorPickerPopup from "./ColorPickerPopup.vue";
+import PresetColorPalette from "./PresetColorPalette.vue";
 import type { IconParkName } from "./iconParkIcons";
 import { createColorLongPressState, shouldCancelColorLongPress, shouldSwallowColorClick } from "./colorLongPress";
 import { isShapeEditorTool } from "./tools";
@@ -447,24 +466,32 @@ const showWidthSlider = ref(false);
 const showOpacitySlider = ref(false);
 const showAddColorPopup = ref(false);
 const showRecolorPopup = ref(false);
+const showAddPresets = ref(false);
+const showRecolorPresets = ref(false);
 const pendingAddColor = ref<string | null>(null);
 const pendingRecolor = ref<string | null>(null);
 
 watch(showAddColorPopup, (open, wasOpen) => {
   if (open) {
     pendingAddColor.value = props.preset.color;
-  } else if (wasOpen && pendingAddColor.value) {
-    emit("selectCustomColor", pendingAddColor.value);
-    pendingAddColor.value = null;
+  } else {
+    showAddPresets.value = false;
+    if (wasOpen && pendingAddColor.value) {
+      emit("selectCustomColor", pendingAddColor.value);
+      pendingAddColor.value = null;
+    }
   }
 });
 
 watch(showRecolorPopup, (open, wasOpen) => {
   if (open) {
     pendingRecolor.value = props.preset.color;
-  } else if (wasOpen && pendingRecolor.value) {
-    emit("recolorSelection", pendingRecolor.value);
-    pendingRecolor.value = null;
+  } else {
+    showRecolorPresets.value = false;
+    if (wasOpen && pendingRecolor.value) {
+      emit("recolorSelection", pendingRecolor.value);
+      pendingRecolor.value = null;
+    }
   }
 });
 
@@ -476,11 +503,19 @@ function closeSlidersOnOutsideClick(e: MouseEvent) {
   if (showOpacitySlider.value && opacityControlRef.value && !opacityControlRef.value.contains(target)) {
     showOpacitySlider.value = false;
   }
-  if (showAddColorPopup.value && addColorWrapRef.value && !addColorWrapRef.value.contains(target)) {
-    showAddColorPopup.value = false;
+  if (showAddColorPopup.value && addColorWrapRef.value) {
+    const presetsEl = addColorWrapRef.value.querySelector(".sketch-float-presets-below");
+    if (!addColorWrapRef.value.contains(target) && !(presetsEl && presetsEl.contains(target))) {
+      showAddColorPopup.value = false;
+      showAddPresets.value = false;
+    }
   }
-  if (showRecolorPopup.value && recolorWrapRef.value && !recolorWrapRef.value.contains(target)) {
-    showRecolorPopup.value = false;
+  if (showRecolorPopup.value && recolorWrapRef.value) {
+    const presetsEl = recolorWrapRef.value.querySelector(".sketch-float-presets-below");
+    if (!recolorWrapRef.value.contains(target) && !(presetsEl && presetsEl.contains(target))) {
+      showRecolorPopup.value = false;
+      showRecolorPresets.value = false;
+    }
   }
 }
 
@@ -557,6 +592,7 @@ const rainbowPresetColors = [
   "#5856d6",
   "#af52de",
   "#ff2d55",
+  "#a0522d",
 ] as const;
 
 const recentPaletteColors = computed(() => {
@@ -1008,5 +1044,20 @@ onUnmounted(() => {
 /* 6. 透明度面板 */
 .sketch-float-opacity {
   position: relative;
+}
+
+/* 预置颜色面板：弹窗下方展开 */
+.sketch-float-presets-below {
+  position: absolute;
+  left: calc(100% + 8px);
+  top: 100%;
+  z-index: 1000;
+  background: rgba(28, 28, 30, 0.94);
+  backdrop-filter: blur(16px) saturate(150%);
+  -webkit-backdrop-filter: blur(16px) saturate(150%);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 12px;
+  padding: 10px;
+  box-shadow: 0 14px 34px rgba(0, 0, 0, 0.34), 0 2px 8px rgba(0, 0, 0, 0.18);
 }
 </style>
