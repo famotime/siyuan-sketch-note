@@ -3,6 +3,8 @@ import {
   addRecentColor,
   normalizeRecentColors,
   appendRecentColor,
+  appendToolColor,
+  normalizeToolColorPalettes,
 } from "./palette";
 
 describe("tool color palette", () => {
@@ -37,5 +39,18 @@ describe("tool color palette", () => {
     expect(next).toHaveLength(10);
     expect(next[9]).toBe("#abcdef");
     expect(next.includes("#111111")).toBe(false); // 最前面的那个被挤掉了，推动现有颜色往前滚
+  });
+
+  it("keeps pen and highlighter palettes independent when appending colors", () => {
+    const palettes = normalizeToolColorPalettes({
+      pen: ["#111111"],
+      highlighter: ["#fff176"],
+    });
+
+    const next = appendToolColor(palettes, "highlighter", "#ABCDEF");
+
+    expect(next.pen).toEqual(palettes.pen);
+    expect(next.highlighter).toContain("#abcdef");
+    expect(next.pen).not.toContain("#abcdef");
   });
 });

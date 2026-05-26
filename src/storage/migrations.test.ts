@@ -70,6 +70,26 @@ describe("sketch data migrations", () => {
     ]);
   });
 
+  it("normalizes persisted highlighter color slots independently", () => {
+    const data = migrateSketchData({
+      version: 1,
+      template: "grid",
+      canvasWidth: 800,
+      canvasHeight: 1200,
+      recentColors: ["#111111"],
+      highlighterRecentColors: ["#FFF176", "not-color", "#abcdef"],
+      strokes: [],
+    });
+
+    expect(data.recentColors[0]).toBe("#111111");
+    expect(data.highlighterRecentColors?.slice(0, 3)).toEqual([
+      "#fff176",
+      "#abcdef",
+      "#81c784",
+    ]);
+    expect(data.recentColors).not.toContain("#abcdef");
+  });
+
   it("reconstructs missing page metadata for paged sketches", () => {
     const data = migrateSketchData({
       version: 1,

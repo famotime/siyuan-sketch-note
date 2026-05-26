@@ -137,7 +137,7 @@
 <script setup lang="ts">
 import { ref, computed, nextTick, onMounted, onUnmounted, watch } from "vue";
 import type { SketchData, ToolPreset } from "@/types/sketch";
-import { PRESET_COLORS, HIGHLIGHTER_PRESET_COLORS } from "@/types/sketch";
+import { PRESET_COLORS } from "@/types/sketch";
 import { getAllTemplates } from "@/template";
 import { saveEditorPreferences, storageKey } from "@/storage";
 import { renderSketchPdfPageImages, renderSketchPngPageImage, thumbnailSketchDataAsync } from "@/storage/thumbnail";
@@ -155,8 +155,8 @@ import type { CustomBackgroundTemplate } from "@/template/customBackground";
 import type { PageOverviewItem } from "@/pages/model";
 import {
   addRecentColor,
-  normalizeRecentColors,
   appendRecentColor,
+  normalizeToolColorPalettes,
 } from "@/tools/palette";
 import { getFirstImageFileFromClipboard } from "./clipboard";
 import { resolveEditorShortcut } from "./shortcuts";
@@ -226,7 +226,10 @@ onMounted(() => {
 });
 const inputSettings = ref(normalizeInputSettings(props.initialData?.inputSettings));
 const customBackgrounds = ref(props.initialData?.customBackgrounds ?? []);
-const recentColors = ref(normalizeRecentColors(props.initialData?.recentColors));
+const colorPalettes = ref(normalizeToolColorPalettes({
+  pen: props.initialData?.recentColors,
+  highlighter: props.initialData?.highlighterRecentColors,
+}));
 const canUndo = ref(false);
 const canRedo = ref(false);
 const pageState = ref({ current: 1, total: 1 });
@@ -269,9 +272,9 @@ const activePreset = computed(() => {
 });
 const colors = computed(() => {
   if (activeTool.value === "highlighter") {
-    return HIGHLIGHTER_PRESET_COLORS;
+    return colorPalettes.value.highlighter;
   }
-  return recentColors.value;
+  return colorPalettes.value.pen;
 });
 const activeCustomBackground = computed(() => getCustomBackgroundTemplate({
   template: currentTemplate.value,
@@ -464,21 +467,44 @@ function selectCustomColor(c: string) {
     activeTool.value = "pen";
   }
   updateActivePreset({ color: c });
-  // 自定义颜色选择时，将其从后端追加，推动现有颜色往前滚
-  recentColors.value = appendRecentColor(recentColors.value, c);
+  // 自定义颜色选择时，只追加到当前绘制工具的颜色栏，避免画笔和荧光笔互相污染。
+  if (activeTool.value === "highlighter") {
+    colorPalettes.value = {
+      ...colorPalettes.value,
+      highlighter: appendRecentColor(colorPalettes.value.highlighter, c),
+    };
+  } else {
+    colorPalettes.value = {
+      ...colorPalettes.value,
+      pen: appendRecentColor(colorPalettes.value.pen, c),
+    };
+  }
 }
 
 function recolorSelection(c: string) {
   canvasRef.value?.recolorLasso(c);
-  recentColors.value = addRecentColor(recentColors.value, c);
+  colorPalettes.value = {
+    ...colorPalettes.value,
+    pen: addRecentColor(colorPalettes.value.pen, c),
+  };
 }
 
 function deleteColor(color: string) {
-  recentColors.value = recentColors.value.filter((c) => c !== color);
+  if (activeTool.value === "highlighter") {
+    colorPalettes.value = {
+      ...colorPalettes.value,
+      highlighter: colorPalettes.value.highlighter.filter((c) => c !== color),
+    };
+  } else {
+    colorPalettes.value = {
+      ...colorPalettes.value,
+      pen: colorPalettes.value.pen.filter((c) => c !== color),
+    };
+  }
   showMessage(t("colorDeleted") || "已删除该颜色", 3000, "info");
 
   if (activePreset.value.color === color) {
-    const fallback = recentColors.value[0] ?? PRESET_COLORS[0];
+    const fallback = colors.value[0] ?? PRESET_COLORS[0];
     selectColor(fallback);
   }
   markDirty();
@@ -486,10 +512,20 @@ function deleteColor(color: string) {
 }
 
 function resetDefaultColors() {
-  recentColors.value = normalizeRecentColors(PRESET_COLORS);
+  if (activeTool.value === "highlighter") {
+    colorPalettes.value = {
+      ...colorPalettes.value,
+      highlighter: normalizeToolColorPalettes().highlighter,
+    };
+  } else {
+    colorPalettes.value = {
+      ...colorPalettes.value,
+      pen: normalizeToolColorPalettes().pen,
+    };
+  }
   showMessage(t("colorReset") || "已恢复默认颜色设置", 3000, "info");
 
-  selectColor(PRESET_COLORS[0]);
+  selectColor(colors.value[0] ?? PRESET_COLORS[0]);
   markDirty();
   if (autoSave.value) scheduleAutoSave();
 }
@@ -593,7 +629,8 @@ async function runSave(): Promise<boolean> {
   data.toolPresets = toolPresets.value;
   data.inputSettings = inputSettings.value;
   data.customBackgrounds = customBackgrounds.value;
-  data.recentColors = recentColors.value;
+  data.recentColors = colorPalettes.value.pen;
+  data.highlighterRecentColors = colorPalettes.value.highlighter;
   if (ocrIndex.value) {
     data.ocrIndex = ocrIndex.value;
   }
@@ -705,7 +742,8 @@ async function exportPng() {
   if (!canvasRef.value) return;
   const data = canvasRef.value.getData();
   data.template = currentTemplate.value;
-  data.recentColors = recentColors.value;
+  data.recentColors = colorPalettes.value.pen;
+  data.highlighterRecentColors = colorPalettes.value.highlighter;
   const plan = createCurrentPagePngExportPlan(props.blockId, data);
   const pngDataUrl = await renderSketchPngPageImage(data, plan, exportIncludeBackground.value);
   const blob = dataUrlToBlob(pngDataUrl);
@@ -716,7 +754,8 @@ async function exportPdf() {
   if (!canvasRef.value) return;
   const data = canvasRef.value.getData();
   data.template = currentTemplate.value;
-  data.recentColors = recentColors.value;
+  data.recentColors = colorPalettes.value.pen;
+  data.highlighterRecentColors = colorPalettes.value.highlighter;
   const plan = createPdfExportPlanFromSketch(
     props.blockId,
     data,
@@ -735,7 +774,8 @@ function exportJson() {
   data.toolPresets = toolPresets.value;
   data.inputSettings = inputSettings.value;
   data.customBackgrounds = customBackgrounds.value;
-  data.recentColors = recentColors.value;
+  data.recentColors = colorPalettes.value.pen;
+  data.highlighterRecentColors = colorPalettes.value.highlighter;
   const blob = exportSketchJson(data);
   downloadBlob(blob, createExportJsonFileName(props.blockId));
 }
@@ -797,7 +837,10 @@ async function onJsonSelected(event: Event) {
     toolPresets.value = importedPresets;
     inputSettings.value = normalizeInputSettings(imported.inputSettings);
     customBackgrounds.value = imported.customBackgrounds ?? [];
-    recentColors.value = normalizeRecentColors(imported.recentColors);
+    colorPalettes.value = normalizeToolColorPalettes({
+      pen: imported.recentColors,
+      highlighter: imported.highlighterRecentColors,
+    });
     loadedData.value = imported;
     await canvasRef.value.restoreData(imported);
     onStroke();

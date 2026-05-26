@@ -35,6 +35,7 @@ export interface SketchData {
   inputSettings?: SketchInputSettings;
   customBackgrounds?: CustomBackgroundTemplate[];
   recentColors?: string[];
+  highlighterRecentColors?: string[];
   elements?: SketchElement[];
   strokes: Stroke[];
 }

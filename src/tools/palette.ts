@@ -1,15 +1,20 @@
-import { PRESET_COLORS } from "@/types/sketch";
+import { HIGHLIGHTER_PRESET_COLORS, PRESET_COLORS } from "@/types/sketch";
 
 export const MAX_RECENT_COLORS = 10;
+
+export interface ToolColorPalettes {
+  pen: string[];
+  highlighter: string[];
+}
 
 function normalizeHexColor(color: string): string | null {
   const trimmed = color.trim().toLowerCase();
   return /^#[0-9a-f]{6}$/.test(trimmed) ? trimmed : null;
 }
 
-export function normalizeRecentColors(input?: readonly string[]): string[] {
+function normalizeColorPalette(input: readonly string[] | undefined, defaults: readonly string[]): string[] {
   const seen = new Set<string>();
-  const colors = [...(input ?? []), ...PRESET_COLORS]
+  const colors = [...(input ?? []), ...defaults]
     .map(normalizeHexColor)
     .filter((color): color is string => Boolean(color))
     .filter((color) => {
@@ -19,6 +24,21 @@ export function normalizeRecentColors(input?: readonly string[]): string[] {
     });
 
   return colors.slice(0, MAX_RECENT_COLORS);
+}
+
+export function normalizeRecentColors(input?: readonly string[]): string[] {
+  return normalizeColorPalette(input, PRESET_COLORS);
+}
+
+export function normalizeHighlighterRecentColors(input?: readonly string[]): string[] {
+  return normalizeColorPalette(input, HIGHLIGHTER_PRESET_COLORS);
+}
+
+export function normalizeToolColorPalettes(input?: Partial<ToolColorPalettes>): ToolColorPalettes {
+  return {
+    pen: normalizeRecentColors(input?.pen),
+    highlighter: normalizeHighlighterRecentColors(input?.highlighter),
+  };
 }
 
 export function addRecentColor(input: readonly string[], color: string): string[] {
@@ -42,4 +62,15 @@ export function appendRecentColor(input: readonly string[], color: string): stri
     return result.slice(result.length - MAX_RECENT_COLORS);
   }
   return result;
+}
+
+export function appendToolColor(
+  palettes: ToolColorPalettes,
+  tool: keyof ToolColorPalettes,
+  color: string,
+): ToolColorPalettes {
+  return {
+    ...palettes,
+    [tool]: appendRecentColor(palettes[tool], color),
+  };
 }
