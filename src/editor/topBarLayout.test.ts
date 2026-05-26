@@ -71,7 +71,7 @@ it("adapts top and floating toolbars to SiYuan light and dark themes", () => {
   expect(editor).toMatch(/--sketch-toolbar-surface-light:/);
   expect(editor).toMatch(/@media\s*\(prefers-color-scheme:\s*light\)/);
   expect(editor).toMatch(/\.sketch-editor--theme-light\s*\{/);
-  expect(editor).toMatch(/\.sketch-editor--theme-dark\s*\{/);
+  expect(editor).toContain(".sketch-editor--theme-dark");
 
   expect(floatingToolbar).toContain("var(--sketch-toolbar-surface)");
 
@@ -82,6 +82,28 @@ it("adapts top and floating toolbars to SiYuan light and dark themes", () => {
   }
 });
 
+it("lets explicit dark theme override light media and document theme rules", () => {
+  const editor = readFileSync(resolve(process.cwd(), "src/editor/SketchEditor.vue"), "utf8");
+  const mediaLightIndex = editor.indexOf("@media (prefers-color-scheme: light)");
+  const explicitDarkIndex = editor.indexOf(".sketch-editor--theme-dark,\n:global(html[data-theme=\"dark\"]) .sketch-editor");
+
+  expect(mediaLightIndex).toBeGreaterThan(-1);
+  expect(explicitDarkIndex).toBeGreaterThan(mediaLightIndex);
+  expect(editor.slice(explicitDarkIndex)).toContain("--sketch-toolbar-text: rgba(255, 255, 255, 0.8)");
+  expect(editor.slice(explicitDarkIndex)).toContain("--sketch-toolbar-border: rgba(255, 255, 255, 0.12)");
+});
+
+it("lets explicit light theme override stale dark document theme rules", () => {
+  const editor = readFileSync(resolve(process.cwd(), "src/editor/SketchEditor.vue"), "utf8");
+  const globalDarkIndex = editor.indexOf(":global(html[data-theme=\"dark\"]) .sketch-editor");
+  const explicitLightIndex = editor.lastIndexOf(".sketch-editor--theme-light");
+
+  expect(globalDarkIndex).toBeGreaterThan(-1);
+  expect(explicitLightIndex).toBeGreaterThan(globalDarkIndex);
+  expect(editor.slice(explicitLightIndex)).toContain("--sketch-toolbar-text: rgba(15, 23, 42, 0.78)");
+  expect(editor.slice(explicitLightIndex)).toContain("--sketch-toolbar-border: rgba(15, 23, 42, 0.1)");
+});
+
 
 
 it("uses the SiYuan runtime appearance mode for toolbar theme classes", () => {
@@ -90,8 +112,48 @@ it("uses the SiYuan runtime appearance mode for toolbar theme classes", () => {
 
   expect(app).toContain("resolveSiyuanThemeMode");
   expect(app).toContain("MutationObserver");
+  expect(app).toContain("themeSyncTimer");
+  expect(app).toContain("window.setInterval(syncThemeMode");
+  expect(app).toContain("resolveDocumentThemeMode");
+  expect(app).toContain("resolveSiyuanConfigThemeMode");
+  expect(app).toContain("resolveCssVariableThemeMode");
+  expect(app).toContain('getPropertyValue("--b3-theme-background")');
+  expect(app).toContain("resolveComputedBackgroundThemeMode");
+  expect(app).toContain("document.body).backgroundColor");
+  expect(app).toContain("getColorLuminance");
+  expect(app).toContain("logThemeDiagnostics");
+  expect(app).toContain("[Sketch Note][Theme]");
   expect(app).toContain(':themeMode="themeMode"');
   expect(editor).toContain("themeMode: 'light' | 'dark'");
+  expect(editor).toContain("effectiveThemeMode");
+  expect(editor).toContain("resolveEditorBackgroundThemeMode");
+  expect(editor).toContain("propThemeMode: props.themeMode");
   expect(editor).toContain("sketch-editor--theme-light");
   expect(editor).toContain("sketch-editor--theme-dark");
+});
+
+it("renders a visible hue spectrum and the custom eyedropper icon in the color picker", () => {
+  const colorPicker = readFileSync(resolve(process.cwd(), "src/editor/ColorPickerPopup.vue"), "utf8");
+
+  expect(colorPicker).toContain("sketch-color-popup__hue::-webkit-slider-runnable-track");
+  expect(colorPicker).toContain("linear-gradient(90deg, #ff0000");
+  expect(colorPicker).toContain("sketch-color-popup__eyedropper-icon");
+  expect(colorPicker).toContain("M13.432 2.569");
+});
+
+it("closes floating color popups from captured pointer events outside the picker", () => {
+  const floatingToolbar = readFileSync(resolve(process.cwd(), "src/editor/FloatingToolbar.vue"), "utf8");
+
+  expect(floatingToolbar).toContain("closeFloatingPopoversOnOutsidePointerDown");
+  expect(floatingToolbar).toContain('document.addEventListener("pointerdown", closeFloatingPopoversOnOutsidePointerDown, true)');
+  expect(floatingToolbar).toContain('document.removeEventListener("pointerdown", closeFloatingPopoversOnOutsidePointerDown, true)');
+});
+
+it("logs applied editor theme variables for runtime diagnosis", () => {
+  const editor = readFileSync(resolve(process.cwd(), "src/editor/SketchEditor.vue"), "utf8");
+
+  expect(editor).toContain("watch(");
+  expect(editor).toContain("logEditorThemeDiagnostics");
+  expect(editor).toContain("getComputedStyle(editorRootRef.value)");
+  expect(editor).toContain("--sketch-toolbar-surface");
 });

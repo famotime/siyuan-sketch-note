@@ -495,7 +495,7 @@ watch(showRecolorPopup, (open, wasOpen) => {
   }
 });
 
-function closeSlidersOnOutsideClick(e: MouseEvent) {
+function closeFloatingPopoversOnOutsidePointerDown(e: PointerEvent) {
   const target = e.target as Node;
   if (showWidthSlider.value && widthControlRef.value && !widthControlRef.value.contains(target)) {
     showWidthSlider.value = false;
@@ -619,7 +619,7 @@ const shapeOptions = [
 }[];
 
 onMounted(() => {
-  document.addEventListener("mousedown", closeSlidersOnOutsideClick);
+  document.addEventListener("pointerdown", closeFloatingPopoversOnOutsidePointerDown, true);
   try {
     const cached = localStorage.getItem("sketch-note-float-pos");
     if (cached) {
@@ -634,7 +634,7 @@ onMounted(() => {
 });
 
 onUnmounted(() => {
-  document.removeEventListener("mousedown", closeSlidersOnOutsideClick);
+  document.removeEventListener("pointerdown", closeFloatingPopoversOnOutsidePointerDown, true);
   window.removeEventListener("mousemove", onDragging);
   window.removeEventListener("touchmove", onDragging);
   window.removeEventListener("mouseup", onDragEnd);

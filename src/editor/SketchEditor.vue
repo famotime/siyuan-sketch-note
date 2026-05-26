@@ -1,7 +1,8 @@
 <template>
   <div
     v-if="visible"
-    :class="[`sketch-editor--theme-${themeMode}`]"
+    ref="editorRootRef"
+    :class="[`sketch-editor--theme-${effectiveThemeMode}`]"
     class="sketch-editor"
   >
     <div
@@ -134,7 +135,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted } from "vue";
+import { ref, computed, nextTick, onMounted, onUnmounted, watch } from "vue";
 import type { SketchData, ToolPreset } from "@/types/sketch";
 import { PRESET_COLORS, HIGHLIGHTER_PRESET_COLORS } from "@/types/sketch";
 import { getAllTemplates } from "@/template";
@@ -186,6 +187,8 @@ const emit = defineEmits<{ (e: "close"): void }>();
 function t(key: string): string { return props.i18n[key] ?? key; }
 
 const visible = ref(false);
+const editorRootRef = ref<HTMLDivElement>();
+const effectiveThemeMode = ref<'light' | 'dark'>(props.themeMode);
 const canvasRef = ref<InstanceType<typeof SketchCanvas>>();
 const bodyRef = ref<HTMLDivElement>();
 const imageInputRef = ref<HTMLInputElement>();
@@ -251,6 +254,7 @@ const searchResults = ref<OcrSearchResult[]>([]);
 const searchResultIndex = ref(0);
 
 let autoSaveTimer: ReturnType<typeof setTimeout> | null = null;
+let themeProbeTimer: ReturnType<typeof setInterval> | null = null;
 const saveQueue = new SaveQueue();
 
 const activePreset = computed(() => {
@@ -273,21 +277,96 @@ const activeCustomBackground = computed(() => getCustomBackgroundTemplate({
   template: currentTemplate.value,
   customBackgrounds: customBackgrounds.value,
 }));
+let lastEditorThemeDiagnosticKey = "";
 
 onMounted(() => {
   visible.value = true;
   document.body.style.overflow = "hidden";
   window.addEventListener("paste", onPaste);
   window.addEventListener("keydown", onKeyDown);
+  syncEffectiveThemeMode();
+  themeProbeTimer = setInterval(syncEffectiveThemeMode, 250);
+  nextTick(logEditorThemeDiagnostics);
 });
 
 onUnmounted(() => {
   document.body.style.overflow = "";
   if (autoSaveTimer) clearTimeout(autoSaveTimer);
+  if (themeProbeTimer) clearInterval(themeProbeTimer);
   window.removeEventListener("paste", onPaste);
   window.removeEventListener("keydown", onKeyDown);
   removeZenToggleDragListeners();
 });
+
+watch(
+  () => props.themeMode,
+  () => {
+    effectiveThemeMode.value = props.themeMode;
+    syncEffectiveThemeMode();
+    nextTick(logEditorThemeDiagnostics);
+  },
+);
+
+function syncEffectiveThemeMode() {
+  const resolved = resolveEditorBackgroundThemeMode();
+  effectiveThemeMode.value = resolved ?? props.themeMode;
+  nextTick(logEditorThemeDiagnostics);
+}
+
+function resolveEditorBackgroundThemeMode(): 'light' | 'dark' | null {
+  if (!editorRootRef.value) return null;
+  return resolveThemeModeFromColor(getComputedStyle(editorRootRef.value).backgroundColor);
+}
+
+function resolveThemeModeFromColor(color: string): 'light' | 'dark' | null {
+  const rgb = parseCssColor(color);
+  if (!rgb) return null;
+  const luminance = getColorLuminance(rgb);
+  return luminance < 0.5 ? 'dark' : 'light';
+}
+
+function parseCssColor(color: string): [number, number, number] | null {
+  const match = color.match(/rgba?\(\s*(\d+(?:\.\d+)?)\s*,\s*(\d+(?:\.\d+)?)\s*,\s*(\d+(?:\.\d+)?)/i);
+  if (!match) return null;
+  return [
+    clampColorChannel(Number(match[1])),
+    clampColorChannel(Number(match[2])),
+    clampColorChannel(Number(match[3])),
+  ];
+}
+
+function getColorLuminance([redChannel, greenChannel, blueChannel]: [number, number, number]): number {
+  const [red, green, blue] = [redChannel, greenChannel, blueChannel].map((channel) => {
+    const value = channel / 255;
+    return value <= 0.03928
+      ? value / 12.92
+      : ((value + 0.055) / 1.055) ** 2.4;
+  });
+  return 0.2126 * red + 0.7152 * green + 0.0722 * blue;
+}
+
+function clampColorChannel(value: number): number {
+  return Math.max(0, Math.min(255, value));
+}
+
+function logEditorThemeDiagnostics() {
+  if (!editorRootRef.value) return;
+  const style = getComputedStyle(editorRootRef.value);
+  const diagnostics = {
+    propThemeMode: props.themeMode,
+    effectiveThemeMode: effectiveThemeMode.value,
+    className: editorRootRef.value.className,
+    toolbarSurface: style.getPropertyValue("--sketch-toolbar-surface").trim(),
+    toolbarText: style.getPropertyValue("--sketch-toolbar-text").trim(),
+    toolbarBorder: style.getPropertyValue("--sketch-toolbar-border").trim(),
+    toolbarHoverBg: style.getPropertyValue("--sketch-toolbar-hover-bg").trim(),
+    background: style.backgroundColor,
+  };
+  const key = JSON.stringify(diagnostics);
+  if (key === lastEditorThemeDiagnosticKey) return;
+  lastEditorThemeDiagnosticKey = key;
+  console.info("[Sketch Note][Theme][Editor]", diagnostics);
+}
 
 // ─── Toolbar actions ───
 
@@ -904,10 +983,6 @@ function onHeightChanged(_h: number) {}
   --sketch-toolbar-active-shadow: 0 4px 12px rgba(var(--b3-theme-primary-rgb), 0.24);
 }
 
-.sketch-editor--theme-dark {
-  --sketch-toolbar-surface: var(--sketch-toolbar-surface-dark);
-}
-
 @media (prefers-color-scheme: light) {
   .sketch-editor {
     --sketch-toolbar-surface: var(--sketch-toolbar-surface-light);
@@ -950,6 +1025,54 @@ function onHeightChanged(_h: number) {}
 :global(html[data-theme-mode="dark"]) .sketch-editor,
 :global(body[data-theme="dark"]) .sketch-editor {
   --sketch-toolbar-surface: var(--sketch-toolbar-surface-dark);
+  --sketch-toolbar-popover-surface: rgba(28, 28, 30, 0.95);
+  --sketch-toolbar-border: rgba(255, 255, 255, 0.12);
+  --sketch-toolbar-control-bg: rgba(255, 255, 255, 0.05);
+  --sketch-toolbar-control-border: rgba(255, 255, 255, 0.08);
+  --sketch-toolbar-hover-bg: rgba(255, 255, 255, 0.15);
+  --sketch-toolbar-hover-border: rgba(255, 255, 255, 0.18);
+  --sketch-toolbar-text: rgba(255, 255, 255, 0.8);
+  --sketch-toolbar-muted-text: rgba(255, 255, 255, 0.58);
+  --sketch-toolbar-strong-text: #fff;
+  --sketch-toolbar-separator: rgba(255, 255, 255, 0.12);
+  --sketch-toolbar-shadow: 0 10px 30px rgba(0, 0, 0, 0.25), 0 2px 8px rgba(0, 0, 0, 0.12);
+  --sketch-toolbar-hover-shadow: 0 12px 35px rgba(0, 0, 0, 0.35), 0 4px 12px rgba(0, 0, 0, 0.15);
+  --sketch-toolbar-active-shadow: 0 4px 12px rgba(0, 0, 0, 0.18);
+}
+
+.sketch-editor--theme-dark,
+:global(html[data-theme="dark"]) .sketch-editor {
+  --sketch-toolbar-surface: var(--sketch-toolbar-surface-dark);
+  --sketch-toolbar-popover-surface: rgba(28, 28, 30, 0.95);
+  --sketch-toolbar-border: rgba(255, 255, 255, 0.12);
+  --sketch-toolbar-control-bg: rgba(255, 255, 255, 0.05);
+  --sketch-toolbar-control-border: rgba(255, 255, 255, 0.08);
+  --sketch-toolbar-hover-bg: rgba(255, 255, 255, 0.15);
+  --sketch-toolbar-hover-border: rgba(255, 255, 255, 0.18);
+  --sketch-toolbar-text: rgba(255, 255, 255, 0.8);
+  --sketch-toolbar-muted-text: rgba(255, 255, 255, 0.58);
+  --sketch-toolbar-strong-text: #fff;
+  --sketch-toolbar-separator: rgba(255, 255, 255, 0.12);
+  --sketch-toolbar-shadow: 0 10px 30px rgba(0, 0, 0, 0.25), 0 2px 8px rgba(0, 0, 0, 0.12);
+  --sketch-toolbar-hover-shadow: 0 12px 35px rgba(0, 0, 0, 0.35), 0 4px 12px rgba(0, 0, 0, 0.15);
+  --sketch-toolbar-active-shadow: 0 4px 12px rgba(0, 0, 0, 0.18);
+}
+
+.sketch-editor--theme-light {
+  --sketch-toolbar-surface: var(--sketch-toolbar-surface-light);
+  --sketch-toolbar-popover-surface: rgba(255, 255, 255, 0.96);
+  --sketch-toolbar-border: rgba(15, 23, 42, 0.1);
+  --sketch-toolbar-control-bg: rgba(15, 23, 42, 0.045);
+  --sketch-toolbar-control-border: rgba(15, 23, 42, 0.08);
+  --sketch-toolbar-hover-bg: rgba(15, 23, 42, 0.09);
+  --sketch-toolbar-hover-border: rgba(15, 23, 42, 0.14);
+  --sketch-toolbar-text: rgba(15, 23, 42, 0.78);
+  --sketch-toolbar-muted-text: rgba(15, 23, 42, 0.52);
+  --sketch-toolbar-strong-text: rgba(15, 23, 42, 0.94);
+  --sketch-toolbar-separator: rgba(15, 23, 42, 0.1);
+  --sketch-toolbar-shadow: 0 12px 32px rgba(15, 23, 42, 0.12), 0 2px 8px rgba(15, 23, 42, 0.06);
+  --sketch-toolbar-hover-shadow: 0 14px 36px rgba(15, 23, 42, 0.16), 0 4px 12px rgba(15, 23, 42, 0.08);
+  --sketch-toolbar-active-shadow: 0 4px 12px rgba(var(--b3-theme-primary-rgb), 0.24);
 }
 
 /* ── 凌空悬浮的磨砂中控顶部卡片 ── */

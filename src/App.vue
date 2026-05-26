@@ -24,27 +24,163 @@ const pluginI18n = ref<Record<string, string>>({});
 const pluginSaveData = ref<(key: string, data: any) => Promise<void>>(async () => {});
 const themeMode = ref<"light" | "dark">(resolveSiyuanThemeMode());
 let themeObserver: MutationObserver | null = null;
+let themeSyncTimer: number | null = null;
+let lastThemeDiagnosticKey = "";
 
 let loadDataFn: (key: string) => Promise<any> = async () => null;
 
-function resolveSiyuanThemeMode(): "light" | "dark" {
+function parseThemeMode(value: unknown): "light" | "dark" | null {
+  if (value === 0 || value === "0" || value === "light") return "light";
+  if (value === 1 || value === "1" || value === "dark") return "dark";
+  if (typeof value !== "string") return null;
+  const normalized = value.toLowerCase();
+  if (normalized.includes("light")) return "light";
+  if (normalized.includes("dark")) return "dark";
+  return null;
+}
+
+function resolveDocumentThemeMode(): "light" | "dark" | null {
+  const signals = [
+    document.documentElement.className,
+    document.body.className,
+    document.documentElement.getAttribute("data-theme"),
+    document.documentElement.getAttribute("data-theme-mode"),
+    document.body.getAttribute("data-theme"),
+    document.body.getAttribute("data-theme-mode"),
+  ].map(parseThemeMode);
+  return signals.includes("dark")
+    ? "dark"
+    : signals.includes("light")
+      ? "light"
+      : null;
+}
+
+function resolveCssVariableThemeMode(): "light" | "dark" | null {
+  const background = getComputedStyle(document.body).getPropertyValue("--b3-theme-background")
+    || getComputedStyle(document.documentElement).getPropertyValue("--b3-theme-background");
+  const luminance = getColorLuminance(background.trim());
+  if (luminance === null) return null;
+  return luminance < 0.5 ? "dark" : "light";
+}
+
+function resolveComputedBackgroundThemeMode(): "light" | "dark" | null {
+  const bodyBackground = getComputedStyle(document.body).backgroundColor;
+  const bodyMode = resolveThemeModeFromColor(bodyBackground);
+  if (bodyMode) return bodyMode;
+  const htmlBackground = getComputedStyle(document.documentElement).backgroundColor;
+  return resolveThemeModeFromColor(htmlBackground);
+}
+
+function resolveThemeModeFromColor(color: string): "light" | "dark" | null {
+  if (!color || color === "transparent" || color === "rgba(0, 0, 0, 0)") return null;
+  const luminance = getColorLuminance(color);
+  if (luminance === null) return null;
+  return luminance < 0.5 ? "dark" : "light";
+}
+
+function getColorLuminance(color: string): number | null {
+  const rgb = parseCssColor(color);
+  if (!rgb) return null;
+  const [red, green, blue] = rgb.map((channel) => {
+    const value = channel / 255;
+    return value <= 0.03928
+      ? value / 12.92
+      : ((value + 0.055) / 1.055) ** 2.4;
+  });
+  return 0.2126 * red + 0.7152 * green + 0.0722 * blue;
+}
+
+function parseCssColor(color: string): [number, number, number] | null {
+  const rgbMatch = color.match(/rgba?\(\s*(\d+(?:\.\d+)?)\s*,\s*(\d+(?:\.\d+)?)\s*,\s*(\d+(?:\.\d+)?)/i);
+  if (rgbMatch) {
+    return [
+      clampColorChannel(Number(rgbMatch[1])),
+      clampColorChannel(Number(rgbMatch[2])),
+      clampColorChannel(Number(rgbMatch[3])),
+    ];
+  }
+  const hexMatch = color.match(/^#([0-9a-f]{3}|[0-9a-f]{6})$/i);
+  if (!hexMatch) return null;
+  const hex = hexMatch[1];
+  if (hex.length === 3) {
+    return [
+      Number.parseInt(`${hex[0]}${hex[0]}`, 16),
+      Number.parseInt(`${hex[1]}${hex[1]}`, 16),
+      Number.parseInt(`${hex[2]}${hex[2]}`, 16),
+    ];
+  }
+  return [
+    Number.parseInt(hex.slice(0, 2), 16),
+    Number.parseInt(hex.slice(2, 4), 16),
+    Number.parseInt(hex.slice(4, 6), 16),
+  ];
+}
+
+function clampColorChannel(value: number): number {
+  return Math.max(0, Math.min(255, value));
+}
+
+function collectThemeDiagnostics() {
+  const siyuanMode = (globalThis as any).window?.siyuan?.config?.appearance?.mode
+    ?? (globalThis as any).siyuan?.config?.appearance?.mode;
+  const matchMediaLight = window.matchMedia?.("(prefers-color-scheme: light)").matches ?? null;
+  const bodyBackgroundColor = getComputedStyle(document.body).backgroundColor;
+  const htmlBackgroundColor = getComputedStyle(document.documentElement).backgroundColor;
+  const cssBackground = getComputedStyle(document.body).getPropertyValue("--b3-theme-background")
+    || getComputedStyle(document.documentElement).getPropertyValue("--b3-theme-background");
+
+  return {
+    htmlClass: document.documentElement.className,
+    bodyClass: document.body.className,
+    htmlTheme: document.documentElement.getAttribute("data-theme"),
+    htmlThemeMode: document.documentElement.getAttribute("data-theme-mode"),
+    bodyTheme: document.body.getAttribute("data-theme"),
+    bodyThemeMode: document.body.getAttribute("data-theme-mode"),
+    siyuanMode,
+    bodyBackgroundColor,
+    htmlBackgroundColor,
+    computedBackgroundMode: resolveComputedBackgroundThemeMode(),
+    cssBackground: cssBackground.trim(),
+    cssMode: resolveCssVariableThemeMode(),
+    documentMode: resolveDocumentThemeMode(),
+    configMode: resolveSiyuanConfigThemeMode(),
+    matchMediaLight,
+  };
+}
+
+function resolveSiyuanConfigThemeMode(): "light" | "dark" | null {
   const mode = (globalThis as any).window?.siyuan?.config?.appearance?.mode
     ?? (globalThis as any).siyuan?.config?.appearance?.mode;
-  if (mode === 0 || mode === "0" || mode === "light") return "light";
-  if (mode === 1 || mode === "1" || mode === "dark") return "dark";
+  return parseThemeMode(mode);
+}
 
-  const attr = document.documentElement.getAttribute("data-theme")
-    ?? document.documentElement.getAttribute("data-theme-mode")
-    ?? document.body.getAttribute("data-theme")
-    ?? document.body.getAttribute("data-theme-mode");
-  if (attr?.toLowerCase().includes("light")) return "light";
-  if (attr?.toLowerCase().includes("dark")) return "dark";
-
+function resolveSiyuanThemeMode(): "light" | "dark" {
+  const computedBackgroundMode = resolveComputedBackgroundThemeMode();
+  if (computedBackgroundMode) return computedBackgroundMode;
+  const cssVariableMode = resolveCssVariableThemeMode();
+  if (cssVariableMode) return cssVariableMode;
+  const liveDocumentMode = resolveDocumentThemeMode();
+  if (liveDocumentMode) return liveDocumentMode;
+  const configMode = resolveSiyuanConfigThemeMode();
+  if (configMode) return configMode;
   return window.matchMedia?.("(prefers-color-scheme: light)").matches ? "light" : "dark";
 }
 
 function syncThemeMode() {
-  themeMode.value = resolveSiyuanThemeMode();
+  const nextThemeMode = resolveSiyuanThemeMode();
+  themeMode.value = nextThemeMode;
+  logThemeDiagnostics(nextThemeMode);
+}
+
+function logThemeDiagnostics(resolvedMode: "light" | "dark") {
+  const diagnostics = {
+    ...collectThemeDiagnostics(),
+    resolvedMode,
+  };
+  const key = JSON.stringify(diagnostics);
+  if (key === lastThemeDiagnosticKey) return;
+  lastThemeDiagnosticKey = key;
+  console.info("[Sketch Note][Theme]", diagnostics);
 }
 
 onMounted(() => {
@@ -53,12 +189,17 @@ onMounted(() => {
   themeObserver.observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme", "data-theme-mode", "class"] });
   themeObserver.observe(document.body, { attributes: true, attributeFilter: ["data-theme", "data-theme-mode", "class"] });
   window.matchMedia?.("(prefers-color-scheme: light)").addEventListener?.("change", syncThemeMode);
+  themeSyncTimer = window.setInterval(syncThemeMode, 500);
 });
 
 onUnmounted(() => {
   themeObserver?.disconnect();
   themeObserver = null;
   window.matchMedia?.("(prefers-color-scheme: light)").removeEventListener?.("change", syncThemeMode);
+  if (themeSyncTimer !== null) {
+    window.clearInterval(themeSyncTimer);
+    themeSyncTimer = null;
+  }
 });
 
 export function setI18n(i18n: Record<string, string>) {
