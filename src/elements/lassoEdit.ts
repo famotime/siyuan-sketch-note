@@ -278,6 +278,25 @@ export function resizeLassoSelection(
   );
 }
 
+export function rotateLassoSelection(
+  elements: SketchElement[],
+  selectedIds: string[],
+  rotation: number,
+): SketchElement[] {
+  const selected = selectionSet(selectedIds);
+  return elements.map((element) =>
+    selected.has(element.id)
+      ? {
+          ...element,
+          transform: {
+            ...element.transform,
+            rotation,
+          },
+        }
+      : element,
+  );
+}
+
 export function resizeStrokeSelection(
   strokes: Stroke[],
   selectedIds: string[],

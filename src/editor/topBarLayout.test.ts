@@ -3,6 +3,34 @@ import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 
 describe("editor top bar layout", () => {
+  it("keeps undo redo and clear grouped on the left before the spacer", () => {
+    const topBar = readFileSync(resolve(process.cwd(), "src/editor/EditorTopBar.vue"), "utf8");
+
+    const undoIndex = topBar.indexOf(":title=\"t('undo')\"");
+    const redoIndex = topBar.indexOf(":title=\"t('redo')\"");
+    const clearIndex = topBar.indexOf(":title=\"t('clear')\"");
+    const spacerIndex = topBar.indexOf("sketch-spacer");
+
+    expect(undoIndex).toBeGreaterThan(-1);
+    expect(redoIndex).toBeGreaterThan(undoIndex);
+    expect(clearIndex).toBeGreaterThan(redoIndex);
+    expect(clearIndex).toBeLessThan(spacerIndex);
+  });
+
+  it("adds a plus image import button immediately before zen mode", () => {
+    const topBar = readFileSync(resolve(process.cwd(), "src/editor/EditorTopBar.vue"), "utf8");
+    const editor = readFileSync(resolve(process.cwd(), "src/editor/SketchEditor.vue"), "utf8");
+
+    const insertIndex = topBar.indexOf("$emit('insertImage')");
+    const zenIndex = topBar.indexOf("$emit('toggleZenMode')");
+
+    expect(insertIndex).toBeGreaterThan(-1);
+    expect(insertIndex).toBeLessThan(zenIndex);
+    expect(topBar).toContain("sketch-btn--add-image");
+    expect(topBar).toContain("<IconParkIcon name=\"Plus\" />");
+    expect(editor).toContain("@insertImage=\"triggerImageImport\"");
+  });
+
   it("keeps the more menu popover outside the horizontally scrollable toolbar row", () => {
     const topBar = readFileSync(resolve(process.cwd(), "src/editor/EditorTopBar.vue"), "utf8");
     const editor = readFileSync(resolve(process.cwd(), "src/editor/SketchEditor.vue"), "utf8");
@@ -188,4 +216,15 @@ it("declares scroll-blocking wheel and touch listeners explicitly", () => {
 
   expect(colorPicker).not.toContain('@touchstart.prevent="onSpectrumPointerStart"');
   expect(colorPicker).toContain('addEventListener("touchstart", onSpectrumPointerStart, { passive: false })');
+});
+
+it("uses image transform handles instead of lasso group handles for a single selected image", () => {
+  const canvas = readFileSync(resolve(process.cwd(), "src/editor/SketchCanvas.vue"), "utf8");
+
+  const lassoActionIndex = canvas.indexOf("resolveElementTransformAction(");
+
+  expect(lassoActionIndex).toBeGreaterThan(-1);
+  expect(canvas).toContain("if (bounds && !getSingleSelectedImage())");
+  expect(canvas).not.toContain("isPointInLassoRotationHandle");
+  expect(canvas).not.toContain("LASSO_ROTATION_HANDLE");
 });

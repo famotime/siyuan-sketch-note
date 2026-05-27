@@ -380,24 +380,31 @@ function renderNonStrokeElements(
 }
 
 function renderImageElement(ctx: CanvasRenderingContext2D, element: Extract<SketchElement, { type: "image" }>): void {
+  const centerX = element.bounds.x + element.bounds.width / 2;
+  const centerY = element.bounds.y + element.bounds.height / 2;
+  const rotation = element.transform.rotation || 0;
+
+  ctx.save();
+  ctx.translate(centerX, centerY);
+  ctx.rotate(rotation);
   const image = imageCache.get(element.src);
   if (image?.complete) {
     ctx.drawImage(
       image,
-      element.bounds.x,
-      element.bounds.y,
+      -element.bounds.width / 2,
+      -element.bounds.height / 2,
       element.bounds.width,
       element.bounds.height,
     );
+    ctx.restore();
     return;
   }
 
-  ctx.save();
   ctx.fillStyle = "#f4f4f4";
   ctx.strokeStyle = "#c8c8c8";
   ctx.lineWidth = 1;
-  ctx.fillRect(element.bounds.x, element.bounds.y, element.bounds.width, element.bounds.height);
-  ctx.strokeRect(element.bounds.x, element.bounds.y, element.bounds.width, element.bounds.height);
+  ctx.fillRect(-element.bounds.width / 2, -element.bounds.height / 2, element.bounds.width, element.bounds.height);
+  ctx.strokeRect(-element.bounds.width / 2, -element.bounds.height / 2, element.bounds.width, element.bounds.height);
   ctx.restore();
 }
 

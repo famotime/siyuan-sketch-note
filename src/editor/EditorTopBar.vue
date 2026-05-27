@@ -13,7 +13,6 @@
       class="sketch-recovery"
     >{{ t("dataRecovered") }}</span>
 
-    <span class="sketch-spacer" />
     <button
       class="sketch-btn sketch-btn--action"
       :disabled="!canUndo"
@@ -37,7 +36,16 @@
     >
       <IconParkIcon name="Clear" />
     </button>
+    <span class="sketch-spacer" />
     <span class="sketch-sep" />
+    <button
+      class="sketch-btn sketch-btn--add-image"
+      :title="t('image')"
+      :aria-label="t('image')"
+      @click="$emit('insertImage')"
+    >
+      <IconParkIcon name="Plus" />
+    </button>
     <button
       class="sketch-btn sketch-btn--zen"
       :aria-label="t(zenToggleState.ariaLabelKey)"
@@ -147,6 +155,7 @@ defineEmits<{
   (e: "back"): void;
   (e: "backgroundFitChange", value: string): void;
   (e: "clear"): void;
+  (e: "insertImage"): void;
   (e: "toggleStylusOnly"): void;
   (e: "togglePressure"): void;
   (e: "toggleZenMode"): void;
@@ -216,6 +225,13 @@ onUnmounted(() => document.removeEventListener("mousedown", onDocClick));
   min-width: 30px;
   width: 30px;
   padding: 4px 0;
+}
+
+.sketch-btn--add-image {
+  min-width: 30px;
+  width: 30px;
+  padding: 4px 0;
+  font-size: 15px;
 }
 
 /* ── 下拉选择菜单 ── */

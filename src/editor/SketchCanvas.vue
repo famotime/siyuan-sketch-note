@@ -93,11 +93,14 @@ import {
 } from "@/elements/shapes";
 import { createImageElement } from "@/elements/image";
 import {
+  angleFromElementCenter,
   hitTestElement,
-  isInResizeCorner,
   moveElement,
   resizeElementFromCorner,
+  resolveElementTransformAction,
+  rotateElement,
 } from "@/elements/transform";
+import type { ResizeCorner } from "@/elements/transform";
 import {
   findElementsInBoxSelection,
   findElementsInLasso,
@@ -176,7 +179,14 @@ const { textEditor, textEditorInputRef, startNewTextEditing, insertText, startEd
 // Element interaction state
 const interaction = {
   shapeStart: null as StrokePoint | null,
-  imageTransform: null as { elementId: string; lastPoint: StrokePoint; mode: "move" | "resize" } | null,
+  imageTransform: null as {
+    elementId: string;
+    lastPoint: StrokePoint;
+    mode: "move" | "resize" | "rotate";
+    corner?: ResizeCorner;
+    startAngle?: number;
+    startRotation?: number;
+  } | null,
   elementTransform: null as { elementId: string; lastPoint: StrokePoint; mode: "move" | "resize" } | null,
   textMove: null as { elementId: string; startPoint: StrokePoint; lastPoint: StrokePoint; moved: boolean } | null,
   selectedElementId: null as string | null,
@@ -194,10 +204,18 @@ const lasso = {
     elements: SketchElement[];
     strokes: SketchData["strokes"];
   } | null,
+  longPress: null as {
+    point: StrokePoint;
+    elementId: string;
+    timer: number;
+    selected: boolean;
+  } | null,
 };
 const LASSO_DUPLICATE_OFFSET = 24;
 const LASSO_RESIZE_HANDLE_SIZE = 14;
 const LASSO_MIN_RESIZE_SIZE = 16;
+const LASSO_LONG_PRESS_MS = 450;
+const LASSO_LONG_PRESS_MOVE_TOLERANCE = 8;
 
 onMounted(async () => {
   if (!bgCanvasRef.value || !strokeCanvasRef.value) return;
@@ -313,7 +331,27 @@ function onPointerDown(e: PointerEvent) {
   if (props.tool === "lasso") {
     const point = eventPoint(e);
     const selectionBounds = getLassoSelectionBounds();
-    if (selectionBounds && isPointInLassoResizeHandle(selectionBounds, point)) {
+    const selectedImage = getSingleSelectedImage();
+    if (selectedImage) {
+      const imageAction = resolveElementTransformAction([selectedImage], selectedImage.id, point.x, point.y);
+      if (imageAction?.mode === "delete") {
+        deleteLassoSelection();
+        return;
+      }
+      if (imageAction && imageAction.mode !== "move") {
+        interaction.imageTransform = {
+          elementId: imageAction.element.id,
+          lastPoint: point,
+          mode: imageAction.mode,
+          corner: imageAction.corner,
+          startAngle: angleFromElementCenter(imageAction.element, point.x, point.y),
+          startRotation: imageAction.element.transform.rotation || 0,
+        };
+        pushHistorySnapshot(state);
+        return;
+      }
+    }
+    if (selectionBounds && !selectedImage && isPointInLassoResizeHandle(selectionBounds, point)) {
       lasso.resize = {
         anchor: { x: selectionBounds.x, y: selectionBounds.y },
         initialBounds: selectionBounds,
@@ -333,6 +371,15 @@ function onPointerDown(e: PointerEvent) {
       pushHistorySnapshot(state);
       return;
     }
+    const pressedImage = hitTestElement(
+      state.elements.filter((item) => item.type === "image"),
+      point.x,
+      point.y,
+    );
+    if (pressedImage) {
+      startLassoImageLongPress(point, pressedImage.id);
+      return;
+    }
     if (props.lassoMode === "box") {
       lasso.box = { start: point, current: point };
     } else {
@@ -347,17 +394,31 @@ function onPointerDown(e: PointerEvent) {
 
   if (props.tool === "image") {
     const point = eventPoint(e);
-    const element = hitTestElement(
+    const action = resolveElementTransformAction(
       state.elements.filter((item) => item.type === "image"),
+      interaction.selectedElementId,
       point.x,
       point.y,
     );
-    interaction.selectedElementId = element?.id ?? null;
-    if (element) {
+    interaction.selectedElementId = action?.element.id ?? null;
+    if (action?.mode === "delete") {
+      pushHistorySnapshot(state);
+      state.elements = state.elements.filter((element) => element.id !== action.element.id);
+      interaction.selectedElementId = null;
+      state.isDirty = true;
+      fullRedrawStrokeCanvas(getCanvas(), state);
+      updateUndoRedoState();
+      emit("stroke");
+      return;
+    }
+    if (action) {
       interaction.imageTransform = {
-        elementId: element.id,
+        elementId: action.element.id,
         lastPoint: point,
-        mode: isInResizeCorner(element, point.x, point.y) ? "resize" : "move",
+        mode: action.mode,
+        corner: action.corner,
+        startAngle: angleFromElementCenter(action.element, point.x, point.y),
+        startRotation: action.element.transform.rotation || 0,
       };
       pushHistorySnapshot(state);
     }
@@ -383,6 +444,25 @@ function onPointerMove(e: PointerEvent) {
 
   if (props.tool === "lasso") {
     const point = eventPoint(e);
+    if (lasso.longPress) {
+      const distance = Math.hypot(point.x - lasso.longPress.point.x, point.y - lasso.longPress.point.y);
+      if (!lasso.longPress.selected && distance > LASSO_LONG_PRESS_MOVE_TOLERANCE) {
+        const start = lasso.longPress.point;
+        cancelLassoImageLongPress();
+        if (props.lassoMode === "box") {
+          lasso.box = { start, current: point };
+          lasso.selectedIds = [];
+          fullRedrawStrokeCanvas(getCanvas(), state);
+          drawLassoBox();
+        } else {
+          lasso.path = [start, point];
+          lasso.selectedIds = [];
+          fullRedrawStrokeCanvas(getCanvas(), state);
+          drawLassoPath();
+        }
+      }
+      return;
+    }
     if (lasso.resize) {
       const width = Math.max(LASSO_MIN_RESIZE_SIZE, point.x - lasso.resize.anchor.x);
       const height = Math.max(LASSO_MIN_RESIZE_SIZE, point.y - lasso.resize.anchor.y);
@@ -426,9 +506,15 @@ function onPointerMove(e: PointerEvent) {
     const dy = point.y - interaction.imageTransform.lastPoint.y;
     state.elements = state.elements.map((element) => {
       if (element.id !== interaction.imageTransform?.elementId) return element;
-      return interaction.imageTransform.mode === "move"
-        ? moveElement(element, dx, dy)
-        : resizeElementFromCorner(element, "se", dx, dy);
+      if (interaction.imageTransform.mode === "move") return moveElement(element, dx, dy);
+      if (interaction.imageTransform.mode === "resize") {
+        return resizeElementFromCorner(element, interaction.imageTransform.corner ?? "se", dx, dy);
+      }
+      const angle = angleFromElementCenter(element, point.x, point.y);
+      const rotation = (interaction.imageTransform.startRotation ?? 0)
+        + angle
+        - (interaction.imageTransform.startAngle ?? angle);
+      return rotateElement(element, rotation);
     });
     interaction.imageTransform.lastPoint = point;
     state.isDirty = true;
@@ -506,6 +592,14 @@ function onPointerUp(e: PointerEvent) {
   if (vpResult) return;
 
   if (props.tool === "lasso") {
+    if (lasso.longPress) {
+      const selected = lasso.longPress.selected;
+      cancelLassoImageLongPress();
+      if (selected) {
+        updateUndoRedoState();
+        return;
+      }
+    }
     if (lasso.resize) { lasso.resize = null; updateUndoRedoState(); emit("stroke"); return; }
     if (lasso.move) { lasso.move = null; updateUndoRedoState(); emit("stroke"); return; }
     if (lasso.path.length > 0) {
@@ -649,13 +743,7 @@ function drawSelectionOutline() {
   if (!element) return;
   const ctx = getCanvas().getContext("2d")!;
   ctx.save();
-  ctx.strokeStyle = "#2f80ed";
-  ctx.lineWidth = 1;
-  ctx.setLineDash([6, 4]);
-  ctx.strokeRect(element.bounds.x, element.bounds.y, element.bounds.width, element.bounds.height);
-  ctx.setLineDash([]);
-  ctx.fillStyle = "#2f80ed";
-  ctx.fillRect(element.bounds.x + element.bounds.width - 10, element.bounds.y + element.bounds.height - 10, 10, 10);
+  drawElementTransformOutline(ctx, element, true);
   ctx.restore();
 }
 
@@ -696,19 +784,67 @@ function drawLassoSelectionOutline() {
   const bounds = getBoundsForElements(selected);
   const ctx = getCanvas().getContext("2d")!;
   ctx.save();
-  ctx.strokeStyle = "#2f80ed";
-  ctx.lineWidth = 1.25;
-  ctx.setLineDash([6, 4]);
-  for (const el of selected) ctx.strokeRect(el.bounds.x, el.bounds.y, el.bounds.width, el.bounds.height);
-  ctx.setLineDash([]);
-  ctx.fillStyle = "rgba(47, 128, 237, 0.12)";
-  for (const el of selected) ctx.fillRect(el.bounds.x, el.bounds.y, el.bounds.width, el.bounds.height);
-  if (bounds) {
+  for (const el of selected) drawElementTransformOutline(ctx, el, selected.length === 1 && el.type === "image");
+  if (bounds && !getSingleSelectedImage()) {
     ctx.fillStyle = "#2f80ed";
     ctx.fillRect(bounds.x + bounds.width - LASSO_RESIZE_HANDLE_SIZE, bounds.y + bounds.height - LASSO_RESIZE_HANDLE_SIZE, LASSO_RESIZE_HANDLE_SIZE, LASSO_RESIZE_HANDLE_SIZE);
     ctx.strokeStyle = "#ffffff";
     ctx.lineWidth = 1;
     ctx.strokeRect(bounds.x + bounds.width - LASSO_RESIZE_HANDLE_SIZE, bounds.y + bounds.height - LASSO_RESIZE_HANDLE_SIZE, LASSO_RESIZE_HANDLE_SIZE, LASSO_RESIZE_HANDLE_SIZE);
+  }
+  ctx.restore();
+}
+
+function drawElementTransformOutline(ctx: CanvasRenderingContext2D, element: SketchElement, withHandles: boolean) {
+  const centerX = element.bounds.x + element.bounds.width / 2;
+  const centerY = element.bounds.y + element.bounds.height / 2;
+  ctx.save();
+  ctx.translate(centerX, centerY);
+  ctx.rotate(element.transform.rotation || 0);
+  ctx.strokeStyle = "#2f80ed";
+  ctx.lineWidth = 1.25;
+  ctx.setLineDash([6, 4]);
+  ctx.strokeRect(-element.bounds.width / 2, -element.bounds.height / 2, element.bounds.width, element.bounds.height);
+  ctx.setLineDash([]);
+  ctx.fillStyle = "rgba(47, 128, 237, 0.12)";
+  ctx.fillRect(-element.bounds.width / 2, -element.bounds.height / 2, element.bounds.width, element.bounds.height);
+  if (withHandles) {
+    const halfHandle = 5;
+    const corners = [
+      [-element.bounds.width / 2, -element.bounds.height / 2],
+      [element.bounds.width / 2, -element.bounds.height / 2],
+      [-element.bounds.width / 2, element.bounds.height / 2],
+      [element.bounds.width / 2, element.bounds.height / 2],
+    ];
+    ctx.fillStyle = "#2f80ed";
+    for (const [x, y] of corners) ctx.fillRect(x - halfHandle, y - halfHandle, halfHandle * 2, halfHandle * 2);
+    ctx.beginPath();
+    ctx.moveTo(0, -element.bounds.height / 2);
+    ctx.lineTo(0, -element.bounds.height / 2 - 32);
+    ctx.strokeStyle = "#2f80ed";
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.arc(0, -element.bounds.height / 2 - 32, 7, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = "#ffffff";
+    ctx.stroke();
+    const deleteX = element.bounds.width / 2 + 28;
+    const deleteY = -element.bounds.height / 2 - 28;
+    ctx.beginPath();
+    ctx.arc(deleteX, deleteY, 9, 0, Math.PI * 2);
+    ctx.fillStyle = "#e5484d";
+    ctx.fill();
+    ctx.strokeStyle = "#ffffff";
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(deleteX - 4, deleteY - 4);
+    ctx.lineTo(deleteX + 4, deleteY + 4);
+    ctx.moveTo(deleteX + 4, deleteY - 4);
+    ctx.lineTo(deleteX - 4, deleteY + 4);
+    ctx.strokeStyle = "#ffffff";
+    ctx.lineWidth = 2;
+    ctx.stroke();
   }
   ctx.restore();
 }
@@ -732,6 +868,32 @@ function isPointInLassoResizeHandle(bounds: Bounds, point: StrokePoint): boolean
   return point.x >= left && point.x <= bounds.x + bounds.width && point.y >= top && point.y <= bounds.y + bounds.height;
 }
 
+function getSingleSelectedImage(): SketchElement | null {
+  if (lasso.selectedIds.length !== 1) return null;
+  const element = state.elements.find((item) => item.id === lasso.selectedIds[0]);
+  return element?.type === "image" ? element : null;
+}
+
+function startLassoImageLongPress(point: StrokePoint, elementId: string) {
+  cancelLassoImageLongPress();
+  const timer = window.setTimeout(() => {
+    if (!lasso.longPress || lasso.longPress.elementId !== elementId) return;
+    lasso.longPress.selected = true;
+    lasso.selectedIds = [elementId];
+    lasso.path = [];
+    lasso.box = null;
+    fullRedrawStrokeCanvas(getCanvas(), state);
+    drawLassoSelectionOutline();
+  }, LASSO_LONG_PRESS_MS);
+  lasso.longPress = { point, elementId, timer, selected: false };
+}
+
+function cancelLassoImageLongPress() {
+  if (!lasso.longPress) return;
+  window.clearTimeout(lasso.longPress.timer);
+  lasso.longPress = null;
+}
+
 function getSelectableElements() {
   const strokeElements = migrateStrokesToElements(state.strokes);
   const strokeIds = new Set(state.strokes.map((s) => s.id));
@@ -742,6 +904,7 @@ function getSelectableElements() {
 }
 
 function clearInteractionState() {
+  cancelLassoImageLongPress();
   interaction.shapeStart = null;
   interaction.imageTransform = null;
   interaction.elementTransform = null;

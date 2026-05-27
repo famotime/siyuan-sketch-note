@@ -35,6 +35,7 @@
         @exportPdf="exportPdf"
         @exportPng="exportPng"
         @goToPage="canvasRef?.goToPage($event)"
+        @insertImage="triggerImageImport"
         @importBackground="triggerBackgroundImport"
         @importJson="triggerJsonImport"
         @nextPage="canvasRef?.goToNextPage()"
