@@ -97,5 +97,15 @@
   "exitZenMode": "Exit Zen Mode",
   "presetColors": "Preset colors",
   "colorHue": "Hue",
-  "eyedropper": "Eyedropper"
+  "eyedropper": "Eyedropper",
+  "replay": "Replay",
+  "replayPlay": "Play",
+  "replayPause": "Pause",
+  "replayPrevious": "Previous",
+  "replayNext": "Next",
+  "replayExit": "Exit Replay",
+  "replaySpeed": "Speed",
+  "replayStepOf": "Step",
+  "replayToolSwitch": "Tool Switch",
+  "replayImageOp": "Image Operation"
 }
