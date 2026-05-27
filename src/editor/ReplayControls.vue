@@ -39,9 +39,15 @@
       :value="speed"
       @change="$emit('speedChange', Number(($event.target as HTMLSelectElement).value))"
     >
-      <option :value="1">1x</option>
-      <option :value="2">2x</option>
-      <option :value="4">4x</option>
+      <option :value="1">
+        1x
+      </option>
+      <option :value="2">
+        2x
+      </option>
+      <option :value="4">
+        4x
+      </option>
     </select>
     <button
       class="replay-btn replay-btn--exit"

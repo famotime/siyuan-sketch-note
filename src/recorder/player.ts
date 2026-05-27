@@ -136,7 +136,7 @@ export class ReplayPlayer {
     this.scheduleFrame();
   }
 
-  private renderEventAnimated(event: ReplayEvent, time: number): boolean {
+  private renderEventAnimated(event: ReplayEvent, _time: number): boolean {
     switch (event.type) {
       case "stroke":
       case "shape":

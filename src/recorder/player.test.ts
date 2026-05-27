@@ -86,7 +86,7 @@ const mockEvents: ReplayEvent[] = [
   },
 ];
 
-describe("ReplayPlayer", () => {
+describe("replayPlayer", () => {
   it("starts in idle state", () => {
     const canvas = createMockCanvas();
     const player = new ReplayPlayer(mockEvents, canvas);

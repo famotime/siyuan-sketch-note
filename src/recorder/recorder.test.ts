@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import { ReplayRecorder } from "./recorder";
 import type { StrokeReplayEvent, ToolSwitchReplayEvent } from "./types";
 
-describe("ReplayRecorder", () => {
+describe("replayRecorder", () => {
   it("records enabled events", () => {
     const recorder = new ReplayRecorder();
     const event: StrokeReplayEvent = {
