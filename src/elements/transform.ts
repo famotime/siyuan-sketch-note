@@ -8,10 +8,12 @@ const ROTATION_HANDLE_OFFSET = 32;
 const ROTATION_HANDLE_SIZE = 14;
 const DELETE_HANDLE_OFFSET = 28;
 const DELETE_HANDLE_SIZE = 16;
+const OPACITY_HANDLE_OFFSET = 28;
+const OPACITY_HANDLE_SIZE = 16;
 
 export interface ElementTransformAction {
   element: SketchElement;
-  mode: "move" | "resize" | "rotate" | "delete";
+  mode: "move" | "resize" | "rotate" | "delete" | "opacity";
   corner?: ResizeCorner;
 }
 
@@ -164,6 +166,16 @@ export function getDeleteHandlePoint(element: SketchElement): { x: number; y: nu
   );
 }
 
+export function getOpacityHandlePoint(element: SketchElement): { x: number; y: number } {
+  const center = getElementCenter(element);
+  return rotatePointAroundCenter(
+    element.bounds.x - OPACITY_HANDLE_OFFSET,
+    element.bounds.y - OPACITY_HANDLE_OFFSET,
+    center,
+    element.transform.rotation || 0,
+  );
+}
+
 export function isInRotationHandle(element: SketchElement, x: number, y: number): boolean {
   const handle = getRotationHandlePoint(element);
   return Math.hypot(x - handle.x, y - handle.y) <= ROTATION_HANDLE_SIZE;
@@ -172,6 +184,11 @@ export function isInRotationHandle(element: SketchElement, x: number, y: number)
 export function isInDeleteHandle(element: SketchElement, x: number, y: number): boolean {
   const handle = getDeleteHandlePoint(element);
   return Math.hypot(x - handle.x, y - handle.y) <= DELETE_HANDLE_SIZE;
+}
+
+export function isInOpacityHandle(element: SketchElement, x: number, y: number): boolean {
+  const handle = getOpacityHandlePoint(element);
+  return Math.hypot(x - handle.x, y - handle.y) <= OPACITY_HANDLE_SIZE;
 }
 
 export function angleFromElementCenter(element: SketchElement, x: number, y: number): number {
@@ -190,6 +207,9 @@ export function resolveElementTransformAction(
     : null;
 
   if (selectedElement) {
+    if (isInOpacityHandle(selectedElement, x, y)) {
+      return { element: selectedElement, mode: "opacity" };
+    }
     if (isInDeleteHandle(selectedElement, x, y)) {
       return { element: selectedElement, mode: "delete" };
     }

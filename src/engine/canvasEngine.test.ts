@@ -211,6 +211,47 @@ describe("canvas engine history", () => {
       { type: "fillText", args: ["visible", 10, 60, 220] },
     ]);
   });
+
+  it("applies image opacity while redrawing image elements", () => {
+    const state = createEngineState("blank");
+    state.elements = [
+      {
+        ...createImageElement("image-1", {
+          x: 10,
+          y: 20,
+          src: "data:image/png;base64,AAA",
+        }),
+        opacity: 0.5,
+      },
+    ];
+    const operations: Array<{ type: string; args: unknown[] }> = [];
+    const canvas = {
+      width: 800,
+      height: 1200,
+      getContext: () => ({
+        save() { operations.push({ type: "save", args: [] }); },
+        restore() { operations.push({ type: "restore", args: [] }); },
+        setTransform() {},
+        clearRect() {},
+        translate: (...args: unknown[]) => operations.push({ type: "translate", args }),
+        rotate: (...args: unknown[]) => operations.push({ type: "rotate", args }),
+        fillRect: (...args: unknown[]) => operations.push({ type: "fillRect", args }),
+        strokeRect() {},
+        get fillStyle() { return ""; },
+        set fillStyle(_value: string) {},
+        get strokeStyle() { return ""; },
+        set strokeStyle(_value: string) {},
+        get lineWidth() { return 1; },
+        set lineWidth(_value: number) {},
+        get globalAlpha() { return 1; },
+        set globalAlpha(value: number) { operations.push({ type: "globalAlpha", args: [value] }); },
+      }),
+    } as unknown as HTMLCanvasElement;
+
+    fullRedrawStrokeCanvas(canvas, state);
+
+    expect(operations).toContainEqual({ type: "globalAlpha", args: [0.5] });
+  });
 });
 
 describe("canvas engine current stroke cancellation", () => {

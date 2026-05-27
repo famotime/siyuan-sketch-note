@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { createImageElement } from "./image";
 import {
   getDeleteHandlePoint,
+  getOpacityHandlePoint,
   getRotationHandlePoint,
   hitTestElement,
   moveElement,
@@ -178,6 +179,22 @@ describe("element transforms", () => {
 
     expect(action?.element.id).toBe("image-1");
     expect(action?.mode).toBe("delete");
+  });
+
+  it("resolves selected opacity handles outside the image bounds", () => {
+    const element = createImageElement("image-1", {
+      x: 20,
+      y: 30,
+      src: "data:image/png;base64,AAA",
+      width: 320,
+      height: 240,
+    });
+    const handle = getOpacityHandlePoint(element);
+
+    const action = resolveElementTransformAction([element], "image-1", handle.x, handle.y);
+
+    expect(action?.element.id).toBe("image-1");
+    expect(action?.mode).toBe("opacity");
   });
 
   it("falls back to moving the topmost image body when no handle is selected", () => {

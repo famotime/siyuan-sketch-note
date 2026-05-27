@@ -387,6 +387,7 @@ function renderImageElement(ctx: CanvasRenderingContext2D, element: Extract<Sket
   ctx.save();
   ctx.translate(centerX, centerY);
   ctx.rotate(rotation);
+  ctx.globalAlpha = element.opacity ?? 1;
   const image = imageCache.get(element.src);
   if (image?.complete) {
     ctx.drawImage(

@@ -18,6 +18,7 @@ describe("image elements", () => {
       type: "image",
       src: "data:image/png;base64,AAA",
       alt: "Imported diagram",
+      opacity: 1,
       bounds: {
         x: 32,
         y: 48,
@@ -50,6 +51,7 @@ describe("image elements", () => {
         height: 120,
       },
       alt: "Updated",
+      opacity: 0.5,
     });
 
     expect(updated.bounds).toEqual({
@@ -59,6 +61,7 @@ describe("image elements", () => {
       height: 120,
     });
     expect(updated.alt).toBe("Updated");
+    expect(updated.opacity).toBe(0.5);
     expect(element.bounds).toEqual({
       x: 0,
       y: 0,
@@ -66,5 +69,6 @@ describe("image elements", () => {
       height: 240,
     });
     expect(element.alt).toBe("");
+    expect(element.opacity).toBe(1);
   });
 });

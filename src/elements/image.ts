@@ -6,6 +6,7 @@ export interface ImageElement {
   type: "image";
   src: string;
   alt: string;
+  opacity: number;
   bounds: Bounds;
   transform: Transform;
   zIndex: number;
@@ -18,6 +19,7 @@ interface CreateImageElementInput {
   alt?: string;
   width?: number;
   height?: number;
+  opacity?: number;
 }
 
 export function createImageElement(id: string, input: CreateImageElementInput): ImageElement {
@@ -26,6 +28,7 @@ export function createImageElement(id: string, input: CreateImageElementInput): 
     type: "image",
     src: input.src,
     alt: input.alt ?? "",
+    opacity: input.opacity ?? 1,
     bounds: {
       x: input.x,
       y: input.y,
@@ -39,12 +42,13 @@ export function createImageElement(id: string, input: CreateImageElementInput): 
 
 export function updateImageElement(
   element: ImageElement,
-  patch: Partial<Pick<ImageElement, "alt" | "bounds" | "src">>,
+  patch: Partial<Pick<ImageElement, "alt" | "bounds" | "opacity" | "src">>,
 ): ImageElement {
   return {
     ...element,
     src: patch.src ?? element.src,
     alt: patch.alt ?? element.alt,
+    opacity: patch.opacity ?? element.opacity,
     bounds: patch.bounds ?? element.bounds,
   };
 }

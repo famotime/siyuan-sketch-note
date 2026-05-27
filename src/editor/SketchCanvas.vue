@@ -334,6 +334,10 @@ function onPointerDown(e: PointerEvent) {
     const selectedImage = getSingleSelectedImage();
     if (selectedImage) {
       const imageAction = resolveElementTransformAction([selectedImage], selectedImage.id, point.x, point.y);
+      if (imageAction?.mode === "opacity") {
+        cycleImageOpacity(imageAction.element.id);
+        return;
+      }
       if (imageAction?.mode === "delete") {
         deleteLassoSelection();
         return;
@@ -401,6 +405,10 @@ function onPointerDown(e: PointerEvent) {
       point.y,
     );
     interaction.selectedElementId = action?.element.id ?? null;
+    if (action?.mode === "opacity") {
+      cycleImageOpacity(action.element.id);
+      return;
+    }
     if (action?.mode === "delete") {
       pushHistorySnapshot(state);
       state.elements = state.elements.filter((element) => element.id !== action.element.id);
@@ -828,6 +836,20 @@ function drawElementTransformOutline(ctx: CanvasRenderingContext2D, element: Ske
     ctx.fill();
     ctx.strokeStyle = "#ffffff";
     ctx.stroke();
+    const opacityX = -element.bounds.width / 2 - 28;
+    const opacityY = -element.bounds.height / 2 - 28;
+    ctx.beginPath();
+    ctx.arc(opacityX, opacityY, 11, 0, Math.PI * 2);
+    ctx.fillStyle = "#2f80ed";
+    ctx.fill();
+    ctx.strokeStyle = "#ffffff";
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+    ctx.fillStyle = "#ffffff";
+    ctx.font = "9px sans-serif";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText(String(Math.round(((element.type === "image" ? element.opacity : 1) ?? 1) * 100)), opacityX, opacityY);
     const deleteX = element.bounds.width / 2 + 28;
     const deleteY = -element.bounds.height / 2 - 28;
     ctx.beginPath();
@@ -1040,6 +1062,29 @@ function deleteLassoSelection() {
   lasso.selectedIds = [];
   state.isDirty = true;
   fullRedrawStrokeCanvas(getCanvas(), state);
+  updateUndoRedoState();
+  emit("stroke");
+}
+
+function getNextImageOpacity(opacity = 1): number {
+  const steps = [1, 0.75, 0.5, 0.25];
+  const currentIndex = steps.findIndex((step) => Math.abs(step - opacity) < 0.01);
+  return steps[(currentIndex + 1) % steps.length];
+}
+
+function cycleImageOpacity(elementId: string) {
+  pushHistorySnapshot(state);
+  state.elements = state.elements.map((element) => {
+    if (element.id !== elementId || element.type !== "image") return element;
+    return {
+      ...element,
+      opacity: getNextImageOpacity(element.opacity ?? 1),
+    };
+  });
+  state.isDirty = true;
+  fullRedrawStrokeCanvas(getCanvas(), state);
+  if (props.tool === "lasso") drawLassoSelectionOutline();
+  else drawSelectionOutline();
   updateUndoRedoState();
   emit("stroke");
 }
