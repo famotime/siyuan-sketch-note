@@ -7,9 +7,9 @@
   >
     <!-- 拖动手柄 -->
     <div
+      ref="dragHandleRef"
       class="sketch-float-panel__handle"
       @mousedown="onDragStart"
-      @touchstart="onDragStart"
     >
       <span class="sketch-float-panel__handle-dot" />
       <span class="sketch-float-panel__handle-dot" />
@@ -330,6 +330,7 @@ const emit = defineEmits<{
 
 // ── 拖拽状态与逻辑 ──
 const panelRef = ref<HTMLDivElement>();
+const dragHandleRef = ref<HTMLDivElement>();
 const widthControlRef = ref<HTMLDivElement>();
 const opacityControlRef = ref<HTMLDivElement>();
 const addColorWrapRef = ref<HTMLDivElement>();
@@ -337,6 +338,18 @@ const recolorWrapRef = ref<HTMLDivElement>();
 const pos = ref({ left: 20, top: 150 });
 let dragStartOffset = { x: 0, y: 0 };
 let isDragging = false;
+
+watch(
+  dragHandleRef,
+  (handle, _oldHandle, onCleanup) => {
+    if (!handle) return;
+    handle.addEventListener("touchstart", onDragStart, { passive: false });
+    onCleanup(() => {
+      handle.removeEventListener("touchstart", onDragStart);
+    });
+  },
+  { immediate: true },
+);
 
 function onDragStart(e: MouseEvent | TouchEvent) {
   isDragging = true;

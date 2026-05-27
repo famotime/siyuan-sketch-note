@@ -6,7 +6,6 @@
         class="sketch-color-popup__spectrum"
         :style="{ backgroundColor: hueColor }"
         @mousedown.prevent="onSpectrumPointerStart"
-        @touchstart.prevent="onSpectrumPointerStart"
       >
         <span
           class="sketch-color-popup__thumb"
@@ -85,6 +84,18 @@ const spectrumRef = ref<HTMLDivElement>();
 const localHue = ref(hexToHsv(props.modelValue).hue);
 let isPickingSpectrum = false;
 
+watch(
+  spectrumRef,
+  (spectrum, _oldSpectrum, onCleanup) => {
+    if (!spectrum) return;
+    spectrum.addEventListener("touchstart", onSpectrumPointerStart, { passive: false });
+    onCleanup(() => {
+      spectrum.removeEventListener("touchstart", onSpectrumPointerStart);
+    });
+  },
+  { immediate: true },
+);
+
 const hasEyeDropper = typeof window !== "undefined" && "EyeDropper" in window;
 
 const selectedHsv = computed(() => {
@@ -134,6 +145,7 @@ function onHueInput(e: Event) {
 }
 
 function onSpectrumPointerStart(e: MouseEvent | TouchEvent) {
+  e.preventDefault();
   isPickingSpectrum = true;
   updateColorFromSpectrum(e);
   window.addEventListener("mousemove", onSpectrumPointerMove);

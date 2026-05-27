@@ -49,6 +49,8 @@
   "redo": "Redo",
   "clear": "Clear",
   "settings": "Settings",
+  "debugLog": "Debug Logs",
+  "debugLogDesc": "Print Sketch Note diagnostic logs to the console. Disabled by default.",
   "more": "More",
   "noteBackground": "Note Background",
   "backgroundFit": "Background Fit",

@@ -1,5 +1,6 @@
 import {
   Plugin,
+  Setting,
   fetchSyncPost,
   getFrontend,
   getActiveEditor,
@@ -8,6 +9,8 @@ import "@/index.scss";
 import { init, destroy } from "./main";
 import { openSketchEditor, setI18n } from "./App.vue";
 import { storageKey, createEmptySketchData, loadEditorPreferences } from "./storage";
+import { loadPluginSettings, savePluginSettings } from "./storage/pluginSettings";
+import { setDebugLogEnabled } from "./utils/logger";
 import {
   createPlaceholderPng,
   uploadPngToAssets,
@@ -34,6 +37,9 @@ export default class SketchNotePlugin extends Plugin {
 
     // Initialize i18n
     setI18n(this.i18n ?? {});
+
+    const pluginSettings = await loadPluginSettings((key) => this.loadData(key));
+    setDebugLogEnabled(pluginSettings.enableDebugLog);
 
     // Initialize Vue app
     init(this);
@@ -78,6 +84,34 @@ export default class SketchNotePlugin extends Plugin {
     }
     destroy();
     delete window.sySketchNote;
+  }
+
+  openSetting() {
+    void this.openPluginSetting();
+  }
+
+  private async openPluginSetting() {
+    const settings = await loadPluginSettings((key) => this.loadData(key));
+    const setting = new Setting({ width: "520px" });
+
+    setting.addItem({
+      title: this.i18n?.debugLog ?? "Debug log",
+      description: this.i18n?.debugLogDesc ?? "Print diagnostic logs to the console.",
+      createActionElement: () => {
+        const checkbox = document.createElement("input");
+        checkbox.type = "checkbox";
+        checkbox.className = "b3-switch fn__flex-center";
+        checkbox.checked = settings.enableDebugLog;
+        checkbox.addEventListener("change", async () => {
+          const nextSettings = { enableDebugLog: checkbox.checked };
+          setDebugLogEnabled(nextSettings.enableDebugLog);
+          await savePluginSettings((key, data) => this.saveData(key, data), nextSettings);
+        });
+        return checkbox;
+      },
+    });
+
+    setting.open(this.name);
   }
 
   /**

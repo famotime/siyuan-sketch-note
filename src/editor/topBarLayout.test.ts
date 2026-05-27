@@ -134,7 +134,7 @@ it("uses the SiYuan runtime appearance mode for toolbar theme classes", () => {
   expect(app).toContain("document.body).backgroundColor");
   expect(app).toContain("getColorLuminance");
   expect(app).toContain("logThemeDiagnostics");
-  expect(app).toContain("[Sketch Note][Theme]");
+  expect(app).toContain('createLogger("Theme")');
   expect(app).toContain(':themeMode="themeMode"');
   expect(editor).toContain("themeMode: 'light' | 'dark'");
   expect(editor).toContain("effectiveThemeMode");
@@ -171,4 +171,21 @@ it("logs applied editor theme variables for runtime diagnosis", () => {
   expect(composable).toContain("getComputedStyle");
   expect(editor).toContain("--sketch-toolbar-surface");
   expect(editor).toContain("useThemeDetection");
+});
+
+it("declares scroll-blocking wheel and touch listeners explicitly", () => {
+  const editor = readFileSync(resolve(process.cwd(), "src/editor/SketchEditor.vue"), "utf8");
+  const floatingToolbar = readFileSync(resolve(process.cwd(), "src/editor/FloatingToolbar.vue"), "utf8");
+  const colorPicker = readFileSync(resolve(process.cwd(), "src/editor/ColorPickerPopup.vue"), "utf8");
+
+  expect(editor).not.toContain('@wheel="onBodyWheel"');
+  expect(editor).not.toContain('@touchstart="onZenToggleDragStart"');
+  expect(editor).toContain('addEventListener("wheel", onBodyWheel, { passive: false })');
+  expect(editor).toContain('addEventListener("touchstart", onZenToggleDragStart, { passive: false })');
+
+  expect(floatingToolbar).not.toContain('@touchstart="onDragStart"');
+  expect(floatingToolbar).toContain('addEventListener("touchstart", onDragStart, { passive: false })');
+
+  expect(colorPicker).not.toContain('@touchstart.prevent="onSpectrumPointerStart"');
+  expect(colorPicker).toContain('addEventListener("touchstart", onSpectrumPointerStart, { passive: false })');
 });

@@ -17,6 +17,7 @@ import { loadSketchData } from "@/storage";
 import { normalizeEditorI18n } from "@/i18n/editorI18n";
 import SketchEditor from "@/editor/SketchEditor.vue";
 import { parseCssColor, getColorLuminance as getLuminance, resolveThemeModeFromColor as resolveColorTheme } from "@/composables/useThemeDetection";
+import { createLogger } from "@/utils/logger";
 
 const editorVisible = ref(false);
 const editorBlockId = ref("");
@@ -27,6 +28,7 @@ const themeMode = ref<"light" | "dark">(resolveSiyuanThemeMode());
 let themeObserver: MutationObserver | null = null;
 let themeSyncTimer: number | null = null;
 let lastThemeDiagnosticKey = "";
+const themeLogger = createLogger("Theme");
 
 let loadDataFn: (key: string) => Promise<any> = async () => null;
 
@@ -133,7 +135,7 @@ function logThemeDiagnostics(resolvedMode: "light" | "dark") {
   const key = JSON.stringify(diagnostics);
   if (key === lastThemeDiagnosticKey) return;
   lastThemeDiagnosticKey = key;
-  console.info("[Sketch Note][Theme]", diagnostics);
+  themeLogger.info(diagnostics);
 }
 
 onMounted(() => {
@@ -172,7 +174,7 @@ export async function openSketchEditor(blockId: string) {
   try {
     editorData.value = await loadSketchData(loadDataFn, blockId);
   } catch (e) {
-    console.error("[Sketch Note] Failed to load sketch data:", e);
+    createLogger().error("Failed to load sketch data:", e);
     showMessage(`Sketch Note: ${pluginI18n.value.loadFailed || "Data load failed"}`, 5000, "error");
     editorData.value = null;
   }
@@ -221,7 +223,7 @@ function refreshSketchImage(blockId: string) {
         }
       });
       if (!found) {
-        console.warn(`[Sketch Note] refreshSketchImage: no img found for pattern "${pattern}"`);
+        createLogger().warn(`refreshSketchImage: no img found for pattern "${pattern}"`);
       }
     }, 100);
   });

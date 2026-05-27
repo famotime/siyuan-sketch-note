@@ -84,7 +84,6 @@
       ref="bodyRef"
       class="sketch-editor__body"
       :class="{ 'sketch-editor__body--zen': isZenMode }"
-      @wheel="onBodyWheel"
     >
       <SketchCanvas
         ref="canvasRef"
@@ -120,6 +119,7 @@
     />
     <button
       v-if="isZenMode"
+      ref="zenToggleRef"
       class="sketch-zen-toggle"
       :style="{ left: `${zenTogglePos.left}px`, top: `${zenTogglePos.top}px` }"
       :aria-label="t(zenToggleState.ariaLabelKey)"
@@ -127,7 +127,6 @@
       :title="t(zenToggleState.titleKey)"
       @click="onZenToggleClick"
       @mousedown="onZenToggleDragStart"
-      @touchstart="onZenToggleDragStart"
     >
       <IconParkIcon :name="zenToggleState.icon" />
     </button>
@@ -135,7 +134,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted } from "vue";
+import { ref, computed, onMounted, onUnmounted, watchEffect } from "vue";
 import type { SketchData, ToolPreset } from "@/types/sketch";
 import { getAllTemplates } from "@/template";
 import { showMessage } from "siyuan";
@@ -183,6 +182,7 @@ const visible = ref(false);
 const editorRootRef = ref<HTMLDivElement>();
 const canvasRef = ref<InstanceType<typeof SketchCanvas>>();
 const bodyRef = ref<HTMLDivElement>();
+const zenToggleRef = ref<HTMLButtonElement>();
 const imageInputRef = ref<HTMLInputElement>();
 const jsonInputRef = ref<HTMLInputElement>();
 const backgroundInputRef = ref<HTMLInputElement>();
@@ -305,14 +305,25 @@ onMounted(() => {
 onMounted(() => {
   visible.value = true;
   document.body.style.overflow = "hidden";
+  bodyRef.value?.addEventListener("wheel", onBodyWheel, { passive: false });
   window.addEventListener("paste", onPaste);
   window.addEventListener("keydown", onKeyDown);
 });
 
 onUnmounted(() => {
   document.body.style.overflow = "";
+  bodyRef.value?.removeEventListener("wheel", onBodyWheel);
   window.removeEventListener("paste", onPaste);
   window.removeEventListener("keydown", onKeyDown);
+});
+
+watchEffect((onCleanup) => {
+  const button = zenToggleRef.value;
+  if (!button) return;
+  button.addEventListener("touchstart", onZenToggleDragStart, { passive: false });
+  onCleanup(() => {
+    button.removeEventListener("touchstart", onZenToggleDragStart);
+  });
 });
 
 // ─── Toolbar actions ───

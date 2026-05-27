@@ -1,5 +1,6 @@
 import { ref, nextTick, onMounted, onUnmounted, watch } from "vue";
 import type { Ref } from "vue";
+import { createLogger } from "@/utils/logger";
 
 export function parseCssColor(color: string): [number, number, number] | null {
   const rgbMatch = color.match(/rgba?\(\s*(\d+(?:\.\d+)?)\s*,\s*(\d+(?:\.\d+)?)\s*,\s*(\d+(?:\.\d+)?)/i);
@@ -56,6 +57,7 @@ export function useThemeDetection(ctx: {
   const effectiveThemeMode = ref<'light' | 'dark'>(ctx.themeMode.value);
   let themeProbeTimer: ReturnType<typeof setInterval> | null = null;
   let lastEditorThemeDiagnosticKey = "";
+  const logger = createLogger(["Theme", "Editor"]);
 
   function resolveEditorBackgroundThemeMode(): 'light' | 'dark' | null {
     if (!ctx.editorRootRef.value) return null;
@@ -84,7 +86,7 @@ export function useThemeDetection(ctx: {
     const key = JSON.stringify(diagnostics);
     if (key === lastEditorThemeDiagnosticKey) return;
     lastEditorThemeDiagnosticKey = key;
-    console.info("[Sketch Note][Theme][Editor]", diagnostics);
+    logger.info(diagnostics);
   }
 
   onMounted(() => {

@@ -3,6 +3,7 @@ import { DEFAULT_SKETCH_DATA } from "@/types/sketch";
 import type { SketchInputSettings } from "@/editor/inputMode";
 import { normalizeInputSettings } from "@/editor/inputMode";
 import type { CustomBackgroundTemplate } from "@/template/customBackground";
+import { createLogger } from "@/utils/logger";
 import { recoverSketchData } from "./migrations";
 
 export { thumbnailCanvas } from "./thumbnail";
@@ -47,7 +48,7 @@ export async function loadSketchData(
 
   const recovery = recoverSketchData(raw);
   if (recovery.recovered) {
-    console.warn(`[Sketch Note] Recovered corrupted data for block ${blockId}: ${recovery.reason}`);
+    createLogger().warn(`Recovered corrupted data for block ${blockId}: ${recovery.reason}`);
   }
   return recovery.data;
 }

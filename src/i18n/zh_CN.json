@@ -49,6 +49,8 @@
   "redo": "重做",
   "clear": "清除",
   "settings": "设置",
+  "debugLog": "日志打印",
+  "debugLogDesc": "开启后在控制台输出闲笔诊断日志，默认关闭。",
   "more": "更多",
   "noteBackground": "笔记背景",
   "backgroundFit": "背景适配",
