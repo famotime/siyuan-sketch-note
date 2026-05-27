@@ -226,7 +226,7 @@ const currentShapeIcon = computed<IconParkName>(() => {
 .sketch-btn--tool-active,
 .sketch-btn--tool.sketch-btn--tool-active:hover {
   background: var(--b3-theme-primary) !important;
-  color: var(--sketch-toolbar-strong-text) !important;
+  color: var(--sketch-toolbar-active-text) !important;
   border-color: transparent !important;
   box-shadow: 0 4px 12px rgba(var(--b3-theme-primary-rgb), 0.25);
 }

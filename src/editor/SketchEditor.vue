@@ -529,6 +529,7 @@ function onHeightChanged(_h: number) {}
   --sketch-toolbar-text: rgba(255, 255, 255, 0.8);
   --sketch-toolbar-muted-text: rgba(255, 255, 255, 0.58);
   --sketch-toolbar-strong-text: #fff;
+  --sketch-toolbar-active-text: #fff;
   --sketch-toolbar-separator: rgba(255, 255, 255, 0.12);
   --sketch-toolbar-shadow: 0 10px 30px rgba(0, 0, 0, 0.25), 0 2px 8px rgba(0, 0, 0, 0.12);
   --sketch-toolbar-hover-shadow: 0 12px 35px rgba(0, 0, 0, 0.35), 0 4px 12px rgba(0, 0, 0, 0.15);
@@ -546,6 +547,7 @@ function onHeightChanged(_h: number) {}
   --sketch-toolbar-text: rgba(15, 23, 42, 0.78);
   --sketch-toolbar-muted-text: rgba(15, 23, 42, 0.52);
   --sketch-toolbar-strong-text: rgba(15, 23, 42, 0.94);
+  --sketch-toolbar-active-text: #fff;
   --sketch-toolbar-separator: rgba(15, 23, 42, 0.1);
   --sketch-toolbar-shadow: 0 12px 32px rgba(15, 23, 42, 0.12), 0 2px 8px rgba(15, 23, 42, 0.06);
   --sketch-toolbar-hover-shadow: 0 14px 36px rgba(15, 23, 42, 0.16), 0 4px 12px rgba(15, 23, 42, 0.08);
@@ -564,6 +566,7 @@ function onHeightChanged(_h: number) {}
     --sketch-toolbar-text: rgba(15, 23, 42, 0.78);
     --sketch-toolbar-muted-text: rgba(15, 23, 42, 0.52);
     --sketch-toolbar-strong-text: rgba(15, 23, 42, 0.94);
+    --sketch-toolbar-active-text: #fff;
     --sketch-toolbar-separator: rgba(15, 23, 42, 0.1);
     --sketch-toolbar-shadow: 0 12px 32px rgba(15, 23, 42, 0.12), 0 2px 8px rgba(15, 23, 42, 0.06);
     --sketch-toolbar-hover-shadow: 0 14px 36px rgba(15, 23, 42, 0.16), 0 4px 12px rgba(15, 23, 42, 0.08);
@@ -584,6 +587,7 @@ function onHeightChanged(_h: number) {}
   --sketch-toolbar-text: rgba(15, 23, 42, 0.78);
   --sketch-toolbar-muted-text: rgba(15, 23, 42, 0.52);
   --sketch-toolbar-strong-text: rgba(15, 23, 42, 0.94);
+  --sketch-toolbar-active-text: #fff;
   --sketch-toolbar-separator: rgba(15, 23, 42, 0.1);
   --sketch-toolbar-shadow: 0 12px 32px rgba(15, 23, 42, 0.12), 0 2px 8px rgba(15, 23, 42, 0.06);
   --sketch-toolbar-hover-shadow: 0 14px 36px rgba(15, 23, 42, 0.16), 0 4px 12px rgba(15, 23, 42, 0.08);
@@ -603,6 +607,7 @@ function onHeightChanged(_h: number) {}
   --sketch-toolbar-text: rgba(255, 255, 255, 0.8);
   --sketch-toolbar-muted-text: rgba(255, 255, 255, 0.58);
   --sketch-toolbar-strong-text: #fff;
+  --sketch-toolbar-active-text: #fff;
   --sketch-toolbar-separator: rgba(255, 255, 255, 0.12);
   --sketch-toolbar-shadow: 0 10px 30px rgba(0, 0, 0, 0.25), 0 2px 8px rgba(0, 0, 0, 0.12);
   --sketch-toolbar-hover-shadow: 0 12px 35px rgba(0, 0, 0, 0.35), 0 4px 12px rgba(0, 0, 0, 0.15);
@@ -620,6 +625,7 @@ function onHeightChanged(_h: number) {}
   --sketch-toolbar-text: rgba(255, 255, 255, 0.8);
   --sketch-toolbar-muted-text: rgba(255, 255, 255, 0.58);
   --sketch-toolbar-strong-text: #fff;
+  --sketch-toolbar-active-text: #fff;
   --sketch-toolbar-separator: rgba(255, 255, 255, 0.12);
   --sketch-toolbar-shadow: 0 10px 30px rgba(0, 0, 0, 0.25), 0 2px 8px rgba(0, 0, 0, 0.12);
   --sketch-toolbar-hover-shadow: 0 12px 35px rgba(0, 0, 0, 0.35), 0 4px 12px rgba(0, 0, 0, 0.15);
@@ -637,6 +643,7 @@ function onHeightChanged(_h: number) {}
   --sketch-toolbar-text: rgba(15, 23, 42, 0.78);
   --sketch-toolbar-muted-text: rgba(15, 23, 42, 0.52);
   --sketch-toolbar-strong-text: rgba(15, 23, 42, 0.94);
+  --sketch-toolbar-active-text: #fff;
   --sketch-toolbar-separator: rgba(15, 23, 42, 0.1);
   --sketch-toolbar-shadow: 0 12px 32px rgba(15, 23, 42, 0.12), 0 2px 8px rgba(15, 23, 42, 0.06);
   --sketch-toolbar-hover-shadow: 0 14px 36px rgba(15, 23, 42, 0.16), 0 4px 12px rgba(15, 23, 42, 0.08);
@@ -757,7 +764,7 @@ function onHeightChanged(_h: number) {}
 .sketch-btn--tool-active,
 .sketch-btn--tool.sketch-btn--tool-active:hover {
   background: var(--b3-theme-primary) !important;
-  color: var(--sketch-toolbar-strong-text) !important;
+  color: var(--sketch-toolbar-active-text) !important;
   border-color: transparent !important;
   box-shadow: var(--sketch-toolbar-active-shadow);
 }

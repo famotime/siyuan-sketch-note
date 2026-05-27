@@ -56,9 +56,20 @@ it("keeps active tool highlight visible while the button is hovered", () => {
   const editor = readFileSync(resolve(process.cwd(), "src/editor/SketchEditor.vue"), "utf8");
 
   const activeHoverRule = /\.sketch-btn--tool\.sketch-btn--tool-active:hover\s*\{[^}]*background:\s*var\(--b3-theme-primary\)\s*!important/;
+  const activeTextRule = /\.sketch-btn--tool-active,[\s\S]*?\.sketch-btn--tool\.sketch-btn--tool-active:hover\s*\{[^}]*color:\s*var\(--sketch-toolbar-active-text\)\s*!important/;
 
   expect(toolbar).toMatch(activeHoverRule);
   expect(editor).toMatch(activeHoverRule);
+  expect(toolbar).toMatch(activeTextRule);
+  expect(editor).toMatch(activeTextRule);
+});
+
+it("keeps active tool icons white in light theme", () => {
+  const editor = readFileSync(resolve(process.cwd(), "src/editor/SketchEditor.vue"), "utf8");
+
+  const explicitLightIndex = editor.lastIndexOf(".sketch-editor--theme-light");
+  expect(explicitLightIndex).toBeGreaterThan(-1);
+  expect(editor.slice(explicitLightIndex)).toContain("--sketch-toolbar-active-text: #fff");
 });
 
 it("adapts top and floating toolbars to SiYuan light and dark themes", () => {
