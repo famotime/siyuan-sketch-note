@@ -1,8 +1,10 @@
 import { describe, expect, it } from "vitest";
 import { createImageElement } from "@/elements/image";
+import { createTextElement } from "@/elements/text";
 import { moveElement } from "@/elements/transform";
 import {
   createEngineState,
+  fullRedrawStrokeCanvas,
   handlePointerDown,
   handlePointerMove,
   handlePointerUp,
@@ -174,6 +176,40 @@ describe("canvas engine history", () => {
       width: 33,
       height: 33,
     });
+  });
+
+  it("can hide selected elements while redrawing the live canvas", () => {
+    const state = createEngineState("blank");
+    state.elements = [
+      createTextElement("text-1", { x: 10, y: 20, text: "hidden" }),
+      createTextElement("text-2", { x: 10, y: 60, text: "visible" }),
+    ];
+    const operations: Array<{ type: string; args: unknown[] }> = [];
+    const canvas = {
+      width: 800,
+      height: 1200,
+      getContext: () => ({
+        save() {},
+        restore() {},
+        setTransform() {},
+        clearRect() {},
+        fillText: (...args: unknown[]) => operations.push({ type: "fillText", args }),
+        get fillStyle() { return ""; },
+        set fillStyle(_value: string) {},
+        get font() { return ""; },
+        set font(_value: string) {},
+        get textBaseline() { return ""; },
+        set textBaseline(_value: string) {},
+      }),
+    } as unknown as HTMLCanvasElement;
+
+    fullRedrawStrokeCanvas(canvas, state, {
+      hiddenElementIds: new Set(["text-1"]),
+    });
+
+    expect(operations).toEqual([
+      { type: "fillText", args: ["visible", 10, 60, 220] },
+    ]);
   });
 });
 

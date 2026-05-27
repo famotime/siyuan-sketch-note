@@ -31,8 +31,12 @@
         class="sketch-text-editor-input"
         type="text"
         :style="{
-          fontSize: `${props.toolPresets.text?.width ?? 20}px`,
-          color: props.toolPresets.text?.color ?? '#000000',
+          width: `${textEditor.width}px`,
+          height: `${textEditor.height}px`,
+          fontSize: `${textEditor.fontSize}px`,
+          lineHeight: `${textEditor.fontSize}px`,
+          color: textEditor.color,
+          fontFamily: textEditor.fontFamily,
         }"
         @keydown.enter="finishTextEditing"
         @keydown.esc="cancelTextEditing"
@@ -129,6 +133,7 @@ import IconParkIcon from "./IconParkIcon.vue";
 import type { OcrSearchResult } from "@/search/ocrIndex";
 import { isShapeEditorTool } from "./tools";
 import type { EditorTool } from "./tools";
+import { hasTextPointerDrag, resolveTextPointerAction } from "./textPointerAction";
 import { useViewport } from "@/composables/useViewport";
 import { useTextEditing } from "@/composables/useTextEditing";
 
@@ -167,12 +172,13 @@ const textEditing = useTextEditing({
   updateUndoRedoState: () => updateUndoRedoState(),
   emit: (e) => emit(e),
 });
-const { textEditor, textEditorInputRef, startNewTextEditing, insertText, startEditText, finishTextEditing, cancelTextEditing } = textEditing;
+const { textEditor, textEditorInputRef, startNewTextEditing, insertText, startEditText, finishTextEditing, cancelTextEditing: cancelTextEditingBase } = textEditing;
 // Element interaction state
 const interaction = {
   shapeStart: null as StrokePoint | null,
   imageTransform: null as { elementId: string; lastPoint: StrokePoint; mode: "move" | "resize" } | null,
   elementTransform: null as { elementId: string; lastPoint: StrokePoint; mode: "move" | "resize" } | null,
+  textMove: null as { elementId: string; startPoint: StrokePoint; lastPoint: StrokePoint; moved: boolean } | null,
   selectedElementId: null as string | null,
 };
 
@@ -288,12 +294,18 @@ function onPointerDown(e: PointerEvent) {
       finishTextEditing();
     } else {
       const point = eventPoint(e);
-      const hit = hitTestElement(
-        state.elements.filter((item) => item.type === "text"),
-        point.x,
-        point.y,
-      );
-      if (!hit) startNewTextEditing(point.x, point.y);
+      const action = resolveTextPointerAction(state.elements, point.x, point.y);
+      if (action.type === "edit") {
+        interaction.selectedElementId = action.element.id;
+        interaction.textMove = {
+          elementId: action.element.id,
+          startPoint: point,
+          lastPoint: point,
+          moved: false,
+        };
+      } else {
+        startNewTextEditing(action.x, action.y);
+      }
     }
     return;
   }
@@ -343,27 +355,6 @@ function onPointerDown(e: PointerEvent) {
     interaction.selectedElementId = element?.id ?? null;
     if (element) {
       interaction.imageTransform = {
-        elementId: element.id,
-        lastPoint: point,
-        mode: isInResizeCorner(element, point.x, point.y) ? "resize" : "move",
-      };
-      pushHistorySnapshot(state);
-    }
-    fullRedrawStrokeCanvas(getCanvas(), state);
-    drawSelectionOutline();
-    return;
-  }
-
-  if (props.tool === "text") {
-    const point = eventPoint(e);
-    const element = hitTestElement(
-      state.elements.filter((item) => item.type === "text"),
-      point.x,
-      point.y,
-    );
-    interaction.selectedElementId = element?.id ?? null;
-    if (element) {
-      interaction.elementTransform = {
         elementId: element.id,
         lastPoint: point,
         mode: isInResizeCorner(element, point.x, point.y) ? "resize" : "move",
@@ -446,6 +437,26 @@ function onPointerMove(e: PointerEvent) {
     return;
   }
 
+  if (interaction.textMove) {
+    const point = eventPoint(e);
+    if (!interaction.textMove.moved && !hasTextPointerDrag(interaction.textMove.startPoint, point)) return;
+    if (!interaction.textMove.moved) {
+      pushHistorySnapshot(state);
+      interaction.textMove.moved = true;
+    }
+    const dx = point.x - interaction.textMove.lastPoint.x;
+    const dy = point.y - interaction.textMove.lastPoint.y;
+    state.elements = state.elements.map((element) => {
+      if (element.id !== interaction.textMove?.elementId) return element;
+      return moveElement(element, dx, dy);
+    });
+    interaction.textMove.lastPoint = point;
+    state.isDirty = true;
+    fullRedrawStrokeCanvas(getCanvas(), state);
+    drawSelectionOutline();
+    return;
+  }
+
   if (interaction.elementTransform) {
     const point = eventPoint(e);
     const dx = point.x - interaction.elementTransform.lastPoint.x;
@@ -521,6 +532,21 @@ function onPointerUp(e: PointerEvent) {
   }
 
   if (interaction.imageTransform) { interaction.imageTransform = null; updateUndoRedoState(); emit("stroke"); return; }
+  if (interaction.textMove) {
+    const textMove = interaction.textMove;
+    interaction.textMove = null;
+    if (textMove.moved) {
+      updateUndoRedoState();
+      emit("stroke");
+      return;
+    }
+    const element = state.elements.find((item) => item.id === textMove.elementId);
+    if (element?.type === "text") {
+      startEditText(element);
+      redrawStrokeCanvasForEditing();
+    }
+    return;
+  }
   if (interaction.elementTransform) { interaction.elementTransform = null; updateUndoRedoState(); emit("stroke"); return; }
 
   if (interaction.shapeStart && isShapeEditorTool(props.tool)) {
@@ -601,6 +627,18 @@ function emitPageState() {
   const navigator = createPageNavigator(serializeState(state));
   const currentIndex = navigator.current?.index ?? 0;
   emit("pagesChanged", { current: currentIndex + 1, total: Math.max(1, navigator.pages.length) });
+}
+
+function redrawStrokeCanvasForEditing() {
+  const hiddenElementIds = textEditor.value.show && textEditor.value.elementId
+    ? new Set([textEditor.value.elementId])
+    : undefined;
+  fullRedrawStrokeCanvas(getCanvas(), state, { hiddenElementIds });
+}
+
+function cancelTextEditing() {
+  cancelTextEditingBase();
+  fullRedrawStrokeCanvas(getCanvas(), state);
 }
 
 // ── Lasso drawing helpers ──
@@ -707,6 +745,7 @@ function clearInteractionState() {
   interaction.shapeStart = null;
   interaction.imageTransform = null;
   interaction.elementTransform = null;
+  interaction.textMove = null;
   interaction.selectedElementId = null;
   lasso.path = [];
   lasso.box = null;
@@ -727,6 +766,7 @@ function onCanvasDoubleClick(e: MouseEvent) {
   );
   if (!element || element.type !== "text") return;
   startEditText(element as any);
+  redrawStrokeCanvasForEditing();
 }
 
 // ── Public API ──
@@ -968,13 +1008,13 @@ defineExpose({
   font-size: 16px;
   color: var(--b3-theme-text-main, #333);
   background: transparent;
-  border: 1px solid var(--b3-theme-primary, #2f80ed);
-  border-radius: 4px;
-  padding: 2px 6px;
+  border: 0;
+  border-radius: 2px;
+  padding: 0;
   min-width: 150px;
   max-width: 300px;
   box-shadow: none;
-  outline: none;
+  outline: 1px solid var(--b3-theme-primary, #2f80ed);
   font-weight: 500;
 }
 

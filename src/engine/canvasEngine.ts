@@ -54,6 +54,10 @@ export interface EngineSnapshot {
   elements: SketchElement[];
 }
 
+export interface RenderOptions {
+  hiddenElementIds?: ReadonlySet<string>;
+}
+
 export function createEngineState(
   templateId: string,
   canvasWidth = CANVAS_LOGICAL_WIDTH,
@@ -187,6 +191,7 @@ export function setupBackgroundCanvas(
 export function setupStrokeCanvas(
   canvas: HTMLCanvasElement,
   state: EngineState,
+  options: RenderOptions = {},
 ): void {
   const dpr = window.devicePixelRatio || 1;
   canvas.width = state.canvasWidth * dpr;
@@ -196,11 +201,11 @@ export function setupStrokeCanvas(
   const ctx = canvas.getContext("2d")!;
   ctx.scale(dpr, dpr);
   const layers = splitElementsForRender(state.elements);
-  renderNonStrokeElements(ctx, layers.background);
+  renderNonStrokeElements(ctx, layers.background, options);
   for (const stroke of state.strokes) {
     renderStroke(ctx, stroke);
   }
-  renderNonStrokeElements(ctx, layers.foreground);
+  renderNonStrokeElements(ctx, layers.foreground, options);
 }
 
 export function handlePointerDown(
@@ -309,6 +314,7 @@ export function clearAll(state: EngineState): void {
 export function fullRedrawStrokeCanvas(
   canvas: HTMLCanvasElement,
   state: EngineState,
+  options: RenderOptions = {},
 ): void {
   const ctx = canvas.getContext("2d")!;
   ctx.save();
@@ -316,11 +322,11 @@ export function fullRedrawStrokeCanvas(
   ctx.clearRect(0, 0, canvas.width, canvas.height);
   ctx.restore();
   const layers = splitElementsForRender(state.elements);
-  renderNonStrokeElements(ctx, layers.background);
+  renderNonStrokeElements(ctx, layers.background, options);
   for (const stroke of state.strokes) {
     renderStroke(ctx, stroke);
   }
-  renderNonStrokeElements(ctx, layers.foreground);
+  renderNonStrokeElements(ctx, layers.foreground, options);
 }
 
 export function resizeCanvases(
@@ -352,8 +358,13 @@ export function serializeState(state: EngineState): SketchData {
   };
 }
 
-function renderNonStrokeElements(ctx: CanvasRenderingContext2D, elements: SketchElement[]): void {
+function renderNonStrokeElements(
+  ctx: CanvasRenderingContext2D,
+  elements: SketchElement[],
+  options: RenderOptions = {},
+): void {
   for (const element of elements) {
+    if (options.hiddenElementIds?.has(element.id)) continue;
     if (element.type === "image") {
       renderImageElement(ctx, element);
       continue;

@@ -18,6 +18,11 @@ export function useTextEditing(ctx: {
     show: false,
     x: 0,
     y: 0,
+    width: 150,
+    height: 28,
+    color: "#000000",
+    fontFamily: "Inter, system-ui, sans-serif",
+    fontSize: 20,
     val: "",
     elementId: null as string | null,
   });
@@ -30,6 +35,11 @@ export function useTextEditing(ctx: {
       show: true,
       x,
       y: y - fontSize / 2,
+      width: 150,
+      height: fontSize + 8,
+      color: textStyle.color,
+      fontFamily: "Inter, system-ui, sans-serif",
+      fontSize,
       val: "",
       elementId: null,
     };
@@ -39,6 +49,8 @@ export function useTextEditing(ctx: {
   }
 
   function insertText(state: EngineState) {
+    const textStyle = ctx.toolPresets.value.text ?? { color: "#000000", width: 20 };
+    const fontSize = textStyle.width;
     const position = createInsertElementPosition({
       canvasWidth: state.canvasWidth,
       pageMode: state.pageMode,
@@ -51,6 +63,11 @@ export function useTextEditing(ctx: {
       show: true,
       x: position.x,
       y: position.y,
+      width: 150,
+      height: fontSize + 8,
+      color: textStyle.color,
+      fontFamily: "Inter, system-ui, sans-serif",
+      fontSize,
       val: "",
       elementId: null,
     };
@@ -64,6 +81,11 @@ export function useTextEditing(ctx: {
       show: true,
       x: element.bounds.x,
       y: element.bounds.y,
+      width: element.bounds.width,
+      height: element.bounds.height,
+      color: element.style.color,
+      fontFamily: element.style.fontFamily,
+      fontSize: element.style.fontSize,
       val: element.text,
       elementId: element.id,
     };
