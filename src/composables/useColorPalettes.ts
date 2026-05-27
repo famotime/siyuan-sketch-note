@@ -12,6 +12,7 @@ export function useColorPalettes(ctx: {
   canvasRef: Ref<{ recolorLasso: (c: string) => void } | undefined>;
   t: (key: string) => string;
   markAndSchedule: () => void;
+  updateActivePreset: (patch: { color: string }) => void;
 }) {
   const activeColor = ref(PRESET_COLORS[0]);
 
@@ -27,6 +28,7 @@ export function useColorPalettes(ctx: {
     if (ctx.activeTool.value === "eraser") {
       ctx.activeTool.value = "pen";
     }
+    ctx.updateActivePreset({ color: c });
   }
 
   function selectCustomColor(c: string) {
@@ -34,6 +36,7 @@ export function useColorPalettes(ctx: {
     if (ctx.activeTool.value === "eraser") {
       ctx.activeTool.value = "pen";
     }
+    ctx.updateActivePreset({ color: c });
     if (ctx.activeTool.value === "highlighter") {
       ctx.colorPalettes.value = {
         ...ctx.colorPalettes.value,

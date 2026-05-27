@@ -204,6 +204,7 @@ const pageOverview = ref<PageOverviewItem[]>([]);
 const currentTemplate = ref(props.initialData?.template ?? "blank");
 const templates = computed(() => [...getAllTemplates(), ...customBackgrounds.value]);
 const loadedData = ref<SketchData | null>(props.initialData);
+const ocrIndex = ref<SketchData["ocrIndex"]>(props.initialData?.ocrIndex);
 
 // ─── Derived state ───
 const activePreset = computed(() => {
@@ -221,7 +222,16 @@ const activeCustomBackground = computed(() => getCustomBackgroundTemplate({
 // ─── Composables ───
 const { effectiveThemeMode } = useThemeDetection({ editorRootRef, themeMode: computed(() => props.themeMode) });
 
-const { saveStatus, autoSave, doSave, manualSave, onStroke: saveOnStroke, markAndSchedule } = useSaveManager({
+const {
+  saveStatus,
+  autoSave,
+  markDirty,
+  scheduleAutoSave,
+  doSave,
+  manualSave,
+  onStroke: saveOnStroke,
+  markAndSchedule,
+} = useSaveManager({
   canvasRef: canvasRef as any,
   blockId: computed(() => props.blockId),
   saveData: props.saveData,
@@ -230,7 +240,7 @@ const { saveStatus, autoSave, doSave, manualSave, onStroke: saveOnStroke, markAn
   inputSettings,
   customBackgrounds,
   colorPalettes,
-  ocrIndex: ref(undefined),
+  ocrIndex,
   t,
   onSaved: () => syncPageOverview(),
 });
@@ -242,6 +252,7 @@ const { colors, selectColor, selectCustomColor, recolorSelection, deleteColor, r
   canvasRef: canvasRef as any,
   t,
   markAndSchedule,
+  updateActivePreset,
 });
 
 const { ocrState, searchResults, recognizeText, onSearch, onSearchNext, onSearchPrev, onClearSearch } = useOcrSearch({
@@ -249,6 +260,7 @@ const { ocrState, searchResults, recognizeText, onSearch, onSearchNext, onSearch
   ocrProvider: props.ocrProvider,
   currentTemplate,
   blockId: computed(() => props.blockId),
+  ocrIndex,
   markDirty,
   scheduleAutoSave,
   autoSave,

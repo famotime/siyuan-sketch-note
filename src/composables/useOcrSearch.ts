@@ -13,12 +13,12 @@ export function useOcrSearch(ctx: {
   ocrProvider?: OcrProvider;
   currentTemplate: Ref<string>;
   blockId: Ref<string>;
+  ocrIndex: Ref<SketchData["ocrIndex"]>;
   markDirty: () => void;
   scheduleAutoSave: () => void;
   autoSave: Ref<boolean>;
 }) {
   const ocrState = ref<"idle" | "recognizing" | "completed" | "error">("idle");
-  const ocrIndex = ref<SketchData["ocrIndex"]>(undefined);
   const searchResults = ref<OcrSearchResult[]>([]);
   const searchResultIndex = ref(0);
 
@@ -45,7 +45,7 @@ export function useOcrSearch(ctx: {
         return;
       }
 
-      ocrIndex.value = createPageAwareOcrIndex(ctx.blockId.value, lines, data);
+      ctx.ocrIndex.value = createPageAwareOcrIndex(ctx.blockId.value, lines, data);
 
       ctx.markDirty();
       if (ctx.autoSave.value) ctx.scheduleAutoSave();
@@ -58,12 +58,12 @@ export function useOcrSearch(ctx: {
   }
 
   function onSearch(query: string) {
-    if (!ocrIndex.value || !query.trim()) {
+    if (!ctx.ocrIndex.value || !query.trim()) {
       searchResults.value = [];
       searchResultIndex.value = 0;
       return;
     }
-    searchResults.value = searchOcrIndex(ocrIndex.value, query);
+    searchResults.value = searchOcrIndex(ctx.ocrIndex.value, query);
     searchResultIndex.value = 0;
     if (searchResults.value.length > 0) {
       navigateToSearchResult(0);
@@ -93,5 +93,5 @@ export function useOcrSearch(ctx: {
     searchResultIndex.value = 0;
   }
 
-  return { ocrState, ocrIndex, searchResults, recognizeText, onSearch, onSearchNext, onSearchPrev, onClearSearch };
+  return { ocrState, ocrIndex: ctx.ocrIndex, searchResults, recognizeText, onSearch, onSearchNext, onSearchPrev, onClearSearch };
 }
