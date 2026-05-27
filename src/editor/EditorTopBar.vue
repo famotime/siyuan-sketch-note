@@ -36,6 +36,13 @@
     >
       <IconParkIcon name="Clear" />
     </button>
+    <button
+      class="sketch-btn sketch-btn--action"
+      :title="t('replay')"
+      @click="$emit('replay')"
+    >
+      <IconParkIcon name="Play" />
+    </button>
     <span class="sketch-spacer" />
     <span class="sketch-sep" />
     <button
@@ -155,6 +162,7 @@ defineEmits<{
   (e: "back"): void;
   (e: "backgroundFitChange", value: string): void;
   (e: "clear"): void;
+  (e: "replay"): void;
   (e: "insertImage"): void;
   (e: "toggleStylusOnly"): void;
   (e: "togglePressure"): void;
