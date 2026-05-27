@@ -2,6 +2,7 @@ import type { Bounds, SketchElement } from "@/elements/model";
 import type { SketchInputSettings } from "@/editor/inputMode";
 import type { OcrIndex } from "@/search/ocrIndex";
 import type { CustomBackgroundTemplate } from "@/template/customBackground";
+import type { ReplayEvent } from "@/recorder/types";
 
 export interface StrokePoint {
   x: number;
@@ -38,6 +39,7 @@ export interface SketchData {
   highlighterRecentColors?: string[];
   elements?: SketchElement[];
   strokes: Stroke[];
+  replayEvents?: ReplayEvent[];
 }
 
 export interface SketchDataRecoveryInfo {
