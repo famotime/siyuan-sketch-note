@@ -41,6 +41,7 @@
         @nextPage="canvasRef?.goToNextPage()"
         @previousPage="canvasRef?.goToPreviousPage()"
         @recognize="recognizeText"
+        @replay="enterReplayMode"
         @redo="canvasRef?.doRedo()"
         @search="onSearch"
         @searchNext="onSearchNext"
@@ -87,6 +88,7 @@
       :class="{ 'sketch-editor__body--zen': isZenMode }"
     >
       <SketchCanvas
+        v-show="!isReplayMode"
         ref="canvasRef"
         :initialData="loadedData"
         :tool="activeTool"
@@ -94,13 +96,40 @@
         :inputSettings="inputSettings"
         :templateId="currentTemplate"
         :lassoMode="lassoMode"
+        :recorder="replayRecorder"
         @update:canUndo="canUndo = $event"
         @update:canRedo="canRedo = $event"
         @heightChanged="onHeightChanged"
         @pagesChanged="onPagesChanged"
         @stroke="onStroke"
       />
+      <div
+        v-if="isReplayMode"
+        class="sketch-replay-canvas-wrap"
+      >
+        <canvas
+          ref="replayCanvasRef"
+          class="sketch-replay-canvas"
+        />
+      </div>
     </div>
+    <ReplayControls
+      v-if="isReplayMode"
+      :isPlaying="replayState === 'playing'"
+      :current="replayCurrent"
+      :total="replayTotal"
+      :speed="replaySpeed"
+      :canStepBack="replayCurrent > 0"
+      :canStepForward="replayCurrent < replayTotal"
+      :t="t"
+      class="sketch-replay-bar"
+      @togglePlay="toggleReplayPlay"
+      @previous="replayPrevious"
+      @next="replayNext"
+      @seek="replaySeek"
+      @speedChange="replaySpeedChange"
+      @exit="exitReplayMode"
+    />
     <FloatingToolbar
       v-if="!isZenMode"
       v-model:lassoMode="lassoMode"
@@ -135,7 +164,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted, watchEffect } from "vue";
+import { ref, computed, onMounted, onUnmounted, watchEffect, nextTick } from "vue";
 import type { SketchData, ToolPreset } from "@/types/sketch";
 import { getAllTemplates } from "@/template";
 import { showMessage } from "siyuan";
@@ -156,6 +185,11 @@ import SketchCanvas from "./SketchCanvas.vue";
 import ToolBar from "./ToolBar.vue";
 import FloatingToolbar from "./FloatingToolbar.vue";
 import IconParkIcon from "./IconParkIcon.vue";
+import { ReplayRecorder } from "@/recorder/recorder";
+import { ReplayPlayer } from "@/recorder/player";
+import type { PlaybackSpeed } from "@/recorder/player";
+import { reconstructFromData } from "@/recorder/reconstruct";
+import ReplayControls from "./ReplayControls.vue";
 
 import { useThemeDetection } from "@/composables/useThemeDetection";
 import { useSaveManager } from "@/composables/useSaveManager";
@@ -206,6 +240,16 @@ const currentTemplate = ref(props.initialData?.template ?? "blank");
 const templates = computed(() => [...getAllTemplates(), ...customBackgrounds.value]);
 const loadedData = ref<SketchData | null>(props.initialData);
 const ocrIndex = ref<SketchData["ocrIndex"]>(props.initialData?.ocrIndex);
+
+// ─── Replay ───
+const isReplayMode = ref(false);
+const replayRecorder = new ReplayRecorder();
+const replayPlayer = ref<InstanceType<typeof ReplayPlayer> | null>(null);
+const replayCanvasRef = ref<HTMLCanvasElement>();
+const replayState = ref<"idle" | "playing" | "paused">("idle");
+const replayCurrent = ref(0);
+const replayTotal = ref(0);
+const replaySpeed = ref<PlaybackSpeed>(1);
 
 // ─── Derived state ───
 const activePreset = computed(() => {
@@ -309,6 +353,7 @@ onMounted(() => {
   bodyRef.value?.addEventListener("wheel", onBodyWheel, { passive: false });
   window.addEventListener("paste", onPaste);
   window.addEventListener("keydown", onKeyDown);
+  window.addEventListener("keydown", onReplayKeyDown);
 });
 
 onUnmounted(() => {
@@ -316,6 +361,7 @@ onUnmounted(() => {
   bodyRef.value?.removeEventListener("wheel", onBodyWheel);
   window.removeEventListener("paste", onPaste);
   window.removeEventListener("keydown", onKeyDown);
+  window.removeEventListener("keydown", onReplayKeyDown);
 });
 
 watchEffect((onCleanup) => {
@@ -497,6 +543,111 @@ function readFileAsDataUrl(file: File): Promise<string> {
     reader.onerror = () => reject(reader.error);
     reader.readAsDataURL(file);
   });
+}
+
+// ─── Replay functions ───
+function enterReplayMode() {
+  const data = canvasRef.value?.getData();
+  if (!data) return;
+
+  // Get events — use recorded events if available, otherwise reconstruct
+  const events = data.replayEvents && data.replayEvents.length > 0
+    ? data.replayEvents
+    : reconstructFromData(data);
+
+  if (events.length === 0) return;
+
+  isReplayMode.value = true;
+  replayTotal.value = events.length;
+  replayCurrent.value = 0;
+  replayState.value = "idle";
+  replaySpeed.value = 1;
+
+  // Create replay canvas after DOM update
+  nextTick(() => {
+    if (!replayCanvasRef.value) return;
+    const canvas = replayCanvasRef.value;
+    const state = canvasRef.value?.getState();
+    if (state) {
+      canvas.width = state.canvasWidth * (window.devicePixelRatio || 1);
+      canvas.height = state.canvasHeight * (window.devicePixelRatio || 1);
+      canvas.style.width = `${state.canvasWidth}px`;
+      canvas.style.height = `${state.canvasHeight}px`;
+      const ctx = canvas.getContext("2d")!;
+      ctx.scale(window.devicePixelRatio || 1, window.devicePixelRatio || 1);
+    }
+
+    const player = new ReplayPlayer(events, canvas);
+    player.onStateChange = (s) => { replayState.value = s; };
+    player.onProgress = (current, total) => {
+      replayCurrent.value = current;
+      replayTotal.value = total;
+    };
+    player.onComplete = () => {
+      replayState.value = "idle";
+    };
+    replayPlayer.value = player;
+  });
+}
+
+function exitReplayMode() {
+  replayPlayer.value?.destroy();
+  replayPlayer.value = null;
+  isReplayMode.value = false;
+  replayState.value = "idle";
+  replayCurrent.value = 0;
+}
+
+function toggleReplayPlay() {
+  const player = replayPlayer.value;
+  if (!player) return;
+  if (replayState.value === "playing") {
+    player.pause();
+  } else {
+    player.play();
+  }
+}
+
+function replayPrevious() {
+  const player = replayPlayer.value;
+  if (!player) return;
+  player.pause();
+  const prev = Math.max(0, player.getCurrentIndex() - 1);
+  player.goToEvent(prev);
+  replayCurrent.value = prev;
+}
+
+function replayNext() {
+  const player = replayPlayer.value;
+  if (!player) return;
+  player.pause();
+  const next = Math.min(player.getTotalEvents(), player.getCurrentIndex() + 1);
+  player.goToEvent(next);
+  replayCurrent.value = next;
+}
+
+function replaySeek(index: number) {
+  const player = replayPlayer.value;
+  if (!player) return;
+  player.pause();
+  player.goToEvent(index);
+  replayCurrent.value = index;
+}
+
+function replaySpeedChange(speed: PlaybackSpeed) {
+  replaySpeed.value = speed;
+  replayPlayer.value?.setSpeed(speed);
+}
+
+function onReplayKeyDown(event: KeyboardEvent) {
+  if (!isReplayMode.value) return;
+  if (event.key === " ") {
+    event.preventDefault();
+    toggleReplayPlay();
+  } else if (event.key === "Escape") {
+    event.preventDefault();
+    exitReplayMode();
+  }
 }
 
 // ─── Back / Close ───
@@ -1030,5 +1181,25 @@ function onHeightChanged(_h: number) {}
   .sketch-tool-options {
     flex: 0 0 auto;
   }
+}
+
+/* ── Replay mode ── */
+.sketch-replay-canvas-wrap {
+  display: flex;
+  justify-content: center;
+  width: 100%;
+  overflow: auto;
+}
+.sketch-replay-canvas {
+  display: block;
+  border-radius: 12px;
+  border: 1px solid var(--b3-theme-border, rgba(0, 0, 0, 0.08));
+}
+.sketch-replay-bar {
+  position: absolute;
+  bottom: 24px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 1100;
 }
 </style>
