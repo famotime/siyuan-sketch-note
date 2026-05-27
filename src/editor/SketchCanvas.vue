@@ -139,6 +139,7 @@ import type { EditorTool } from "./tools";
 import { hasTextPointerDrag, resolveTextPointerAction } from "./textPointerAction";
 import { useViewport } from "@/composables/useViewport";
 import { useTextEditing } from "@/composables/useTextEditing";
+import type { ReplayRecorder } from "@/recorder/recorder";
 
 const props = defineProps<{
   initialData: SketchData | null;
@@ -147,6 +148,7 @@ const props = defineProps<{
   inputSettings: SketchInputSettings;
   templateId: string;
   lassoMode: "freehand" | "box";
+  recorder?: ReplayRecorder;
 }>();
 
 const emit = defineEmits<{
@@ -174,6 +176,7 @@ const textEditing = useTextEditing({
   toolPresets: computed(() => props.toolPresets),
   updateUndoRedoState: () => updateUndoRedoState(),
   emit: (e) => emit(e),
+  recorder: props.recorder,
 });
 const { textEditor, textEditorInputRef, startNewTextEditing, insertText, startEditText, finishTextEditing, cancelTextEditing: cancelTextEditingBase } = textEditing;
 // Element interaction state
@@ -658,6 +661,15 @@ function onPointerUp(e: PointerEvent) {
       const stroke = createShapeStrokeForTool(`shape-${Date.now()}`, props.tool, interaction.shapeStart, end, preset);
       pushHistorySnapshot(state);
       state.strokes.push(stroke);
+      // Record replay event
+      if (props.recorder) {
+        props.recorder.record({
+          type: "shape",
+          id: `re-${Date.now()}`,
+          timestamp: Date.now(),
+          stroke,
+        });
+      }
     }
     interaction.shapeStart = null;
     fullRedrawStrokeCanvas(getCanvas(), state);
@@ -666,6 +678,11 @@ function onPointerUp(e: PointerEvent) {
     return;
   }
 
+  // Before enginePointerUp, capture pre-state for eraser detection
+  const preStrokeIds = props.recorder && props.tool === "eraser"
+    ? new Set(state.strokes.map((s) => s.id))
+    : null;
+
   const completed = enginePointerUp(state);
   if (completed) {
     if (props.tool === "eraser" && props.toolPresets.eraser.mode === "stroke") {
@@ -673,6 +690,31 @@ function onPointerUp(e: PointerEvent) {
     }
     updateUndoRedoState();
     emit("stroke");
+
+    // Record replay event
+    if (props.recorder) {
+      if (props.tool === "eraser" && preStrokeIds) {
+        const erasedIds = [...preStrokeIds].filter((id) => !state.strokes.some((s) => s.id === id));
+        if (erasedIds.length > 0) {
+          props.recorder.record({
+            type: "erase",
+            id: `re-${Date.now()}`,
+            timestamp: Date.now(),
+            erasedIds,
+          });
+        }
+      } else if (props.tool !== "eraser") {
+        const lastStroke = state.strokes[state.strokes.length - 1];
+        if (lastStroke) {
+          props.recorder.record({
+            type: "stroke",
+            id: `re-${Date.now()}`,
+            timestamp: Date.now(),
+            stroke: lastStroke,
+          });
+        }
+      }
+    }
   }
 }
 
@@ -959,7 +1001,13 @@ function onCanvasDoubleClick(e: MouseEvent) {
 function doUndo() { lasso.selectedIds = []; engineUndo(state); fullRedrawStrokeCanvas(getCanvas(), state); updateUndoRedoState(); emit("stroke"); }
 function doRedo() { lasso.selectedIds = []; engineRedo(state); fullRedrawStrokeCanvas(getCanvas(), state); updateUndoRedoState(); emit("stroke"); }
 function doClear() { lasso.selectedIds = []; engineClear(state); fullRedrawStrokeCanvas(getCanvas(), state); updateUndoRedoState(); emit("stroke"); }
-function getData(): SketchData { return serializeState(state); }
+function getData(): SketchData {
+  const data = serializeState(state);
+  if (props.recorder) {
+    data.replayEvents = props.recorder.getEvents();
+  }
+  return data;
+}
 function getState(): EngineState { return state; }
 function getPageOverviewItems() { return createPageOverviewItems(serializeState(state)); }
 
@@ -1132,6 +1180,15 @@ async function insertImage(src: string) {
   state.elements = [...state.elements, element];
   fullRedrawStrokeCanvas(getCanvas(), state);
   updateUndoRedoState();
+  // Record replay event
+  if (props.recorder) {
+    props.recorder.record({
+      type: "image",
+      id: `re-${Date.now()}`,
+      timestamp: Date.now(),
+      element,
+    });
+  }
 }
 
 function highlightSearchResult(result: OcrSearchResult) {

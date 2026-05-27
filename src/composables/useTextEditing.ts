@@ -13,6 +13,7 @@ export function useTextEditing(ctx: {
   toolPresets: Ref<ToolPresetCollection>;
   updateUndoRedoState: () => void;
   emit: (e: "stroke") => void;
+  recorder?: { record: (event: any) => void };
 }) {
   const textEditor = ref({
     show: false,
@@ -117,10 +118,17 @@ export function useTextEditing(ctx: {
 
     pushHistorySnapshot(state);
 
+    let recordedElement: SketchElement | null = null;
+
     if (elementId) {
-      state.elements = state.elements.map((item) =>
-        item.id === elementId ? updateTextElement(item as any, { text: val }) : item,
-      );
+      state.elements = state.elements.map((item) => {
+        if (item.id === elementId) {
+          const updated = updateTextElement(item as any, { text: val });
+          recordedElement = updated;
+          return updated;
+        }
+        return item;
+      });
     } else {
       const textStyle = ctx.toolPresets.value.text ?? { color: "#000000", width: 20 };
       const fontSize = textStyle.width;
@@ -136,12 +144,23 @@ export function useTextEditing(ctx: {
         style: { fontSize, color, fontFamily: "Inter, system-ui, sans-serif" },
       });
       state.elements = [...state.elements, element];
+      recordedElement = element;
     }
 
     state.isDirty = true;
     fullRedrawStrokeCanvas(ctx.getCanvas(), state);
     ctx.updateUndoRedoState();
     ctx.emit("stroke");
+
+    // Record replay event
+    if (ctx.recorder && recordedElement) {
+      ctx.recorder.record({
+        type: "text",
+        id: `re-${Date.now()}`,
+        timestamp: Date.now(),
+        element: recordedElement,
+      });
+    }
   }
 
   function cancelTextEditing() {
