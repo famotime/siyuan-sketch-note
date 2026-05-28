@@ -166,12 +166,12 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted, watchEffect, nextTick } from "vue";
 import type { SketchData, ToolPreset } from "@/types/sketch";
-import { getAllTemplates } from "@/template";
+import { getAllTemplates, getTemplate } from "@/template";
 import { showMessage } from "siyuan";
 import { normalizeToolPresets, updateToolPreset } from "@/tools/presets";
 import { importSketchJson } from "@/export/json";
 import { normalizeInputSettings } from "./inputMode";
-import { createCustomBackgroundTemplate, getCustomBackgroundTemplate, updateCustomBackgroundFit } from "@/template/customBackground";
+import { createCustomBackgroundTemplate, getCustomBackgroundDrawRect, getCustomBackgroundTemplate, updateCustomBackgroundFit } from "@/template/customBackground";
 import type { CustomBackgroundTemplate } from "@/template/customBackground";
 import type { PageOverviewItem } from "@/pages/model";
 import { normalizeToolColorPalettes } from "@/tools/palette";
@@ -546,9 +546,46 @@ function readFileAsDataUrl(file: File): Promise<string> {
 }
 
 // ─── Replay functions ───
+function renderReplayBackground(ctx: CanvasRenderingContext2D, canvas: HTMLCanvasElement, data: SketchData) {
+  const dpr = window.devicePixelRatio || 1;
+  const width = canvas.width / dpr;
+  const height = canvas.height / dpr;
+
+  const customBackground = getCustomBackgroundTemplate(data);
+  if (customBackground) {
+    const image = new Image();
+    image.onload = () => {
+      const rect = getCustomBackgroundDrawRect({
+        imageWidth: image.naturalWidth,
+        imageHeight: image.naturalHeight,
+        targetWidth: width,
+        targetHeight: height,
+        fit: customBackground.fit,
+      });
+      ctx.drawImage(
+        image,
+        rect.sx,
+        rect.sy,
+        rect.sw,
+        rect.sh,
+        rect.dx,
+        rect.dy,
+        rect.dw,
+        rect.dh,
+      );
+    };
+    image.src = customBackground.src;
+    return;
+  }
+
+  getTemplate(data.template).render(ctx, width, height);
+}
+
 function enterReplayMode() {
   const data = canvasRef.value?.getData();
   if (!data) return;
+  data.template = currentTemplate.value;
+  data.customBackgrounds = customBackgrounds.value;
 
   // Get events — use recorded events if available, otherwise reconstruct
   const events = data.replayEvents && data.replayEvents.length > 0
@@ -577,7 +614,10 @@ function enterReplayMode() {
       ctx.scale(window.devicePixelRatio || 1, window.devicePixelRatio || 1);
     }
 
-    const player = new ReplayPlayer(events, canvas);
+    const player = new ReplayPlayer(events, canvas, {
+      redrawBackground: (ctx, playbackCanvas) => renderReplayBackground(ctx, playbackCanvas, data),
+    });
+    player.reset();
     player.onStateChange = (s) => { replayState.value = s; };
     player.onProgress = (current, total) => {
       replayCurrent.value = current;

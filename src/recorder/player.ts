@@ -8,10 +8,15 @@ export type PlaybackSpeed = 1 | 2 | 4;
 const CHAR_DELAY_MS = 30;
 const IMAGE_FADE_MS = 200;
 
+export interface ReplayPlayerOptions {
+  redrawBackground?: (ctx: CanvasRenderingContext2D, canvas: HTMLCanvasElement) => void;
+}
+
 export class ReplayPlayer {
   private events: ReplayEvent[];
   private canvas: HTMLCanvasElement;
   private ctx: CanvasRenderingContext2D;
+  private options: ReplayPlayerOptions;
   private state: PlaybackState = "idle";
   private speed: PlaybackSpeed = 1;
   private currentIndex = 0;
@@ -31,9 +36,10 @@ export class ReplayPlayer {
   onProgress?: (current: number, total: number) => void;
   onComplete?: () => void;
 
-  constructor(events: ReplayEvent[], canvas: HTMLCanvasElement) {
+  constructor(events: ReplayEvent[], canvas: HTMLCanvasElement, options: ReplayPlayerOptions = {}) {
     this.events = events;
     this.canvas = canvas;
+    this.options = options;
     this.ctx = canvas.getContext("2d")!;
   }
 
@@ -345,5 +351,6 @@ export class ReplayPlayer {
     this.ctx.setTransform(1, 0, 0, 1, 0, 0);
     this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
     this.ctx.restore();
+    this.options.redrawBackground?.(this.ctx, this.canvas);
   }
 }

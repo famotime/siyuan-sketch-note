@@ -149,4 +149,16 @@ describe("replayPlayer", () => {
     player.goToEvent(1);
     expect(player.getProgress()).toBeGreaterThan(0);
   });
+
+  it("redraws the replay background whenever playback canvas is cleared", () => {
+    const canvas = createMockCanvas();
+    const redrawBackground = vi.fn();
+    const player = new ReplayPlayer(mockEvents, canvas, { redrawBackground });
+
+    player.reset();
+    expect(redrawBackground).toHaveBeenCalledTimes(1);
+
+    player.goToEvent(1);
+    expect(redrawBackground).toHaveBeenCalledTimes(2);
+  });
 });
