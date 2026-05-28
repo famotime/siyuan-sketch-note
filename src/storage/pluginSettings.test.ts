@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { DEFAULT_RECORDER_CONFIG } from "@/recorder/types";
 import {
   loadPluginSettings,
   normalizePluginSettings,
@@ -10,6 +11,8 @@ describe("plugin settings", () => {
   it("defaults debug logging to disabled", () => {
     expect(normalizePluginSettings()).toEqual({
       enableDebugLog: false,
+      hideReplayControls: false,
+      replayRecordConfig: { ...DEFAULT_RECORDER_CONFIG },
     });
   });
 
@@ -25,9 +28,11 @@ describe("plugin settings", () => {
 
     expect(store.get(pluginSettingsKey())).toEqual({
       enableDebugLog: true,
+      hideReplayControls: false,
+      replayRecordConfig: { ...DEFAULT_RECORDER_CONFIG },
     });
 
-    const loaded = await loadPluginSettings(async key => store.get(key));
+    const loaded = await loadPluginSettings(async (key) => store.get(key));
 
     expect(loaded.enableDebugLog).toBe(true);
   });

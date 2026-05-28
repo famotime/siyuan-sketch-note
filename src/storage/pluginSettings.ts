@@ -1,7 +1,12 @@
+import type { ReplayRecorderConfig } from "@/recorder/types";
+import { DEFAULT_RECORDER_CONFIG } from "@/recorder/types";
+
 const PLUGIN_SETTINGS_KEY = "plugin-settings.json";
 
 export interface SketchPluginSettings {
   enableDebugLog: boolean;
+  hideReplayControls: boolean;
+  replayRecordConfig: ReplayRecorderConfig;
 }
 
 export function pluginSettingsKey(): string {
@@ -11,6 +16,8 @@ export function pluginSettingsKey(): string {
 export function normalizePluginSettings(input?: Partial<SketchPluginSettings> | null): SketchPluginSettings {
   return {
     enableDebugLog: input?.enableDebugLog === true,
+    hideReplayControls: input?.hideReplayControls === true,
+    replayRecordConfig: { ...DEFAULT_RECORDER_CONFIG, ...input?.replayRecordConfig },
   };
 }
 

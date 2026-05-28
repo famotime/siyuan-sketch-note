@@ -107,5 +107,12 @@
   "replaySpeed": "倍速",
   "replayStepOf": "步骤",
   "replayToolSwitch": "工具切换",
-  "replayImageOp": "图片操作"
+  "replayImageOp": "图片操作",
+  "replayRecord": "回放录制",
+  "replayRecordStroke": "笔迹",
+  "replayRecordErase": "橡皮擦",
+  "replayRecordShape": "形状",
+  "replayRecordText": "文本",
+  "hideReplayControls": "隐藏回放控制栏",
+  "hideReplayControlsDesc": "播放回放时不显示底部控制工具栏。"
 }

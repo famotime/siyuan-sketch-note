@@ -1,4 +1,4 @@
-import type { ReplayEvent, StrokeReplayEvent, ShapeReplayEvent } from "./types";
+import type { ReplayEvent, StrokeReplayEvent, ShapeReplayEvent, ToolSwitchReplayEvent } from "./types";
 import type { Stroke, StrokePoint } from "@/types/sketch";
 import { getPressureWidth, getSmoothedSegments } from "@/engine/strokeSmoothing";
 
@@ -7,6 +7,7 @@ export type PlaybackSpeed = 1 | 2 | 4;
 
 const CHAR_DELAY_MS = 30;
 const IMAGE_FADE_MS = 200;
+const TOOL_SWITCH_FADE_MS = 500;
 
 export interface ReplayPlayerOptions {
   redrawBackground?: (ctx: CanvasRenderingContext2D, canvas: HTMLCanvasElement) => void;
@@ -30,6 +31,8 @@ export class ReplayPlayer {
   private textAnimIndex = 0;
   private textAnimTimer = 0;
   private imageAnimProgress = 0;
+  private toolSwitchProgress = 0;
+  private toolSwitchLabel = "";
 
   // Completed strokes for erase visualization
   private completedStrokes: Map<string, Stroke> = new Map();
@@ -84,6 +87,8 @@ export class ReplayPlayer {
     this.textAnimIndex = 0;
     this.textAnimTimer = 0;
     this.imageAnimProgress = 0;
+    this.toolSwitchProgress = 0;
+    this.toolSwitchLabel = "";
     this.completedStrokes.clear();
     this.clearCanvas();
     this.onStateChange?.("idle");
@@ -102,6 +107,8 @@ export class ReplayPlayer {
     this.strokeAnimIndex = 0;
     this.textAnimIndex = 0;
     this.imageAnimProgress = 0;
+    this.toolSwitchProgress = 0;
+    this.toolSwitchLabel = "";
 
     // Instantly render all events before currentIndex
     for (let i = 0; i < this.currentIndex; i++) {
@@ -139,6 +146,8 @@ export class ReplayPlayer {
       this.textAnimIndex = 0;
       this.textAnimTimer = 0;
       this.imageAnimProgress = 0;
+      this.toolSwitchProgress = 0;
+      this.toolSwitchLabel = "";
       this.onProgress?.(this.currentIndex, this.events.length);
     }
 
@@ -159,7 +168,7 @@ export class ReplayPlayer {
       case "image":
         return this.animateImage(event.element);
       case "toolSwitch":
-        return true;
+        return this.animateToolSwitch(event);
     }
   }
 
@@ -237,6 +246,53 @@ export class ReplayPlayer {
     this.presentLayer();
 
     return this.imageAnimProgress >= 1;
+  }
+
+  private animateToolSwitch(event: ToolSwitchReplayEvent): boolean {
+    if (this.toolSwitchProgress === 0) {
+      this.toolSwitchLabel = this.getToolDisplayName(event.tool);
+    }
+    this.toolSwitchProgress += 16 / TOOL_SWITCH_FADE_MS;
+    if (this.toolSwitchProgress > 1) this.toolSwitchProgress = 1;
+
+    const alpha = 1 - this.toolSwitchProgress;
+    const ctx = this.getDrawingContext();
+    const dpr = this.getCanvasScale();
+    const w = this.canvas.width / dpr;
+    ctx.save();
+    ctx.globalAlpha = alpha * 0.85;
+    ctx.fillStyle = "rgba(0,0,0,0.7)";
+    ctx.font = "bold 14px sans-serif";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "top";
+    const textW = ctx.measureText(this.toolSwitchLabel).width + 24;
+    const x = (w - textW) / 2;
+    ctx.beginPath();
+    ctx.roundRect(x, 8, textW, 28, 6);
+    ctx.fill();
+    ctx.fillStyle = "#fff";
+    ctx.fillText(this.toolSwitchLabel, w / 2, 12);
+    ctx.restore();
+    this.presentLayer();
+
+    return this.toolSwitchProgress >= 1;
+  }
+
+  private getToolDisplayName(tool: string): string {
+    const names: Record<string, string> = {
+      pen: "Pen",
+      highlighter: "Highlighter",
+      eraser: "Eraser",
+      lasso: "Lasso",
+      line: "Line",
+      arrow: "Arrow",
+      rectangle: "Rectangle",
+      triangle: "Triangle",
+      ellipse: "Ellipse",
+      text: "Text",
+      image: "Image",
+    };
+    return names[tool] ?? tool;
   }
 
   private applyErase(erasedIds: string[]): void {

@@ -1,4 +1,4 @@
-import type { Stroke, SketchTool, ToolPreset } from "@/types/sketch";
+import type { Stroke, ToolPreset } from "@/types/sketch";
 import type { SketchElement } from "@/elements/model";
 
 export type ReplayEventType = ReplayEvent["type"];
@@ -50,7 +50,7 @@ export interface ToolSwitchReplayEvent {
   type: "toolSwitch";
   id: string;
   timestamp: number;
-  tool: SketchTool;
+  tool: string;
   preset: ToolPreset;
 }
 
@@ -68,6 +68,6 @@ export const DEFAULT_RECORDER_CONFIG: ReplayRecorderConfig = {
   erase: true,
   shape: true,
   text: true,
-  image: false,
-  toolSwitch: false,
+  image: true,
+  toolSwitch: true,
 };

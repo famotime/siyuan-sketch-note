@@ -118,7 +118,7 @@
       </div>
     </div>
     <ReplayControls
-      v-if="isReplayMode"
+      v-if="isReplayMode && !props.hideReplayControls"
       :isPlaying="replayState === 'playing'"
       :current="replayCurrent"
       :total="replayTotal"
@@ -168,7 +168,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted, watchEffect, nextTick } from "vue";
+import { ref, computed, onMounted, onUnmounted, watch, watchEffect, nextTick } from "vue";
 import type { SketchData, ToolPreset } from "@/types/sketch";
 import { getAllTemplates, getTemplate } from "@/template";
 import { showMessage } from "siyuan";
@@ -190,6 +190,7 @@ import ToolBar from "./ToolBar.vue";
 import FloatingToolbar from "./FloatingToolbar.vue";
 import IconParkIcon from "./IconParkIcon.vue";
 import { ReplayRecorder } from "@/recorder/recorder";
+import type { ReplayRecorderConfig } from "@/recorder/types";
 import { ReplayPlayer } from "@/recorder/player";
 import type { PlaybackSpeed } from "@/recorder/player";
 import { reconstructFromData } from "@/recorder/reconstruct";
@@ -210,6 +211,8 @@ const props = defineProps<{
   saveData: (key: string, data: any) => Promise<void>;
   ocrProvider?: OcrProvider;
   themeMode: 'light' | 'dark';
+  replayRecordConfig?: Partial<ReplayRecorderConfig>;
+  hideReplayControls?: boolean;
 }>();
 
 const emit = defineEmits<{ (e: "close"): void }>();
@@ -247,7 +250,7 @@ const ocrIndex = ref<SketchData["ocrIndex"]>(props.initialData?.ocrIndex);
 
 // ─── Replay ───
 const isReplayMode = ref(false);
-const replayRecorder = new ReplayRecorder();
+const replayRecorder = new ReplayRecorder(props.replayRecordConfig);
 const replayPlayer = ref<InstanceType<typeof ReplayPlayer> | null>(null);
 const replayCanvasRef = ref<HTMLCanvasElement>();
 const replayState = ref<"idle" | "playing" | "paused">("idle");
@@ -261,6 +264,19 @@ const activePreset = computed(() => {
     return { tool: "text", mode: "ink", ...textPreset.value } as any;
   }
   return toolPresets.value[getDrawingToolForEditorTool(activeTool.value)];
+});
+
+// Record toolSwitch events
+let skipFirstToolWatch = true;
+watch(activeTool, () => {
+  if (skipFirstToolWatch) { skipFirstToolWatch = false; return; }
+  replayRecorder.record({
+    type: "toolSwitch",
+    id: `ts-${Date.now()}`,
+    timestamp: Date.now(),
+    tool: activeTool.value,
+    preset: activePreset.value,
+  });
 });
 
 const activeCustomBackground = computed(() => getCustomBackgroundTemplate({
@@ -631,6 +647,7 @@ function enterReplayMode() {
       replayState.value = "idle";
     };
     replayPlayer.value = player;
+    player.play();
   });
 }
 

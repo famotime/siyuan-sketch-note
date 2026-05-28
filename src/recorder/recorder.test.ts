@@ -54,7 +54,7 @@ describe("replayRecorder", () => {
       },
     };
     recorder.record(imageEvent);
-    expect(recorder.getEvents()).toHaveLength(0); // image disabled by default
+    expect(recorder.getEvents()).toHaveLength(1); // image enabled by default
   });
 
   it("clear resets events", () => {

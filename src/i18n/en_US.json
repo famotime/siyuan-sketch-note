@@ -107,5 +107,12 @@
   "replaySpeed": "Speed",
   "replayStepOf": "Step",
   "replayToolSwitch": "Tool Switch",
-  "replayImageOp": "Image Operation"
+  "replayImageOp": "Image Operation",
+  "replayRecord": "Replay Recording",
+  "replayRecordStroke": "Strokes",
+  "replayRecordErase": "Eraser",
+  "replayRecordShape": "Shapes",
+  "replayRecordText": "Text",
+  "hideReplayControls": "Hide replay controls",
+  "hideReplayControlsDesc": "Hide the replay control bar during playback."
 }

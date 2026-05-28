@@ -7,9 +7,10 @@ import {
 } from "siyuan";
 import "@/index.scss";
 import { init, destroy } from "./main";
-import { openSketchEditor, setI18n } from "./App.vue";
+import { openSketchEditor, setI18n, setReplayRecordConfig, setHideReplayControls } from "./App.vue";
 import { storageKey, createEmptySketchData, loadEditorPreferences } from "./storage";
 import { loadPluginSettings, savePluginSettings } from "./storage/pluginSettings";
+import type { ReplayEventType } from "./recorder/types";
 import { setDebugLogEnabled } from "./utils/logger";
 import {
   createPlaceholderPng,
@@ -40,6 +41,8 @@ export default class SketchNotePlugin extends Plugin {
 
     const pluginSettings = await loadPluginSettings((key) => this.loadData(key));
     setDebugLogEnabled(pluginSettings.enableDebugLog);
+    setReplayRecordConfig(pluginSettings.replayRecordConfig);
+    setHideReplayControls(pluginSettings.hideReplayControls);
 
     // Initialize Vue app
     init(this);
@@ -103,9 +106,59 @@ export default class SketchNotePlugin extends Plugin {
         checkbox.className = "b3-switch fn__flex-center";
         checkbox.checked = settings.enableDebugLog;
         checkbox.addEventListener("change", async () => {
-          const nextSettings = { enableDebugLog: checkbox.checked };
-          setDebugLogEnabled(nextSettings.enableDebugLog);
-          await savePluginSettings((key, data) => this.saveData(key, data), nextSettings);
+          settings.enableDebugLog = checkbox.checked;
+          setDebugLogEnabled(checkbox.checked);
+          await savePluginSettings((key, data) => this.saveData(key, data), settings);
+        });
+        return checkbox;
+      },
+    });
+
+    // Replay recording toggles
+    setting.addItem({
+      title: this.i18n?.replayRecord ?? "Replay Recording",
+    });
+    const recordTypeLabels: Record<ReplayEventType, () => string> = {
+      stroke: () => this.i18n?.replayRecordStroke ?? "Strokes",
+      erase: () => this.i18n?.replayRecordErase ?? "Eraser",
+      shape: () => this.i18n?.replayRecordShape ?? "Shapes",
+      text: () => this.i18n?.replayRecordText ?? "Text",
+      image: () => this.i18n?.replayImageOp ?? "Image Operation",
+      toolSwitch: () => this.i18n?.replayToolSwitch ?? "Tool Switch",
+    };
+
+    const recordTypes: ReplayEventType[] = ["stroke", "erase", "shape", "text", "image", "toolSwitch"];
+
+    for (const type of recordTypes) {
+      setting.addItem({
+        title: recordTypeLabels[type](),
+        createActionElement: () => {
+          const checkbox = document.createElement("input");
+          checkbox.type = "checkbox";
+          checkbox.className = "b3-switch fn__flex-center";
+          checkbox.checked = settings.replayRecordConfig[type];
+          checkbox.addEventListener("change", async () => {
+            settings.replayRecordConfig[type] = checkbox.checked;
+            setReplayRecordConfig(settings.replayRecordConfig);
+            await savePluginSettings((key, data) => this.saveData(key, data), settings);
+          });
+          return checkbox;
+        },
+      });
+    }
+
+    setting.addItem({
+      title: this.i18n?.hideReplayControls ?? "Hide replay controls",
+      description: this.i18n?.hideReplayControlsDesc ?? "Hide the replay control bar during playback.",
+      createActionElement: () => {
+        const checkbox = document.createElement("input");
+        checkbox.type = "checkbox";
+        checkbox.className = "b3-switch fn__flex-center";
+        checkbox.checked = settings.hideReplayControls;
+        checkbox.addEventListener("change", async () => {
+          settings.hideReplayControls = checkbox.checked;
+          setHideReplayControls(checkbox.checked);
+          await savePluginSettings((key, data) => this.saveData(key, data), settings);
         });
         return checkbox;
       },

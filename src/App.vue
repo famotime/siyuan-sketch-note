@@ -6,6 +6,8 @@
     :i18n="pluginI18n"
     :saveData="pluginSaveData"
     :themeMode="themeMode"
+    :replayRecordConfig="replayRecordConfig"
+    :hideReplayControls="hideReplayControls"
     @close="closeEditor"
   />
 </template>
@@ -18,6 +20,8 @@ import { normalizeEditorI18n } from "@/i18n/editorI18n";
 import SketchEditor from "@/editor/SketchEditor.vue";
 import { parseCssColor, getColorLuminance as getLuminance, resolveThemeModeFromColor as resolveColorTheme } from "@/composables/useThemeDetection";
 import { createLogger } from "@/utils/logger";
+import type { ReplayRecorderConfig } from "@/recorder/types";
+import { DEFAULT_RECORDER_CONFIG } from "@/recorder/types";
 
 const editorVisible = ref(false);
 const editorBlockId = ref("");
@@ -25,6 +29,8 @@ const editorData = ref<any>(null);
 const pluginI18n = ref<Record<string, string>>({});
 const pluginSaveData = ref<(key: string, data: any) => Promise<void>>(async () => {});
 const themeMode = ref<"light" | "dark">(resolveSiyuanThemeMode());
+const replayRecordConfig = ref<ReplayRecorderConfig>({ ...DEFAULT_RECORDER_CONFIG });
+const hideReplayControls = ref(false);
 let themeObserver: MutationObserver | null = null;
 let themeSyncTimer: number | null = null;
 let lastThemeDiagnosticKey = "";
@@ -169,6 +175,14 @@ export function setLoadDataFn(fn: (key: string) => Promise<any>) {
   loadDataFn = fn;
 }
 
+export function setReplayRecordConfig(config?: Partial<ReplayRecorderConfig>) {
+  replayRecordConfig.value = { ...DEFAULT_RECORDER_CONFIG, ...config };
+}
+
+export function setHideReplayControls(value: boolean) {
+  hideReplayControls.value = value;
+}
+
 export async function openSketchEditor(blockId: string) {
   editorBlockId.value = blockId;
   try {
@@ -239,6 +253,8 @@ export default {
       pluginI18n,
       pluginSaveData,
       themeMode,
+      replayRecordConfig,
+      hideReplayControls,
       closeEditor,
     };
   },
