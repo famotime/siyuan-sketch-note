@@ -18,6 +18,7 @@ import { showMessage } from "siyuan";
 import { loadSketchData } from "@/storage";
 import { normalizeEditorI18n } from "@/i18n/editorI18n";
 import SketchEditor from "@/editor/SketchEditor.vue";
+import { extractSketchIdFromImage, sketchAssetFileName } from "@/utils/sketchReference";
 import { parseCssColor, getColorLuminance as getLuminance, resolveThemeModeFromColor as resolveColorTheme } from "@/composables/useThemeDetection";
 import { createLogger } from "@/utils/logger";
 import type { ReplayRecorderConfig } from "@/recorder/types";
@@ -183,10 +184,10 @@ export function setHideReplayControls(value: boolean) {
   hideReplayControls.value = value;
 }
 
-export async function openSketchEditor(blockId: string) {
-  editorBlockId.value = blockId;
+export async function openSketchEditor(sketchId: string) {
+  editorBlockId.value = sketchId;
   try {
-    editorData.value = await loadSketchData(loadDataFn, blockId);
+    editorData.value = await loadSketchData(loadDataFn, sketchId);
   } catch (e) {
     createLogger().error("Failed to load sketch data:", e);
     showMessage(`Sketch Note: ${pluginI18n.value.loadFailed || "Data load failed"}`, 5000, "error");
@@ -196,13 +197,13 @@ export async function openSketchEditor(blockId: string) {
 }
 
 function closeEditor() {
-  const savedBlockId = editorBlockId.value;
+  const savedSketchId = editorBlockId.value;
   editorVisible.value = false;
   editorBlockId.value = "";
   editorData.value = null;
 
   // Refresh the sketch-note image in the document to show updated content
-  refreshSketchImage(savedBlockId);
+  refreshSketchImage(savedSketchId);
 }
 
 /**
@@ -210,8 +211,8 @@ function closeEditor() {
  * Uses nextTick + setTimeout to wait for Vue DOM update, then
  * force-fetches to bust HTTP cache and updates both data-src and src.
  */
-function refreshSketchImage(blockId: string) {
-  const pattern = `sketch-note-${blockId}.png`;
+function refreshSketchImage(sketchId: string) {
+  const canonicalSrc = `assets/${sketchAssetFileName(sketchId)}`;
 
   // Wait for Vue DOM update (editor overlay removal) to complete
   nextTick(() => {
@@ -219,14 +220,12 @@ function refreshSketchImage(blockId: string) {
       const imgs = document.querySelectorAll("img");
       let found = false;
       imgs.forEach((img) => {
-        const dataSrc = img.getAttribute("data-src") || "";
-        if (dataSrc.includes(pattern)) {
+        if (extractSketchIdFromImage(img) === sketchId) {
           found = true;
-          const baseSrc = dataSrc.split("?")[0];
-          const bustSrc = `${baseSrc}?t=${Date.now()}`;
+          const bustSrc = `${canonicalSrc}?t=${Date.now()}`;
 
           // Force browser HTTP cache refresh (like excalidraw approach)
-          fetch(baseSrc, { cache: "reload" }).then(() => {
+          fetch(canonicalSrc, { cache: "reload" }).then(() => {
             img.setAttribute("data-src", bustSrc);
             img.src = bustSrc;
           }).catch(() => {
@@ -237,7 +236,7 @@ function refreshSketchImage(blockId: string) {
         }
       });
       if (!found) {
-        createLogger().warn(`refreshSketchImage: no img found for pattern "${pattern}"`);
+        createLogger().warn(`refreshSketchImage: no img found for sketch "${sketchId}"`);
       }
     }, 100);
   });

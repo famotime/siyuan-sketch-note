@@ -3,18 +3,29 @@ import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 
 describe("editor top bar layout", () => {
-  it("keeps undo redo and clear grouped on the left before the spacer", () => {
+  it("keeps undo and redo grouped on the left before the spacer", () => {
     const topBar = readFileSync(resolve(process.cwd(), "src/editor/EditorTopBar.vue"), "utf8");
 
     const undoIndex = topBar.indexOf(":title=\"t('undo')\"");
     const redoIndex = topBar.indexOf(":title=\"t('redo')\"");
-    const clearIndex = topBar.indexOf(":title=\"t('clear')\"");
     const spacerIndex = topBar.indexOf("sketch-spacer");
 
     expect(undoIndex).toBeGreaterThan(-1);
     expect(redoIndex).toBeGreaterThan(undoIndex);
-    expect(clearIndex).toBeGreaterThan(redoIndex);
-    expect(clearIndex).toBeLessThan(spacerIndex);
+    expect(redoIndex).toBeLessThan(spacerIndex);
+  });
+
+  it("keeps clear inside the more menu popover", () => {
+    const topBar = readFileSync(resolve(process.cwd(), "src/editor/EditorTopBar.vue"), "utf8");
+
+    const popoverIndex = topBar.indexOf("sketch-more-popover");
+    const clearIndex = topBar.indexOf("@click=\"$emit('clear'); moreOpen = false\"");
+    const dividerIndex = topBar.indexOf("sketch-more-divider");
+
+    expect(popoverIndex).toBeGreaterThan(-1);
+    expect(clearIndex).toBeGreaterThan(popoverIndex);
+    expect(clearIndex).toBeLessThan(dividerIndex);
+    expect(topBar).toContain("{{ t(\"clear\") }}");
   });
 
   it("adds a plus image import button immediately before zen mode", () => {

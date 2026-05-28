@@ -1,5 +1,8 @@
 import { thumbnailCanvas } from "@/storage/thumbnail";
 import { dataUrlToBlob } from "@/export/png";
+import { extractSketchIdFromAsset, sketchAssetFileName } from "./sketchReference";
+
+export { extractSketchIdFromAsset, sketchAssetFileName };
 
 /**
  * Create a placeholder PNG blob for a sketch block.
@@ -41,18 +44,10 @@ export async function uploadDataUrlToAssets(dataUrl: string, fileName: string): 
 }
 
 /**
- * Get the asset file name for a sketch block.
- */
-export function sketchAssetFileName(blockId: string): string {
-  return `sketch-note-${blockId}.png`;
-}
-
-/**
  * Extract blockId from a sketch-note asset path.
  * Input: "assets/sketch-note-abc123.png" or "assets/subdir/sketch-note-abc123.png"
  * Returns: "abc123" or null if not a match.
  */
 export function extractBlockIdFromAsset(assetSrc: string): string | null {
-  const match = assetSrc.match(/sketch-note-(.+)\.png$/);
-  return match ? match[1] : null;
+  return extractSketchIdFromAsset(assetSrc);
 }

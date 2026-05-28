@@ -4,22 +4,26 @@ import {
   fetchSyncPost,
   getFrontend,
   getActiveEditor,
+  showMessage,
 } from "siyuan";
 import "@/index.scss";
 import { init, destroy } from "./main";
 import { openSketchEditor, setI18n, setReplayRecordConfig, setHideReplayControls } from "./App.vue";
-import { storageKey, createEmptySketchData, loadEditorPreferences } from "./storage";
+import { storageKey, createEmptySketchData, loadEditorPreferences, loadSketchData } from "./storage";
 import { loadPluginSettings, savePluginSettings } from "./storage/pluginSettings";
 import type { ReplayEventType } from "./recorder/types";
 import { setDebugLogEnabled } from "./utils/logger";
 import {
   createPlaceholderPng,
   uploadPngToAssets,
-  sketchAssetFileName,
-  extractBlockIdFromAsset,
 } from "./utils/uploadPng";
-
-const SKETCH_IMAGE_PATTERN = /sketch-note-.+\.png$/;
+import {
+  buildSketchImageMarkdown,
+  extractSketchIdFromImage,
+  generateSketchId,
+  isSketchImageSource,
+  sketchAssetFileName,
+} from "./utils/sketchReference";
 
 const ICON_SVG = `<svg xmlns="http://www.w3.org/2000/svg" width="52" height="52" viewBox="0 0 52 52"><path d="M5.414 38.35a3.033 3.033 0 0 1-.62.506c-.626.38-1.31.435-1.937.29-.094-.021-.142-.036-.13-.031-1.399-.551-2.88.585-2.714 2.08 1.268 11.415 19.239 11.88 23.796.524a2 2 0 0 0-.45-2.167l-9.068-8.956a1.995 1.995 0 0 0-1.402-.575c-4.567 0-6.186 1.992-6.835 6.043l-.03.196c-.216 1.352-.361 1.828-.61 2.09zM20 41.37c-3.355 5.69-12.19 5.987-15 1.705a6.642 6.642 0 0 0 2.103-.822 7.125 7.125 0 0 0 1.463-1.168c1.036-1.072 1.341-2.051 1.693-4.23l.03-.192c.33-2.025.59-2.557 2.134-2.663L20 41.37zm3.37-4.634a4.314 4.314 0 0 0 6.128.003l.234-.23.701-.7c.753-.755 1.592-1.608 2.494-2.543 2.58-2.67 5.16-5.46 7.57-8.234a142.055 142.055 0 0 0 3.486-4.158C51.226 11.87 54.143 5.994 50.301 3c-3.41-2.658-8.99.134-17.087 6.63a130.127 130.127 0 0 0-4.51 3.802 200.127 200.127 0 0 0-8.099 7.564 205.356 205.356 0 0 0-3.173 3.193l-.245.254c-1.644 1.68-1.626 4.42.045 6.104l6.138 6.19zm2.877-2.831l-6.143-6.193a.375.375 0 0 1-.008-.508l.243-.253a201.487 201.487 0 0 1 3.107-3.125 196.32 196.32 0 0 1 7.94-7.413 126.252 126.252 0 0 1 4.374-3.687c3.214-2.578 6.024-4.507 8.28-5.636 2.135-1.067 3.479-1.264 3.867-.961.216.168.115 1.27-.939 3.39-1.163 2.34-3.239 5.346-6.04 8.828-1.046 1.3-2.18 2.65-3.39 4.042a212.273 212.273 0 0 1-7.434 8.083 219.059 219.059 0 0 1-3.372 3.412c-.15.151-.356.15-.485.021z" fill="none" stroke="#333" stroke-width="3" stroke-linejoin="round" fill-rule="nonzero"/></svg>`;
 
@@ -231,10 +235,8 @@ export default class SketchNotePlugin extends Plugin {
     if (!imgElement) return;
 
     const dataSrc = imgElement.getAttribute("data-src") || imgElement.getAttribute("src") || "";
-    if (!SKETCH_IMAGE_PATTERN.test(dataSrc)) return;
-
-    const blockId = extractBlockIdFromAsset(dataSrc);
-    if (!blockId) return;
+    const sketchId = extractSketchIdFromImage(imgElement);
+    if (!sketchId || (!isSketchImageSource(dataSrc) && !imgElement.getAttribute("alt")?.trim().startsWith("sketch:"))) return;
 
     const actionBar = blockElement.querySelector(".protyle-action");
     if (!actionBar) return;
@@ -246,7 +248,7 @@ export default class SketchNotePlugin extends Plugin {
     editBtn.addEventListener("click", (e) => {
       e.preventDefault();
       e.stopPropagation();
-      openSketchEditor(blockId);
+      openSketchEditor(sketchId);
     });
     actionBar.insertAdjacentElement("afterbegin", editBtn);
   }
@@ -258,21 +260,81 @@ export default class SketchNotePlugin extends Plugin {
     const selectedElement = detail?.element as HTMLElement | undefined;
     if (!selectedElement) return;
 
-    const imgElement = selectedElement.querySelector("img") as HTMLImageElement | null;
+    const imgElement = this.findImageElement(selectedElement);
     if (!imgElement) return;
 
     const dataSrc = imgElement.getAttribute("data-src") || imgElement.dataset?.src || imgElement.getAttribute("src") || "";
-    if (!SKETCH_IMAGE_PATTERN.test(dataSrc)) return;
-
-    const blockId = extractBlockIdFromAsset(dataSrc);
-    if (!blockId) return;
+    const sketchId = extractSketchIdFromImage(imgElement);
+    if (!sketchId || (!isSketchImageSource(dataSrc) && !imgElement.getAttribute("alt")?.trim().startsWith("sketch:"))) return;
 
     window.siyuan.menus.menu.addItem({
       id: "edit-sketch-note",
       icon: "iconEdit",
       label: this.i18n?.editSketch ?? "Edit Sketch",
-      click: () => openSketchEditor(blockId),
+      click: () => openSketchEditor(sketchId),
     });
+    window.siyuan.menus.menu.addItem({
+      id: "duplicate-sketch-note-copy",
+      icon: "iconCopy",
+      label: this.i18n?.duplicateSketchCopy ?? "Copy as Independent Sketch",
+      click: () => this.duplicateSketchAsIndependentCopy(selectedElement, sketchId),
+    });
+  }
+
+  private async duplicateSketchAsIndependentCopy(selectedElement: HTMLElement, sourceSketchId: string): Promise<void> {
+    try {
+      const sourceData = await loadSketchData((key) => this.loadData(key), sourceSketchId);
+      if (!sourceData) {
+        console.error("[Sketch Note] 复制手写副本失败：源数据不存在", sourceSketchId);
+        showMessage(this.i18n?.duplicateSketchCopyFailed ?? "Failed to copy sketch", 5000, "error");
+        return;
+      }
+
+      const newSketchId = generateSketchId();
+      const imgElement = this.findImageElement(selectedElement);
+      const dataSrc = imgElement?.currentSrc || imgElement?.src || imgElement?.getAttribute("data-src") || imgElement?.dataset?.src || "";
+      const sourceImageUrl = dataSrc.split("?")[0];
+      const imageResponse = sourceImageUrl
+        ? await fetch(sourceImageUrl, { cache: "reload" })
+        : null;
+      const imageBlob = imageResponse?.ok
+        ? await imageResponse.blob()
+        : createPlaceholderPng(sourceData.template);
+
+      await uploadPngToAssets(imageBlob, sketchAssetFileName(newSketchId));
+      await this.saveData(storageKey(newSketchId), JSON.parse(JSON.stringify(sourceData)));
+
+      const anchorBlockId = selectedElement.closest("[data-node-id]")?.getAttribute("data-node-id");
+      const docId = this.getCurrentDocId();
+      const result = anchorBlockId
+        ? await fetchSyncPost("/api/block/insertBlock", {
+            dataType: "markdown",
+            data: buildSketchImageMarkdown(newSketchId),
+            previousID: anchorBlockId,
+          })
+        : docId
+          ? await fetchSyncPost("/api/block/appendBlock", {
+              dataType: "markdown",
+              data: buildSketchImageMarkdown(newSketchId),
+              parentID: docId,
+            })
+          : { code: -1, msg: "missing document id" };
+
+      if (result.code !== 0) {
+        console.error("[Sketch Note] 插入独立手写副本失败:", result.msg);
+        showMessage(this.i18n?.duplicateSketchCopyFailed ?? "Failed to copy sketch", 5000, "error");
+        return;
+      }
+      showMessage(this.i18n?.duplicateSketchCopySuccess ?? "Copied as independent sketch", 3000, "info");
+    } catch (e) {
+      console.error("[Sketch Note] 复制手写副本失败:", e);
+      showMessage(this.i18n?.duplicateSketchCopyFailed ?? "Failed to copy sketch", 5000, "error");
+    }
+  }
+
+  private findImageElement(element: HTMLElement): HTMLImageElement | null {
+    if (element instanceof HTMLImageElement) return element;
+    return element.querySelector("img") as HTMLImageElement | null;
   }
 
   /**
@@ -298,8 +360,8 @@ export default class SketchNotePlugin extends Plugin {
       return;
     }
 
-    const blockId = Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
-    const fileName = sketchAssetFileName(blockId);
+    const sketchId = generateSketchId();
+    const fileName = sketchAssetFileName(sketchId);
 
     try {
       const editorPreferences = await loadEditorPreferences((key) => this.loadData(key));
@@ -366,7 +428,7 @@ export default class SketchNotePlugin extends Plugin {
       }
 
       // 3. 构建插入 markdown 数据并通过思源 API 插入
-      const data = `![](${`assets/${fileName}`})`;
+      const data = buildSketchImageMarkdown(sketchId);
       let result;
 
       if (focusedBlockId) {
@@ -391,10 +453,10 @@ export default class SketchNotePlugin extends Plugin {
       }
 
       // 4. 保存初始空手写数据
-      await this.saveData(storageKey(blockId), createEmptySketchData(editorPreferences));
+      await this.saveData(storageKey(sketchId), createEmptySketchData(editorPreferences));
 
       // 5. 打开手写编辑器
-      await openSketchEditor(blockId);
+      await openSketchEditor(sketchId);
     } catch (e) {
       console.error("[Sketch Note] 插入手写块失败:", e);
     }
