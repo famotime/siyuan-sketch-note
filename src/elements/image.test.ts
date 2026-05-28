@@ -36,6 +36,23 @@ describe("image elements", () => {
     });
   });
 
+  it("fits imported images within the default box without changing their aspect ratio", () => {
+    const element = createImageElement("image-1", {
+      x: 32,
+      y: 48,
+      src: "data:image/png;base64,AAA",
+      naturalWidth: 1600,
+      naturalHeight: 900,
+    });
+
+    expect(element.bounds).toEqual({
+      x: 32,
+      y: 48,
+      width: 320,
+      height: 180,
+    });
+  });
+
   it("updates image geometry without mutating the original element", () => {
     const element = createImageElement("image-1", {
       x: 0,

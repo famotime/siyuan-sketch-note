@@ -88,6 +88,8 @@ defineEmits<{
   display: flex;
   align-items: center;
   gap: 8px;
+  max-width: 100%;
+  box-sizing: border-box;
   padding: 8px 14px;
   background: var(--sketch-toolbar-surface);
   backdrop-filter: blur(14px) saturate(160%);
@@ -109,6 +111,7 @@ defineEmits<{
   font-size: 13px;
   min-height: 30px;
   min-width: 30px;
+  flex: 0 0 auto;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -140,11 +143,12 @@ defineEmits<{
   display: flex;
   align-items: center;
   gap: 8px;
-  min-width: 120px;
+  min-width: 0;
 }
 
 .replay-progress {
   flex: 1;
+  min-width: 0;
   height: 4px;
   appearance: none;
   background: var(--sketch-toolbar-control-border);
@@ -196,5 +200,37 @@ defineEmits<{
 .replay-speed option {
   background: #1c1c1e;
   color: #fff;
+}
+
+@media (max-width: 520px) {
+  .replay-controls {
+    gap: 6px;
+    padding: 6px 8px;
+    border-radius: 10px;
+  }
+
+  .replay-btn {
+    min-width: 28px;
+    min-height: 28px;
+    padding: 3px 7px;
+  }
+
+  .replay-btn--play {
+    min-width: 34px;
+  }
+
+  .replay-progress-wrap {
+    gap: 6px;
+  }
+
+  .replay-progress-label {
+    display: none;
+  }
+
+  .replay-speed {
+    min-height: 28px;
+    padding: 3px 6px;
+    font-size: 12px;
+  }
 }
 </style>

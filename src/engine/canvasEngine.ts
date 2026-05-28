@@ -112,15 +112,15 @@ export async function preloadElementImages(elements: SketchElement[]): Promise<v
   await Promise.all(imageSources.map((src) => preloadImage(src)));
 }
 
-export function preloadImage(src: string): Promise<void> {
+export function preloadImage(src: string): Promise<HTMLImageElement> {
   const cached = imageCache.get(src);
-  if (cached?.complete) return Promise.resolve();
+  if (cached?.complete) return Promise.resolve(cached);
 
   return new Promise((resolve, reject) => {
     const image = new Image();
     image.onload = () => {
       imageCache.set(src, image);
-      resolve();
+      resolve(image);
     };
     image.onerror = () => reject(new Error("Failed to load image element"));
     image.src = src;

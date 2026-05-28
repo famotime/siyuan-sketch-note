@@ -27,4 +27,26 @@ describe("replay canvas visibility wiring", () => {
     expect(floatingToolbar).toContain(":data-tool=\"shape.tool\"");
     expect(editor).toContain("recordFloatingToolbarAction");
   });
+
+  it("keeps the replay canvas origin aligned on narrow screens", () => {
+    const editor = readFileSync(resolve(process.cwd(), "src/editor/SketchEditor.vue"), "utf8");
+
+    const replayWrapRule = editor.match(/\.sketch-replay-canvas-wrap\s*\{[^}]*\}/)?.[0] ?? "";
+    expect(replayWrapRule).toContain("overflow: auto");
+    expect(replayWrapRule).toContain("height: 100%");
+    expect(replayWrapRule).not.toContain("justify-content: center");
+    expect(editor).toContain('ref="replayCanvasWrapRef"');
+    expect(editor).toContain("scrollReplayCanvasToActivePage");
+  });
+
+  it("keeps replay controls within the mobile viewport", () => {
+    const editor = readFileSync(resolve(process.cwd(), "src/editor/SketchEditor.vue"), "utf8");
+    const controls = readFileSync(resolve(process.cwd(), "src/editor/ReplayControls.vue"), "utf8");
+
+    const replayBarRule = editor.match(/\.sketch-replay-bar\s*\{[^}]*\}/)?.[0] ?? "";
+    expect(replayBarRule).toContain("max-width: calc(100vw - 24px)");
+    expect(replayBarRule).toContain("box-sizing: border-box");
+    expect(controls).toContain("min-width: 0");
+    expect(controls).toContain("@media (max-width: 520px)");
+  });
 });

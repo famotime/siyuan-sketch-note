@@ -111,6 +111,7 @@
       </div>
       <div
         v-if="isReplayMode"
+        ref="replayCanvasWrapRef"
         class="sketch-replay-canvas-wrap"
       >
         <canvas
@@ -259,6 +260,7 @@ const ocrIndex = ref<SketchData["ocrIndex"]>(props.initialData?.ocrIndex);
 const isReplayMode = ref(false);
 const replayRecorder = new ReplayRecorder(props.replayRecordConfig);
 const replayPlayer = ref<InstanceType<typeof ReplayPlayer> | null>(null);
+const replayCanvasWrapRef = ref<HTMLDivElement>();
 const replayCanvasRef = ref<HTMLCanvasElement>();
 const replayState = ref<"idle" | "playing" | "paused">("idle");
 const replayCurrent = ref(0);
@@ -683,6 +685,7 @@ function enterReplayMode() {
       canvas.style.height = `${state.canvasHeight}px`;
       const ctx = canvas.getContext("2d")!;
       ctx.scale(window.devicePixelRatio || 1, window.devicePixelRatio || 1);
+      scrollReplayCanvasToActivePage(state);
     }
 
     const player = new ReplayPlayer(events, canvas, {
@@ -709,6 +712,23 @@ function enterReplayMode() {
     replayPlayer.value = player;
     player.play();
   });
+}
+
+function scrollReplayCanvasToActivePage(state: EngineState) {
+  const wrap = replayCanvasWrapRef.value;
+  if (!wrap) return;
+  const page = state.pageMode === "paged"
+    ? state.pages.find((item) => item.id === state.activePageId) ?? state.pages[0]
+    : undefined;
+
+  const left = page?.x ?? 0;
+  const top = page?.y ?? 0;
+  if (typeof wrap.scrollTo === "function") {
+    wrap.scrollTo({ left, top, behavior: "auto" });
+    return;
+  }
+  wrap.scrollLeft = left;
+  wrap.scrollTop = top;
 }
 
 function triggerToolbarClickAnimation(tool: string, source: ReplayToolSource = "mainToolbar") {
@@ -1353,13 +1373,14 @@ function onHeightChanged(_h: number) {}
   animation: sketch-replay-click 250ms cubic-bezier(0.25, 0.8, 0.25, 1);
 }
 .sketch-replay-canvas-wrap {
-  display: flex;
-  justify-content: center;
   width: 100%;
+  height: 100%;
   overflow: auto;
+  box-sizing: border-box;
 }
 .sketch-replay-canvas {
   display: block;
+  margin: 24px auto;
   border-radius: 12px;
   border: 1px solid var(--b3-theme-border, rgba(0, 0, 0, 0.08));
 }
@@ -1369,5 +1390,8 @@ function onHeightChanged(_h: number) {}
   left: 50%;
   transform: translateX(-50%);
   z-index: 1100;
+  width: max-content;
+  max-width: calc(100vw - 24px);
+  box-sizing: border-box;
 }
 </style>

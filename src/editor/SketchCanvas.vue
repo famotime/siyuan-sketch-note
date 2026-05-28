@@ -91,7 +91,7 @@ import {
   createRectangleStroke,
   createTriangleStroke,
 } from "@/elements/shapes";
-import { createImageElement } from "@/elements/image";
+import { createImageElement, fitImageElementSize } from "@/elements/image";
 import type { ImageElement } from "@/elements/image";
 import {
   angleFromElementCenter,
@@ -1301,16 +1301,26 @@ function duplicateLassoSelection() {
 }
 
 async function insertImage(src: string, options: { source?: ReplayToolSource; loadingMs?: number } = {}) {
-  await preloadImage(src);
+  const image = await preloadImage(src);
+  const elementSize = fitImageElementSize({
+    naturalWidth: image.naturalWidth,
+    naturalHeight: image.naturalHeight,
+  });
   const position = createInsertElementPosition({
     canvasWidth: state.canvasWidth,
     pageMode: state.pageMode,
     activePageId: state.activePageId,
     pages: state.pages,
-    elementWidth: 320,
+    elementWidth: elementSize.width,
     topOffset: 140,
   });
-  const element = createImageElement(`image-${Date.now()}`, { x: position.x, y: position.y, src });
+  const element = createImageElement(`image-${Date.now()}`, {
+    x: position.x,
+    y: position.y,
+    src,
+    naturalWidth: image.naturalWidth,
+    naturalHeight: image.naturalHeight,
+  });
   pushHistorySnapshot(state);
   state.elements = [...state.elements, element];
   fullRedrawStrokeCanvas(getCanvas(), state);
