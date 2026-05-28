@@ -27,6 +27,7 @@ describe("editor top bar layout", () => {
     expect(insertIndex).toBeGreaterThan(-1);
     expect(insertIndex).toBeLessThan(zenIndex);
     expect(topBar).toContain("sketch-btn--add-image");
+    expect(topBar).toContain('data-replay-target="topbar-image"');
     expect(topBar).toContain("<IconParkIcon name=\"Plus\" />");
     expect(editor).toContain("@insertImage=\"triggerImageImport\"");
   });
@@ -90,6 +91,13 @@ it("keeps active tool highlight visible while the button is hovered", () => {
   expect(editor).toMatch(activeHoverRule);
   expect(toolbar).toMatch(activeTextRule);
   expect(editor).toMatch(activeTextRule);
+});
+
+it("defines replay click animation where top bar buttons can use it", () => {
+  const editor = readFileSync(resolve(process.cwd(), "src/editor/SketchEditor.vue"), "utf8");
+
+  expect(editor).toContain("@keyframes sketch-replay-click");
+  expect(editor).toContain(".sketch-editor .sketch-btn--replay-click");
 });
 
 it("keeps active tool icons white in light theme", () => {

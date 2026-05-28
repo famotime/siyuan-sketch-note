@@ -36,6 +36,32 @@ describe("replayRecorder", () => {
     expect(recorder.getEvents()).toHaveLength(0);
   });
 
+  it("does not record events while suspended", () => {
+    const recorder = new ReplayRecorder();
+    recorder.setSuspended(true);
+    expect(recorder.isSuspended()).toBe(true);
+
+    recorder.record({
+      type: "stroke",
+      id: "e1",
+      timestamp: 1000,
+      stroke: { id: "s1", points: [], color: "#000", width: 3, tool: "pen" },
+    });
+
+    expect(recorder.getEvents()).toHaveLength(0);
+
+    recorder.setSuspended(false);
+    expect(recorder.isSuspended()).toBe(false);
+    recorder.record({
+      type: "stroke",
+      id: "e2",
+      timestamp: 1001,
+      stroke: { id: "s2", points: [], color: "#000", width: 3, tool: "pen" },
+    });
+
+    expect(recorder.getEvents()).toHaveLength(1);
+  });
+
   it("respects default config", () => {
     const recorder = new ReplayRecorder();
     const imageEvent = {

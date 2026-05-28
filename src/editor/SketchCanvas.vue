@@ -92,6 +92,7 @@ import {
   createTriangleStroke,
 } from "@/elements/shapes";
 import { createImageElement } from "@/elements/image";
+import type { ImageElement } from "@/elements/image";
 import {
   angleFromElementCenter,
   hitTestElement,
@@ -140,6 +141,7 @@ import { hasTextPointerDrag, resolveTextPointerAction } from "./textPointerActio
 import { useViewport } from "@/composables/useViewport";
 import { useTextEditing } from "@/composables/useTextEditing";
 import type { ReplayRecorder } from "@/recorder/recorder";
+import type { ImageTransformSample, ReplayToolSource } from "@/recorder/types";
 
 const props = defineProps<{
   initialData: SketchData | null;
@@ -190,6 +192,10 @@ const interaction = {
     startAngle?: number;
     startRotation?: number;
     points: Array<{ x: number; y: number; timestamp: number }>;
+    initialElement: ImageElement;
+    startedAt: number;
+    lastSampleAt: number;
+    samples: ImageTransformSample[];
   } | null,
   elementTransform: null as { elementId: string; lastPoint: StrokePoint; mode: "move" | "resize" } | null,
   textMove: null as { elementId: string; startPoint: StrokePoint; lastPoint: StrokePoint; moved: boolean } | null,
@@ -201,7 +207,14 @@ const lasso = {
   path: [] as LassoPoint[],
   selectedIds: [] as string[],
   box: null as { start: LassoPoint; current: LassoPoint } | null,
-  move: null as { lastPoint: StrokePoint } | null,
+  move: null as {
+    lastPoint: StrokePoint;
+    initialImage?: ImageElement;
+    startedAt?: number;
+    lastSampleAt?: number;
+    points?: Array<{ x: number; y: number; timestamp: number }>;
+    samples?: ImageTransformSample[];
+  } | null,
   resize: null as {
     anchor: { x: number; y: number };
     initialBounds: Bounds;
@@ -220,6 +233,17 @@ const LASSO_RESIZE_HANDLE_SIZE = 14;
 const LASSO_MIN_RESIZE_SIZE = 16;
 const LASSO_LONG_PRESS_MS = 450;
 const LASSO_LONG_PRESS_MOVE_TOLERANCE = 8;
+const IMAGE_TRANSFORM_SAMPLE_INTERVAL_MS = 16;
+
+function createImageTransformSample(element: ImageElement, offsetMs: number, pointer?: { x: number; y: number }): ImageTransformSample {
+  return {
+    offsetMs,
+    bounds: { ...element.bounds },
+    rotation: element.transform.rotation || 0,
+    opacity: element.opacity ?? 1,
+    pointer,
+  };
+}
 
 onMounted(async () => {
   if (!bgCanvasRef.value || !strokeCanvasRef.value) return;
@@ -347,13 +371,20 @@ function onPointerDown(e: PointerEvent) {
         return;
       }
       if (imageAction && imageAction.mode !== "move") {
+        const startTime = Date.now();
+        const imageElement = imageAction.element as ImageElement;
         interaction.imageTransform = {
-          elementId: imageAction.element.id,
+          elementId: imageElement.id,
           lastPoint: point,
           mode: imageAction.mode,
           corner: imageAction.corner,
-          startAngle: angleFromElementCenter(imageAction.element, point.x, point.y),
-          startRotation: imageAction.element.transform.rotation || 0,
+          startAngle: angleFromElementCenter(imageElement, point.x, point.y),
+          startRotation: imageElement.transform.rotation || 0,
+          points: [{ x: point.x, y: point.y, timestamp: startTime }],
+          initialElement: imageElement,
+          startedAt: startTime,
+          lastSampleAt: startTime,
+          samples: [createImageTransformSample(imageElement, 0, { x: point.x, y: point.y })],
         };
         pushHistorySnapshot(state);
         return;
@@ -375,7 +406,16 @@ function onPointerDown(e: PointerEvent) {
       point.y,
     );
     if (selectedElement) {
-      lasso.move = { lastPoint: point };
+      const startTime = Date.now();
+      const selectedImage = selectedElement.type === "image" && lasso.selectedIds.length === 1 ? selectedElement as ImageElement : undefined;
+      lasso.move = {
+        lastPoint: point,
+        initialImage: selectedImage,
+        startedAt: selectedImage ? startTime : undefined,
+        lastSampleAt: selectedImage ? startTime : undefined,
+        points: selectedImage ? [{ x: point.x, y: point.y, timestamp: startTime }] : undefined,
+        samples: selectedImage ? [createImageTransformSample(selectedImage, 0, { x: point.x, y: point.y })] : undefined,
+      };
       pushHistorySnapshot(state);
       return;
     }
@@ -432,14 +472,20 @@ function onPointerDown(e: PointerEvent) {
       return;
     }
     if (action) {
+      const startTime = Date.now();
+      const imageElement = action.element as ImageElement;
       interaction.imageTransform = {
-        elementId: action.element.id,
+        elementId: imageElement.id,
         lastPoint: point,
         mode: action.mode,
         corner: action.corner,
-        startAngle: angleFromElementCenter(action.element, point.x, point.y),
-        startRotation: action.element.transform.rotation || 0,
-        points: [{ x: point.x, y: point.y, timestamp: Date.now() }],
+        startAngle: angleFromElementCenter(imageElement, point.x, point.y),
+        startRotation: imageElement.transform.rotation || 0,
+        points: [{ x: point.x, y: point.y, timestamp: startTime }],
+        initialElement: imageElement,
+        startedAt: startTime,
+        lastSampleAt: startTime,
+        samples: [createImageTransformSample(imageElement, 0, { x: point.x, y: point.y })],
       };
       pushHistorySnapshot(state);
     }
@@ -502,6 +548,15 @@ function onPointerMove(e: PointerEvent) {
       state.elements = translateLassoSelection(state.elements, lasso.selectedIds, dx, dy);
       state.strokes = translateStrokeSelection(state.strokes, lasso.selectedIds, dx, dy);
       lasso.move.lastPoint = point;
+      const now = Date.now();
+      if (lasso.move.initialImage && lasso.move.startedAt != null && lasso.move.lastSampleAt != null && lasso.move.points && lasso.move.samples) {
+        lasso.move.points.push({ x: point.x, y: point.y, timestamp: now });
+        const updated = state.elements.find((element): element is ImageElement => element.id === lasso.move?.initialImage?.id && element.type === "image");
+        if (updated && now - lasso.move.lastSampleAt >= IMAGE_TRANSFORM_SAMPLE_INTERVAL_MS) {
+          lasso.move.samples.push(createImageTransformSample(updated, now - lasso.move.startedAt, { x: point.x, y: point.y }));
+          lasso.move.lastSampleAt = now;
+        }
+      }
       state.isDirty = true;
       fullRedrawStrokeCanvas(getCanvas(), state);
       drawLassoSelectionOutline();
@@ -538,7 +593,13 @@ function onPointerMove(e: PointerEvent) {
       return rotateElement(element, rotation);
     });
     interaction.imageTransform.lastPoint = point;
-    interaction.imageTransform.points.push({ x: point.x, y: point.y, timestamp: Date.now() });
+    const now = Date.now();
+    interaction.imageTransform.points.push({ x: point.x, y: point.y, timestamp: now });
+    const updated = state.elements.find((element): element is ImageElement => element.id === interaction.imageTransform?.elementId && element.type === "image");
+    if (updated && now - interaction.imageTransform.lastSampleAt >= IMAGE_TRANSFORM_SAMPLE_INTERVAL_MS) {
+      interaction.imageTransform.samples.push(createImageTransformSample(updated, now - interaction.imageTransform.startedAt, { x: point.x, y: point.y }));
+      interaction.imageTransform.lastSampleAt = now;
+    }
     state.isDirty = true;
     fullRedrawStrokeCanvas(getCanvas(), state);
     drawSelectionOutline();
@@ -623,7 +684,29 @@ function onPointerUp(e: PointerEvent) {
       }
     }
     if (lasso.resize) { lasso.resize = null; updateUndoRedoState(); emit("stroke"); return; }
-    if (lasso.move) { lasso.move = null; updateUndoRedoState(); emit("stroke"); return; }
+    if (lasso.move) {
+      const move = lasso.move;
+      if (move.initialImage && move.startedAt != null && move.points && move.samples && props.recorder) {
+        const element = state.elements.find((el): el is ImageElement => el.id === move.initialImage?.id && el.type === "image");
+        if (element) {
+          props.recorder.record({
+            type: "imageTransform",
+            id: `lm-${Date.now()}`,
+            timestamp: Date.now(),
+            elementId: element.id,
+            op: "move",
+            initialElement: move.initialImage,
+            finalElement: element,
+            points: move.points,
+            samples: [...move.samples, createImageTransformSample(element, Date.now() - move.startedAt, move.points.at(-1))],
+          });
+        }
+      }
+      lasso.move = null;
+      updateUndoRedoState();
+      emit("stroke");
+      return;
+    }
     if (lasso.path.length > 0) {
       lasso.selectedIds = findElementsInLasso(getSelectableElements(), lasso.path).map((el) => el.id);
       lasso.path = [];
@@ -651,14 +734,17 @@ function onPointerUp(e: PointerEvent) {
     const imgTransform = interaction.imageTransform;
     const element = state.elements.find((el) => el.id === imgTransform.elementId);
     if (element && element.type === "image" && props.recorder) {
+      const finalSample = createImageTransformSample(element, Date.now() - imgTransform.startedAt, imgTransform.points.at(-1));
       props.recorder.record({
         type: "imageTransform",
         id: `it-${Date.now()}`,
         timestamp: Date.now(),
         elementId: imgTransform.elementId,
         op: imgTransform.mode,
+        initialElement: imgTransform.initialElement,
         finalElement: element,
         points: imgTransform.points,
+        samples: [...imgTransform.samples, finalSample],
       });
     }
     interaction.imageTransform = null;
@@ -1150,6 +1236,8 @@ function getNextImageOpacity(opacity = 1): number {
 }
 
 function cycleImageOpacity(elementId: string) {
+  const initial = state.elements.find((el): el is ImageElement => el.id === elementId && el.type === "image");
+  if (!initial) return;
   pushHistorySnapshot(state);
   state.elements = state.elements.map((element) => {
     if (element.id !== elementId || element.type !== "image") return element;
@@ -1172,7 +1260,12 @@ function cycleImageOpacity(elementId: string) {
         timestamp: Date.now(),
         elementId,
         op: "opacity",
+        initialElement: initial,
         finalElement: updated,
+        samples: [
+          createImageTransformSample(initial, 0),
+          createImageTransformSample(updated, 120),
+        ],
       });
     }
   }
@@ -1207,7 +1300,7 @@ function duplicateLassoSelection() {
   emit("stroke");
 }
 
-async function insertImage(src: string) {
+async function insertImage(src: string, options: { source?: ReplayToolSource; loadingMs?: number } = {}) {
   await preloadImage(src);
   const position = createInsertElementPosition({
     canvasWidth: state.canvasWidth,
@@ -1229,6 +1322,8 @@ async function insertImage(src: string) {
       id: `re-${Date.now()}`,
       timestamp: Date.now(),
       element,
+      source: options.source,
+      loadingMs: options.loadingMs,
     });
   }
 }

@@ -4,6 +4,16 @@ import type { ImageElement } from "@/elements/image";
 
 export type ReplayEventType = ReplayEvent["type"];
 
+export type ReplayToolSource = "mainToolbar" | "floatingToolbar" | "topBar" | "shortcut" | "canvas" | "paste";
+
+export interface ImageTransformSample {
+  offsetMs: number;
+  bounds: ImageElement["bounds"];
+  rotation: number;
+  opacity: number;
+  pointer?: { x: number; y: number };
+}
+
 export type ReplayEvent =
   | StrokeReplayEvent
   | EraseReplayEvent
@@ -47,6 +57,8 @@ export interface ImageReplayEvent {
   id: string;
   timestamp: number;
   element: Extract<SketchElement, { type: "image" }>;
+  source?: ReplayToolSource;
+  loadingMs?: number;
 }
 
 export interface ImageTransformReplayEvent {
@@ -55,8 +67,10 @@ export interface ImageTransformReplayEvent {
   timestamp: number;
   elementId: string;
   op: "move" | "resize" | "rotate" | "opacity";
+  initialElement?: ImageElement;
   finalElement: ImageElement;
   points?: Array<{ x: number; y: number; timestamp: number }>;
+  samples?: ImageTransformSample[];
 }
 
 export interface ImageDeleteReplayEvent {
@@ -72,6 +86,7 @@ export interface ToolSwitchReplayEvent {
   timestamp: number;
   tool: string;
   preset: ToolPreset;
+  source?: ReplayToolSource;
 }
 
 export interface ReplayRecorderConfig {

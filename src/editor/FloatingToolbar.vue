@@ -3,6 +3,7 @@
     v-if="isVisible"
     ref="panelRef"
     class="sketch-float-panel"
+    :class="{ 'sketch-float-panel--replay': replayActive }"
     :style="{ left: `${pos.left}px`, top: `${pos.top}px` }"
   >
     <!-- 拖动手柄 -->
@@ -26,6 +27,7 @@
         class="sketch-float-btn"
         :class="{ 'sketch-float-btn--active': activeTool === shape.tool }"
         :title="t(shape.labelKey)"
+        :data-tool="shape.tool"
         @click="$emit('selectTool', shape.tool)"
       >
         <IconParkIcon :name="shape.icon" />
@@ -313,6 +315,7 @@ const props = defineProps<{
   lassoMode: "freehand" | "box";
   preset: ToolPreset;
   t: (key: string) => string;
+  replayActive?: boolean;
 }>();
 
 const emit = defineEmits<{
@@ -681,6 +684,14 @@ onUnmounted(() => {
   box-shadow: var(--sketch-toolbar-hover-shadow);
 }
 
+.sketch-float-panel--replay {
+  pointer-events: none;
+}
+
+.sketch-float-panel--replay-click {
+  animation: sketch-replay-click 250ms cubic-bezier(0.25, 0.8, 0.25, 1);
+}
+
 /* 拖拽手柄：置于面板顶部，设计为极简的小圆点/横杠，增强仪式感 */
 .sketch-float-panel__handle {
   width: 100%;
@@ -750,6 +761,9 @@ onUnmounted(() => {
   color: var(--sketch-toolbar-strong-text) !important;
   box-shadow: var(--sketch-toolbar-active-shadow);
   border-color: var(--sketch-toolbar-separator);
+}
+.sketch-float-btn--replay-click {
+  animation: sketch-replay-click 250ms cubic-bezier(0.25, 0.8, 0.25, 1);
 }
 
 /* 模式切换：像素/整笔，自由/框选 等 */

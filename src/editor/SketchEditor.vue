@@ -55,7 +55,7 @@
       />
       <ToolBar
         ref="toolbarRef"
-        :activeTool="activeTool"
+        :activeTool="displayTool"
         :lastShapeTool="lastShapeTool"
         :t="t"
         :replayActive="isReplayMode"
@@ -137,16 +137,17 @@
       @exit="exitReplayMode"
     />
     <FloatingToolbar
-      v-if="!isZenMode && !isReplayMode"
+      v-if="!isZenMode"
       v-model:lassoMode="lassoMode"
-      :activeTool="activeTool"
+      :activeTool="displayTool"
       :colors="colors"
-      :preset="activePreset"
+      :preset="displayPreset"
       :t="t"
-      @selectColor="selectColor"
-      @selectCustomColor="selectCustomColor"
-      @selectTool="selectTool"
-      @updatePreset="updateActivePreset"
+      :replayActive="isReplayMode"
+      @selectColor="onFloatingSelectColor"
+      @selectCustomColor="onFloatingSelectCustomColor"
+      @selectTool="selectTool($event, 'floatingToolbar')"
+      @updatePreset="onFloatingUpdatePreset"
       @deleteSelection="canvasRef?.deleteLassoSelection()"
       @duplicateSelection="canvasRef?.duplicateLassoSelection()"
       @recolorSelection="recolorSelection"
@@ -192,7 +193,7 @@ import ToolBar from "./ToolBar.vue";
 import FloatingToolbar from "./FloatingToolbar.vue";
 import IconParkIcon from "./IconParkIcon.vue";
 import { ReplayRecorder } from "@/recorder/recorder";
-import type { ReplayRecorderConfig } from "@/recorder/types";
+import type { ReplayRecorderConfig, ReplayToolSource } from "@/recorder/types";
 import { ReplayPlayer } from "@/recorder/player";
 import type { PlaybackSpeed } from "@/recorder/player";
 import { reconstructFromData } from "@/recorder/reconstruct";
@@ -232,6 +233,9 @@ const imageInputRef = ref<HTMLInputElement>();
 const jsonInputRef = ref<HTMLInputElement>();
 const backgroundInputRef = ref<HTMLInputElement>();
 const activeTool = ref<EditorTool>("pen");
+const nextToolSwitchSource = ref<ReplayToolSource>("mainToolbar");
+let imageImportStartedAt = 0;
+let imageImportSource: ReplayToolSource = "topBar";
 const lassoMode = ref<"freehand" | "box">("box");
 const lastShapeTool = ref<ShapeEditorTool>("line");
 const toolPresets = ref(normalizeToolPresets(props.initialData?.toolPresets));
@@ -260,6 +264,8 @@ const replayState = ref<"idle" | "playing" | "paused">("idle");
 const replayCurrent = ref(0);
 const replayTotal = ref(0);
 const replaySpeed = ref<PlaybackSpeed>(1);
+const replayDisplayTool = ref<EditorTool>("pen");
+const replayDisplayPreset = ref<ToolPreset | null>(null);
 let preReplayTool: EditorTool = "pen";
 
 // ─── Derived state ───
@@ -269,18 +275,21 @@ const activePreset = computed(() => {
   }
   return toolPresets.value[getDrawingToolForEditorTool(activeTool.value)];
 });
+const displayTool = computed(() => isReplayMode.value ? replayDisplayTool.value : activeTool.value);
+const displayPreset = computed(() => isReplayMode.value && replayDisplayPreset.value ? replayDisplayPreset.value : activePreset.value);
 
 // Record toolSwitch events
-let skipFirstToolWatch = true;
 watch(activeTool, () => {
-  if (skipFirstToolWatch) { skipFirstToolWatch = false; return; }
+  if (isReplayMode.value) return;
   replayRecorder.record({
     type: "toolSwitch",
     id: `ts-${Date.now()}`,
     timestamp: Date.now(),
     tool: activeTool.value,
     preset: activePreset.value,
+    source: nextToolSwitchSource.value,
   });
+  nextToolSwitchSource.value = "mainToolbar";
 });
 
 const activeCustomBackground = computed(() => getCustomBackgroundTemplate({
@@ -398,14 +407,15 @@ watchEffect((onCleanup) => {
 });
 
 // ─── Toolbar actions ───
-function selectTool(tool: EditorTool) {
+function selectTool(tool: EditorTool, source: ReplayToolSource = "mainToolbar") {
   if (tool === "image") {
-    triggerImageImport();
+    triggerImageImport(source);
     return;
   }
   if (isShapeEditorTool(tool)) {
     lastShapeTool.value = tool;
   }
+  nextToolSwitchSource.value = source;
   activeTool.value = tool;
 }
 
@@ -420,6 +430,33 @@ function updateActivePreset(patch: Partial<Omit<ToolPreset, "tool">>) {
     return;
   }
   toolPresets.value = updateToolPreset(toolPresets.value, getDrawingToolForEditorTool(activeTool.value), patch);
+}
+
+function recordFloatingToolbarAction() {
+  if (isReplayMode.value) return;
+  replayRecorder.record({
+    type: "toolSwitch",
+    id: `ft-${Date.now()}`,
+    timestamp: Date.now(),
+    tool: activeTool.value,
+    preset: activePreset.value,
+    source: "floatingToolbar",
+  });
+}
+
+function onFloatingSelectColor(color: string) {
+  selectColor(color);
+  recordFloatingToolbarAction();
+}
+
+function onFloatingSelectCustomColor(color: string) {
+  selectCustomColor(color);
+  recordFloatingToolbarAction();
+}
+
+function onFloatingUpdatePreset(patch: Partial<Omit<ToolPreset, "tool">>) {
+  updateActivePreset(patch);
+  recordFloatingToolbarAction();
 }
 
 function onStroke() {
@@ -507,7 +544,10 @@ async function onBackgroundSelected(event: Event) {
   onStroke();
 }
 
-function triggerImageImport() {
+function triggerImageImport(source: ReplayToolSource = "topBar") {
+  imageImportStartedAt = Date.now();
+  imageImportSource = source;
+  nextToolSwitchSource.value = source;
   activeTool.value = "image";
   imageInputRef.value?.click();
 }
@@ -518,7 +558,7 @@ async function onImageSelected(event: Event) {
   input.value = "";
   if (!file) return;
   const dataUrl = await readFileAsDataUrl(file);
-  await canvasRef.value?.insertImage(dataUrl);
+  await canvasRef.value?.insertImage(dataUrl, { source: imageImportSource, loadingMs: Math.max(0, Date.now() - imageImportStartedAt) });
   onStroke();
 }
 
@@ -528,9 +568,12 @@ async function onPaste(event: ClipboardEvent) {
     : null;
   if (!file) return;
   event.preventDefault();
+  imageImportStartedAt = Date.now();
+  imageImportSource = "paste";
+  nextToolSwitchSource.value = "paste";
   activeTool.value = "image";
   const dataUrl = await readFileAsDataUrl(file);
-  await canvasRef.value?.insertImage(dataUrl);
+  await canvasRef.value?.insertImage(dataUrl, { source: "paste", loadingMs: Math.max(0, Date.now() - imageImportStartedAt) });
   onStroke();
 }
 
@@ -619,6 +662,9 @@ function enterReplayMode() {
   if (events.length === 0) return;
 
   preReplayTool = activeTool.value;
+  replayDisplayTool.value = activeTool.value;
+  replayDisplayPreset.value = activePreset.value;
+  replayRecorder.setSuspended(true);
   isReplayMode.value = true;
   replayTotal.value = events.length;
   replayCurrent.value = 0;
@@ -651,17 +697,44 @@ function enterReplayMode() {
     player.onComplete = () => {
       replayState.value = "idle";
     };
-    player.onToolSwitch = (tool) => {
-      activeTool.value = tool as EditorTool;
-      triggerToolbarClickAnimation(tool);
+    player.onToolSwitch = (tool, source) => {
+      replayDisplayTool.value = tool as EditorTool;
+      const event = events[player.getCurrentIndex()];
+      if (event?.type === "toolSwitch") replayDisplayPreset.value = event.preset;
+      triggerToolbarClickAnimation(tool, source);
+    };
+    player.onImageInsert = (source) => {
+      if (source === "topBar") triggerToolbarClickAnimation("image", source);
     };
     replayPlayer.value = player;
     player.play();
   });
 }
 
-function triggerToolbarClickAnimation(tool: string) {
+function triggerToolbarClickAnimation(tool: string, source: ReplayToolSource = "mainToolbar") {
   nextTick(() => {
+    if (source === "floatingToolbar") {
+      const root = editorRootRef.value;
+      const targetTool = isShapeEditorTool(tool as EditorTool) ? tool : null;
+      const btn = targetTool ? root?.querySelector(`.sketch-float-panel [data-tool="${targetTool}"]`) as HTMLElement | null : null;
+      const target = btn ?? root?.querySelector(".sketch-float-panel") as HTMLElement | null;
+      if (!target) return;
+      target.classList.remove(btn ? "sketch-float-btn--replay-click" : "sketch-float-panel--replay-click");
+      void target.offsetWidth; // force reflow to restart animation
+      target.classList.add(btn ? "sketch-float-btn--replay-click" : "sketch-float-panel--replay-click");
+      setTimeout(() => target.classList.remove(btn ? "sketch-float-btn--replay-click" : "sketch-float-panel--replay-click"), 300);
+      return;
+    }
+    if (source === "topBar") {
+      const root = editorRootRef.value;
+      const btn = root?.querySelector('[data-replay-target="topbar-image"]') as HTMLElement | null;
+      if (!btn) return;
+      btn.classList.remove("sketch-btn--replay-click");
+      void btn.offsetWidth; // force reflow to restart animation
+      btn.classList.add("sketch-btn--replay-click");
+      setTimeout(() => btn.classList.remove("sketch-btn--replay-click"), 300);
+      return;
+    }
     const toolbarEl = toolbarRef.value?.$el as HTMLElement | undefined;
     if (!toolbarEl) return;
     const targetTool = isShapeEditorTool(tool as EditorTool) ? "shape" : tool;
@@ -680,7 +753,9 @@ function exitReplayMode() {
   isReplayMode.value = false;
   replayState.value = "idle";
   replayCurrent.value = 0;
+  replayDisplayPreset.value = null;
   activeTool.value = preReplayTool;
+  replayRecorder.setSuspended(false);
 }
 
 function toggleReplayPlay() {
@@ -1269,6 +1344,14 @@ function onHeightChanged(_h: number) {}
 }
 
 /* ── Replay mode ── */
+@keyframes sketch-replay-click {
+  0% { transform: scale(1); }
+  40% { transform: scale(0.85); }
+  100% { transform: scale(1); }
+}
+.sketch-editor .sketch-btn--replay-click {
+  animation: sketch-replay-click 250ms cubic-bezier(0.25, 0.8, 0.25, 1);
+}
 .sketch-replay-canvas-wrap {
   display: flex;
   justify-content: center;

@@ -1,4 +1,4 @@
-import type { ReplayEvent, StrokeReplayEvent, ShapeReplayEvent, ToolSwitchReplayEvent, ImageTransformReplayEvent } from "./types";
+import type { ReplayEvent, StrokeReplayEvent, ShapeReplayEvent, ToolSwitchReplayEvent, ImageTransformReplayEvent, ReplayToolSource, ImageTransformSample, ImageReplayEvent } from "./types";
 import type { Stroke, StrokePoint } from "@/types/sketch";
 import type { ImageElement } from "@/elements/image";
 import { getPressureWidth, getSmoothedSegments } from "@/engine/strokeSmoothing";
@@ -9,6 +9,7 @@ export type PlaybackSpeed = 1 | 2 | 4;
 const CHAR_DELAY_MS = 30;
 const IMAGE_FADE_MS = 200;
 const IMAGE_TRANSFORM_MS = 300;
+const MIN_IMAGE_TRANSFORM_SAMPLE_MS = 500;
 const TOOL_SWITCH_FADE_MS = 500;
 
 export interface ReplayPlayerOptions {
@@ -33,6 +34,7 @@ export class ReplayPlayer {
   private textAnimIndex = 0;
   private textAnimTimer = 0;
   private imageAnimProgress = 0;
+  private imageInsertElapsed = 0;
   private toolSwitchProgress = 0;
   private toolSwitchLabel = "";
 
@@ -54,6 +56,9 @@ export class ReplayPlayer {
     points: Array<{ x: number; y: number }>;
     pointIndex: number;
     progress: number;
+    elapsedMs: number;
+    samples: ImageTransformSample[];
+    baseElement: ImageElement;
   } | null = null;
 
   private imageDeleteAnim: { elementId: string; progress: number } | null = null;
@@ -61,7 +66,8 @@ export class ReplayPlayer {
   onStateChange?: (state: PlaybackState) => void;
   onProgress?: (current: number, total: number) => void;
   onComplete?: () => void;
-  onToolSwitch?: (tool: string) => void;
+  onToolSwitch?: (tool: string, source?: ReplayToolSource) => void;
+  onImageInsert?: (source?: ReplayToolSource, loadingMs?: number) => void;
 
   constructor(events: ReplayEvent[], canvas: HTMLCanvasElement, options: ReplayPlayerOptions = {}) {
     this.events = events;
@@ -111,6 +117,7 @@ export class ReplayPlayer {
     this.textAnimIndex = 0;
     this.textAnimTimer = 0;
     this.imageAnimProgress = 0;
+    this.imageInsertElapsed = 0;
     this.toolSwitchProgress = 0;
     this.toolSwitchLabel = "";
     this.completedStrokes.clear();
@@ -137,6 +144,7 @@ export class ReplayPlayer {
     this.strokeAnimIndex = 0;
     this.textAnimIndex = 0;
     this.imageAnimProgress = 0;
+    this.imageInsertElapsed = 0;
     this.toolSwitchProgress = 0;
     this.toolSwitchLabel = "";
 
@@ -176,6 +184,7 @@ export class ReplayPlayer {
       this.textAnimIndex = 0;
       this.textAnimTimer = 0;
       this.imageAnimProgress = 0;
+      this.imageInsertElapsed = 0;
       this.toolSwitchProgress = 0;
       this.toolSwitchLabel = "";
       this.onProgress?.(this.currentIndex, this.events.length);
@@ -196,7 +205,7 @@ export class ReplayPlayer {
       case "text":
         return this.animateText(event.element.text, event.element);
       case "image":
-        return this.animateImageInsert(event.element);
+        return this.animateImageInsert(event);
       case "imageTransform":
         return this.animateImageTransform(event);
       case "imageDelete":
@@ -264,10 +273,19 @@ export class ReplayPlayer {
     return this.textAnimIndex >= text.length;
   }
 
-  private animateImageInsert(element: ImageElement): boolean {
+  private animateImageInsert(event: ImageReplayEvent): boolean {
+    const element = event.element;
     if (this.imageAnimProgress === 0) {
       this.imageStates.set(element.id, element);
       this.loadImage(element.src);
+      this.onImageInsert?.(event.source, event.loadingMs);
+    }
+    this.imageInsertElapsed += 16 * this.speed;
+    const loadingMs = Math.min(event.loadingMs ?? 0, 1000);
+    if (this.imageInsertElapsed < loadingMs) {
+      this.drawImageWithTransform(element, 1, true);
+      this.presentLayer();
+      return false;
     }
     this.imageAnimProgress += 16 / IMAGE_FADE_MS;
     if (this.imageAnimProgress > 1) this.imageAnimProgress = 1;
@@ -292,19 +310,47 @@ export class ReplayPlayer {
       this.imageTransformAnim = {
         elementId: event.elementId,
         op: event.op,
-        fromBounds: { ...current.bounds },
+        fromBounds: { ...(event.initialElement ?? current).bounds },
         toBounds: { ...event.finalElement.bounds },
-        fromRotation: current.transform?.rotation ?? 0,
+        fromRotation: (event.initialElement ?? current).transform?.rotation ?? 0,
         toRotation: event.finalElement.transform?.rotation ?? 0,
-        fromOpacity: current.opacity ?? 1,
+        fromOpacity: (event.initialElement ?? current).opacity ?? 1,
         toOpacity: event.finalElement.opacity ?? 1,
         points: event.points?.map((p) => ({ x: p.x, y: p.y })) ?? [],
         pointIndex: 0,
         progress: 0,
+        elapsedMs: 0,
+        samples: event.samples ?? [],
+        baseElement: event.initialElement ?? current,
       };
     }
 
     const anim = this.imageTransformAnim;
+    anim.elapsedMs += 16 * this.speed;
+    if (anim.samples.length > 0) {
+      const lastOffset = anim.samples[anim.samples.length - 1].offsetMs;
+      const visibleDuration = Math.max(lastOffset, MIN_IMAGE_TRANSFORM_SAMPLE_MS);
+      const sampleElapsed = lastOffset <= 0 ? 0 : Math.min(lastOffset, (anim.elapsedMs / visibleDuration) * lastOffset);
+      const sample = this.getTransformSample(anim.samples, sampleElapsed);
+      const sampledElement: ImageElement = {
+        ...anim.baseElement,
+        bounds: { ...sample.bounds },
+        opacity: sample.opacity,
+        transform: {
+          ...anim.baseElement.transform,
+          rotation: sample.rotation,
+        },
+      };
+      this.renderImageTransformFrame(event.elementId, sampledElement);
+
+      if (anim.elapsedMs >= visibleDuration) {
+        this.imageStates.set(event.elementId, event.finalElement);
+        this.imageTransformAnim = null;
+        return true;
+      }
+      return false;
+    }
+
     anim.progress += 16 / IMAGE_TRANSFORM_MS;
     if (anim.progress > 1) anim.progress = 1;
 
@@ -359,7 +405,7 @@ export class ReplayPlayer {
 
   private animateToolSwitch(event: ToolSwitchReplayEvent): boolean {
     if (this.toolSwitchProgress === 0) {
-      this.onToolSwitch?.(event.tool);
+      this.onToolSwitch?.(event.tool, event.source);
     }
     this.toolSwitchProgress += 16 / TOOL_SWITCH_FADE_MS;
     if (this.toolSwitchProgress > 1) this.toolSwitchProgress = 1;
@@ -378,13 +424,23 @@ export class ReplayPlayer {
 
   private loadImage(src: string): void {
     if (this.imageCache.has(src)) return;
+    if (typeof Image === "undefined") return;
     const img = new Image();
     img.crossOrigin = "anonymous";
     img.src = src;
     this.imageCache.set(src, img);
   }
 
-  private drawImageWithTransform(element: ImageElement, alpha: number): void {
+  private getTransformSample(samples: ImageTransformSample[], elapsedMs: number): ImageTransformSample {
+    let current = samples[0];
+    for (const sample of samples) {
+      if (sample.offsetMs > elapsedMs) break;
+      current = sample;
+    }
+    return current;
+  }
+
+  private drawImageWithTransform(element: ImageElement, alpha: number, forcePlaceholder = false): void {
     const img = this.imageCache.get(element.src);
     const ctx = this.getDrawingContext();
     const cx = element.bounds.x + element.bounds.width / 2;
@@ -394,7 +450,7 @@ export class ReplayPlayer {
     ctx.save();
     ctx.globalAlpha = (element.opacity ?? 1) * alpha;
 
-    if (img && img.complete && img.naturalWidth > 0) {
+    if (!forcePlaceholder && img && img.complete && img.naturalWidth > 0) {
       ctx.translate(cx, cy);
       if (rotation) ctx.rotate(rotation);
       ctx.drawImage(
@@ -450,6 +506,26 @@ export class ReplayPlayer {
     this.clearCanvas();
     for (const stroke of this.completedStrokes.values()) this.renderStrokeFull(stroke);
     for (const element of this.imageStates.values()) this.drawImageWithTransform(element, 1);
+  }
+
+  private renderImageTransformFrame(elementId: string, frameElement: ImageElement): void {
+    if (this.layerCtx) {
+      this.clearLayer();
+      for (const stroke of this.completedStrokes.values()) this.renderStrokeFull(stroke);
+      for (const element of this.imageStates.values()) {
+        if (element.id !== elementId) this.drawImageWithTransform(element, 1);
+      }
+      this.drawImageWithTransform(frameElement, 1);
+      this.presentLayer();
+      return;
+    }
+
+    this.clearCanvas();
+    for (const stroke of this.completedStrokes.values()) this.renderStrokeFull(stroke);
+    for (const element of this.imageStates.values()) {
+      if (element.id !== elementId) this.drawImageWithTransform(element, 1);
+    }
+    this.drawImageWithTransform(frameElement, 1);
   }
 
   private renderEventInstant(event: ReplayEvent): void {

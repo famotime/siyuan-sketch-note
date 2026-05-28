@@ -49,6 +49,7 @@
       class="sketch-btn sketch-btn--add-image"
       :title="t('image')"
       :aria-label="t('image')"
+      data-replay-target="topbar-image"
       @click="$emit('insertImage')"
     >
       <IconParkIcon name="Plus" />

@@ -44,6 +44,8 @@ function createMockCanvas(): HTMLCanvasElement {
     fillText: vi.fn(),
     drawImage: vi.fn(),
     setTransform: vi.fn(),
+    translate: vi.fn(),
+    rotate: vi.fn(),
     globalAlpha: 1,
     globalCompositeOperation: "source-over",
     strokeStyle: "",
@@ -60,6 +62,19 @@ function createMockCanvas(): HTMLCanvasElement {
     height: 1200,
     getContext: vi.fn().mockReturnValue(ctx),
   } as unknown as HTMLCanvasElement;
+}
+
+function createImageElement(id: string, bounds: { x: number; y: number; width: number; height: number }, rotation = 0, opacity = 1) {
+  return {
+    id,
+    type: "image" as const,
+    src: "data:image/png;base64,abc",
+    alt: "",
+    opacity,
+    bounds,
+    transform: { x: 0, y: 0, scaleX: 1, scaleY: 1, rotation },
+    zIndex: 0,
+  };
 }
 
 const mockEvents: ReplayEvent[] = [
@@ -144,6 +159,50 @@ describe("replayPlayer", () => {
     expect(player.getState()).toBe("playing");
   });
 
+  it("emits tool switch source for toolbar click replay", () => {
+    const events: ReplayEvent[] = [
+      {
+        type: "toolSwitch",
+        id: "tool-event",
+        timestamp: 1000,
+        tool: "highlighter",
+        preset: { tool: "highlighter", color: "#ff0", width: 18, opacity: 0.45, mode: "marker" },
+        source: "floatingToolbar",
+      },
+    ];
+    const canvas = createMockCanvas();
+    const player = new ReplayPlayer(events, canvas);
+    const switches: Array<{ tool: string; source?: string }> = [];
+    player.onToolSwitch = (tool, source) => switches.push({ tool, source });
+
+    player.play();
+    tickFrame(16);
+
+    expect(switches).toEqual([{ tool: "highlighter", source: "floatingToolbar" }]);
+  });
+
+  it("emits image insert source for import click replay", () => {
+    const events: ReplayEvent[] = [
+      {
+        type: "image",
+        id: "image-insert",
+        timestamp: 1000,
+        element: createImageElement("image-1", { x: 10, y: 20, width: 100, height: 80 }),
+        source: "topBar",
+        loadingMs: 120,
+      },
+    ];
+    const canvas = createMockCanvas();
+    const player = new ReplayPlayer(events, canvas);
+    const inserts: Array<{ source?: string; loadingMs?: number }> = [];
+    player.onImageInsert = (source, loadingMs) => inserts.push({ source, loadingMs });
+
+    player.play();
+    tickFrame(16);
+
+    expect(inserts).toEqual([{ source: "topBar", loadingMs: 120 }]);
+  });
+
   it("goToEvent jumps to specific event index", () => {
     const canvas = createMockCanvas();
     const player = new ReplayPlayer(mockEvents, canvas);
@@ -219,5 +278,78 @@ describe("replayPlayer", () => {
 
     expect(ctx.clearRect).not.toHaveBeenCalled();
     expect(ctx.fillText).toHaveBeenCalled();
+  });
+
+  it("plays image transforms from recorded samples before committing the final element", () => {
+    const initial = createImageElement("image-1", { x: 10, y: 20, width: 100, height: 80 });
+    const middle = createImageElement("image-1", { x: 40, y: 50, width: 130, height: 95 }, 0.15, 0.8);
+    const final = createImageElement("image-1", { x: 80, y: 90, width: 160, height: 120 }, 0.3, 0.6);
+    const events: ReplayEvent[] = [
+      {
+        type: "image",
+        id: "image-insert",
+        timestamp: 1000,
+        element: initial,
+      },
+      {
+        type: "imageTransform",
+        id: "image-transform",
+        timestamp: 1100,
+        elementId: "image-1",
+        op: "resize",
+        initialElement: initial,
+        finalElement: final,
+        samples: [
+          { offsetMs: 0, bounds: initial.bounds, rotation: 0, opacity: 1 },
+          { offsetMs: 16, bounds: middle.bounds, rotation: 0.15, opacity: 0.8 },
+          { offsetMs: 32, bounds: final.bounds, rotation: 0.3, opacity: 0.6 },
+        ],
+      },
+    ];
+    const canvas = createMockCanvas();
+    const ctx = canvas.getContext("2d")!;
+    const player = new ReplayPlayer(events, canvas);
+
+    player.goToEvent(1);
+    player.play();
+    for (let i = 1; i <= 18; i++) {
+      tickFrame(i * 16);
+    }
+
+    expect(ctx.fillRect).toHaveBeenCalledWith(-initial.bounds.width / 2, -initial.bounds.height / 2, initial.bounds.width, initial.bounds.height);
+    expect(ctx.fillRect).toHaveBeenCalledWith(-middle.bounds.width / 2, -middle.bounds.height / 2, middle.bounds.width, middle.bounds.height);
+  });
+
+  it("stretches short image transform samples so operation steps remain visible", () => {
+    const initial = createImageElement("image-1", { x: 10, y: 20, width: 100, height: 80 });
+    const final = createImageElement("image-1", { x: 80, y: 90, width: 160, height: 120 }, 0.3, 0.6);
+    const events: ReplayEvent[] = [
+      { type: "image", id: "image-insert", timestamp: 1000, element: initial },
+      {
+        type: "imageTransform",
+        id: "image-transform",
+        timestamp: 1100,
+        elementId: "image-1",
+        op: "resize",
+        initialElement: initial,
+        finalElement: final,
+        samples: [
+          { offsetMs: 0, bounds: initial.bounds, rotation: 0, opacity: 1 },
+          { offsetMs: 32, bounds: final.bounds, rotation: 0.3, opacity: 0.6 },
+        ],
+      },
+    ];
+    const canvas = createMockCanvas();
+    const ctx = canvas.getContext("2d")!;
+    const player = new ReplayPlayer(events, canvas);
+
+    player.goToEvent(1);
+    vi.mocked(ctx.fillRect).mockClear();
+    player.play();
+    tickFrame(16);
+    tickFrame(32);
+
+    expect(ctx.fillRect).toHaveBeenCalledWith(-initial.bounds.width / 2, -initial.bounds.height / 2, initial.bounds.width, initial.bounds.height);
+    expect(ctx.fillRect).not.toHaveBeenCalledWith(-final.bounds.width / 2, -final.bounds.height / 2, final.bounds.width, final.bounds.height);
   });
 });
