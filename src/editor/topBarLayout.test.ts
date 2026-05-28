@@ -134,7 +134,16 @@ it("keeps replay click selectors available for toolbar playback", () => {
 it("restores saved replay events into the active recorder", () => {
   const editor = readFileSync(resolve(process.cwd(), "src/editor/SketchEditor.vue"), "utf8");
 
-  expect(editor).toContain("new ReplayRecorder(props.replayRecordConfig, props.initialData?.replayEvents ?? [])");
+  expect(editor).toContain("new ReplayRecorder(props.initialData?.replayEvents ?? [])");
+});
+
+it("hides the replay button when replay playback is disabled", () => {
+  const topBar = readFileSync(resolve(process.cwd(), "src/editor/EditorTopBar.vue"), "utf8");
+  const editor = readFileSync(resolve(process.cwd(), "src/editor/SketchEditor.vue"), "utf8");
+
+  expect(topBar).toContain("showReplay");
+  expect(topBar).toContain('v-if="showReplay"');
+  expect(editor).toContain(':showReplay="replayPlaybackEnabled"');
 });
 
 it("keeps active tool icons white in light theme", () => {

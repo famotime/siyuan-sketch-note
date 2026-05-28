@@ -1,19 +1,15 @@
-import type { ReplayEvent, ReplayEventType, ReplayRecorderConfig } from "./types";
-import { DEFAULT_RECORDER_CONFIG } from "./types";
+import type { ReplayEvent } from "./types";
 
 export class ReplayRecorder {
   private events: ReplayEvent[] = [];
-  private config: ReplayRecorderConfig;
   private suspended = false;
 
-  constructor(config: Partial<ReplayRecorderConfig> = {}, initialEvents: ReplayEvent[] = []) {
-    this.config = { ...DEFAULT_RECORDER_CONFIG, ...config };
+  constructor(initialEvents: ReplayEvent[] = []) {
     this.events = [...initialEvents];
   }
 
   record(event: ReplayEvent): void {
     if (this.suspended) return;
-    if (!this.config[event.type]) return;
     this.events.push(event);
   }
 
@@ -23,18 +19,6 @@ export class ReplayRecorder {
 
   clear(): void {
     this.events = [];
-  }
-
-  setEnabled(type: ReplayEventType, enabled: boolean): void {
-    this.config[type] = enabled;
-  }
-
-  isEnabled(type: ReplayEventType): boolean {
-    return this.config[type];
-  }
-
-  getConfig(): ReplayRecorderConfig {
-    return { ...this.config };
   }
 
   setSuspended(suspended: boolean): void {

@@ -33,3 +33,65 @@
 .sketch-editor {
   pointer-events: all;
 }
+
+.sketch-note-settings--recording {
+  margin-bottom: 8px !important;
+}
+
+.config__item.sketch-note-settings--replay-group-start {
+  margin-top: 6px !important;
+  padding-top: 12px !important;
+  padding-bottom: 6px !important;
+  border-top: 1px solid var(--b3-theme-surface-lighter) !important;
+  border-radius: 6px 6px 0 0 !important;
+  background: var(--b3-theme-surface) !important;
+}
+
+.config__item.sketch-note-settings--compact {
+  padding-top: 6px !important;
+  padding-bottom: 6px !important;
+  border-top: 0 !important;
+  box-shadow: none !important;
+  background: var(--b3-theme-surface) !important;
+}
+
+.sketch-note-settings--compact .config__item-description {
+  margin-top: 2px !important;
+}
+
+.config__item.sketch-note-settings--replay-child {
+  border-top: 0 !important;
+  border-bottom: 0 !important;
+  box-shadow: none !important;
+  margin-top: 0 !important;
+}
+
+.config__item.sketch-note-settings--replay + .config__item.sketch-note-settings--replay-child,
+.config__item.sketch-note-settings--replay-child + .config__item.sketch-note-settings--replay-child {
+  border-top: 0 !important;
+  box-shadow: none !important;
+}
+
+.config__item.sketch-note-settings--replay-group-start::before,
+.config__item.sketch-note-settings--replay-child::before,
+.config__item.sketch-note-settings--replay-group-start::after,
+.config__item.sketch-note-settings--replay-child::after {
+  display: none !important;
+}
+
+.config__item.sketch-note-settings--replay-group-end {
+  padding-bottom: 10px !important;
+  border-radius: 0 0 6px 6px !important;
+  border-bottom: 1px solid var(--b3-theme-surface-lighter) !important;
+  margin-bottom: 6px !important;
+}
+
+.sketch-note-settings--disabled {
+  opacity: 0.45;
+}
+
+.sketch-note-settings--disabled .config__item-info,
+.sketch-note-settings--disabled input {
+  cursor: not-allowed;
+  pointer-events: none;
+}

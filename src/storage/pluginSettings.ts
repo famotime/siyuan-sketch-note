@@ -6,6 +6,8 @@ const PLUGIN_SETTINGS_KEY = "plugin-settings.json";
 export interface SketchPluginSettings {
   enableDebugLog: boolean;
   hideReplayControls: boolean;
+  replayPlaybackEnabled: boolean;
+  replayRecordingEnabled: boolean;
   replayRecordConfig: ReplayRecorderConfig;
 }
 
@@ -14,10 +16,17 @@ export function pluginSettingsKey(): string {
 }
 
 export function normalizePluginSettings(input?: Partial<SketchPluginSettings> | null): SketchPluginSettings {
+  const replayRecordConfig = { ...DEFAULT_RECORDER_CONFIG, ...input?.replayRecordConfig };
+  if (input?.replayRecordConfig?.image === false) {
+    replayRecordConfig.imageTransform = false;
+    replayRecordConfig.imageDelete = false;
+  }
   return {
     enableDebugLog: input?.enableDebugLog === true,
     hideReplayControls: input?.hideReplayControls === true,
-    replayRecordConfig: { ...DEFAULT_RECORDER_CONFIG, ...input?.replayRecordConfig },
+    replayPlaybackEnabled: input?.replayPlaybackEnabled !== false,
+    replayRecordingEnabled: input?.replayRecordingEnabled === true,
+    replayRecordConfig,
   };
 }
 

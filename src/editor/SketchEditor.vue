@@ -19,6 +19,7 @@
         :pageState="pageState"
         :recovered="Boolean(loadedData?.recovery?.recovered)"
         :searchResultCount="searchResults.length"
+        :showReplay="replayPlaybackEnabled"
         :stylusOnly="inputSettings.stylusOnly"
         :enablePressure="inputSettings.enablePressure ?? false"
         :t="t"
@@ -101,7 +102,7 @@
           :inputSettings="inputSettings"
           :templateId="currentTemplate"
           :lassoMode="lassoMode"
-          :recorder="replayRecorder"
+          :recorder="replayRecordingEnabled ? replayRecorder : undefined"
           @update:canUndo="canUndo = $event"
           @update:canRedo="canRedo = $event"
           @heightChanged="onHeightChanged"
@@ -194,7 +195,8 @@ import ToolBar from "./ToolBar.vue";
 import FloatingToolbar from "./FloatingToolbar.vue";
 import IconParkIcon from "./IconParkIcon.vue";
 import { ReplayRecorder } from "@/recorder/recorder";
-import type { ReplayRecorderConfig, ReplayToolSource } from "@/recorder/types";
+import type { ReplayEvent, ReplayRecorderConfig, ReplayToolSource } from "@/recorder/types";
+import { DEFAULT_RECORDER_CONFIG } from "@/recorder/types";
 import { ReplayPlayer } from "@/recorder/player";
 import type { PlaybackSpeed } from "@/recorder/player";
 import { reconstructFromData } from "@/recorder/reconstruct";
@@ -215,6 +217,8 @@ const props = defineProps<{
   saveData: (key: string, data: any) => Promise<void>;
   ocrProvider?: OcrProvider;
   themeMode: 'light' | 'dark';
+  replayPlaybackEnabled?: boolean;
+  replayRecordingEnabled?: boolean;
   replayRecordConfig?: Partial<ReplayRecorderConfig>;
   hideReplayControls?: boolean;
 }>();
@@ -258,7 +262,7 @@ const ocrIndex = ref<SketchData["ocrIndex"]>(props.initialData?.ocrIndex);
 
 // ─── Replay ───
 const isReplayMode = ref(false);
-const replayRecorder = new ReplayRecorder(props.replayRecordConfig, props.initialData?.replayEvents ?? []);
+const replayRecorder = new ReplayRecorder(props.initialData?.replayEvents ?? []);
 const replayPlayer = ref<InstanceType<typeof ReplayPlayer> | null>(null);
 const replayCanvasWrapRef = ref<HTMLDivElement>();
 const replayCanvasRef = ref<HTMLCanvasElement>();
@@ -269,6 +273,8 @@ const replaySpeed = ref<PlaybackSpeed>(1);
 const replayDisplayTool = ref<EditorTool>("pen");
 const replayDisplayPreset = ref<ToolPreset | null>(null);
 let preReplayTool: EditorTool = "pen";
+const replayPlaybackEnabled = computed(() => props.replayPlaybackEnabled !== false);
+const replayRecordingEnabled = computed(() => props.replayRecordingEnabled === true);
 
 // ─── Derived state ───
 const activePreset = computed(() => {
@@ -657,9 +663,10 @@ function enterReplayMode() {
   data.customBackgrounds = customBackgrounds.value;
 
   // Get events — use recorded events if available, otherwise reconstruct
-  const events = data.replayEvents && data.replayEvents.length > 0
+  const sourceEvents = data.replayEvents && data.replayEvents.length > 0
     ? data.replayEvents
     : reconstructFromData(data);
+  const events = filterReplayEventsForPlayback(sourceEvents, props.replayRecordConfig);
 
   if (events.length === 0) return;
 
@@ -711,6 +718,19 @@ function enterReplayMode() {
     };
     replayPlayer.value = player;
     player.play();
+  });
+}
+
+function filterReplayEventsForPlayback(
+  events: ReplayEvent[],
+  config: Partial<ReplayRecorderConfig> = {},
+): ReplayEvent[] {
+  const mergedConfig = { ...DEFAULT_RECORDER_CONFIG, ...config };
+  return events.filter((event) => {
+    if (event.type === "imageTransform" || event.type === "imageDelete") {
+      return mergedConfig.image;
+    }
+    return mergedConfig[event.type];
   });
 }
 

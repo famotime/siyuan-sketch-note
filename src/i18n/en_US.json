@@ -113,11 +113,15 @@
   "replayImageOp": "Image Insert",
   "replayImageTransform": "Image Transform",
   "replayImageDelete": "Image Delete",
-  "replayRecord": "Replay Recording",
+  "replayRecord": "Replay",
+  "replaySettingsDesc": "Control whether replay is shown and which saved operation types are played.",
+  "replayRecording": "Recording",
+  "replayRecordingDesc": "Save all operation records, including handwriting, tool switches, colors, and images. Disabled by default.",
   "replayRecordStroke": "Strokes",
   "replayRecordErase": "Eraser",
   "replayRecordShape": "Shapes",
   "replayRecordText": "Text",
+  "replayRecordImage": "Images",
   "hideReplayControls": "Hide replay controls",
   "hideReplayControlsDesc": "Hide the replay control bar during playback."
 }

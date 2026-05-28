@@ -22,9 +22,8 @@ describe("replayRecorder", () => {
     expect(recorder.getEvents()[0]).toBe(event);
   });
 
-  it("filters disabled events", () => {
+  it("records all events because filtering is applied during playback", () => {
     const recorder = new ReplayRecorder();
-    recorder.setEnabled("toolSwitch", false);
     const event: ToolSwitchReplayEvent = {
       type: "toolSwitch",
       id: "e1",
@@ -33,7 +32,7 @@ describe("replayRecorder", () => {
       preset: { tool: "pen", color: "#000", width: 3, opacity: 1, mode: "ink" },
     };
     recorder.record(event);
-    expect(recorder.getEvents()).toHaveLength(0);
+    expect(recorder.getEvents()).toHaveLength(1);
   });
 
   it("does not record events while suspended", () => {
@@ -95,9 +94,8 @@ describe("replayRecorder", () => {
     expect(recorder.getEvents()).toHaveLength(0);
   });
 
-  it("setEnabled toggles filtering", () => {
+  it("records image events without per-type recording filters", () => {
     const recorder = new ReplayRecorder();
-    recorder.setEnabled("image", true);
     const imageEvent = {
       type: "image" as const,
       id: "e1",
@@ -140,7 +138,7 @@ describe("replayRecorder", () => {
       source: "mainToolbar",
     };
 
-    const recorder = new ReplayRecorder({}, [restoredEvent]);
+    const recorder = new ReplayRecorder([restoredEvent]);
 
     expect(recorder.getEvents()).toEqual([restoredEvent]);
   });

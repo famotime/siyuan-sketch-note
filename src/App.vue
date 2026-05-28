@@ -6,6 +6,8 @@
     :i18n="pluginI18n"
     :saveData="pluginSaveData"
     :themeMode="themeMode"
+    :replayPlaybackEnabled="replayPlaybackEnabled"
+    :replayRecordingEnabled="replayRecordingEnabled"
     :replayRecordConfig="replayRecordConfig"
     :hideReplayControls="hideReplayControls"
     @close="closeEditor"
@@ -30,6 +32,8 @@ const editorData = ref<any>(null);
 const pluginI18n = ref<Record<string, string>>({});
 const pluginSaveData = ref<(key: string, data: any) => Promise<void>>(async () => {});
 const themeMode = ref<"light" | "dark">(resolveSiyuanThemeMode());
+const replayPlaybackEnabled = ref(true);
+const replayRecordingEnabled = ref(false);
 const replayRecordConfig = ref<ReplayRecorderConfig>({ ...DEFAULT_RECORDER_CONFIG });
 const hideReplayControls = ref(false);
 let themeObserver: MutationObserver | null = null;
@@ -180,6 +184,14 @@ export function setReplayRecordConfig(config?: Partial<ReplayRecorderConfig>) {
   replayRecordConfig.value = { ...DEFAULT_RECORDER_CONFIG, ...config };
 }
 
+export function setReplayPlaybackEnabled(value: boolean) {
+  replayPlaybackEnabled.value = value;
+}
+
+export function setReplayRecordingEnabled(value: boolean) {
+  replayRecordingEnabled.value = value;
+}
+
 export function setHideReplayControls(value: boolean) {
   hideReplayControls.value = value;
 }
@@ -252,6 +264,8 @@ export default {
       pluginI18n,
       pluginSaveData,
       themeMode,
+      replayPlaybackEnabled,
+      replayRecordingEnabled,
       replayRecordConfig,
       hideReplayControls,
       closeEditor,

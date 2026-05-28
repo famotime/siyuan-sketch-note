@@ -30,6 +30,7 @@
       <IconParkIcon name="Redo" />
     </button>
     <button
+      v-if="showReplay"
       class="sketch-btn sketch-btn--action"
       :title="t('replay')"
       @click="$emit('replay')"
@@ -153,6 +154,7 @@ defineProps<{
   pageState: { current: number; total: number };
   recovered: boolean;
   searchResultCount: number;
+  showReplay: boolean;
   stylusOnly: boolean;
   enablePressure: boolean;
   templateId: string;

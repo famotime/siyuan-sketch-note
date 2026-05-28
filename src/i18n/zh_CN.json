@@ -113,11 +113,15 @@
   "replayImageOp": "图片插入",
   "replayImageTransform": "图片变换",
   "replayImageDelete": "图片删除",
-  "replayRecord": "回放录制",
+  "replayRecord": "回放",
+  "replaySettingsDesc": "控制是否显示回放入口，以及播放已保存记录中的哪些操作。",
+  "replayRecording": "录制",
+  "replayRecordingDesc": "开启后保存所有操作记录，包括手写、工具切换、颜色、图片等；默认关闭。",
   "replayRecordStroke": "笔迹",
   "replayRecordErase": "橡皮擦",
   "replayRecordShape": "形状",
   "replayRecordText": "文本",
+  "replayRecordImage": "图片",
   "hideReplayControls": "隐藏回放控制栏",
   "hideReplayControlsDesc": "播放回放时不显示底部控制工具栏。"
 }
