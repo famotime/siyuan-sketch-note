@@ -87,22 +87,26 @@
       class="sketch-editor__body"
       :class="{ 'sketch-editor__body--zen': isZenMode }"
     >
-      <SketchCanvas
+      <div
         v-show="!isReplayMode"
-        ref="canvasRef"
-        :initialData="loadedData"
-        :tool="activeTool"
-        :toolPresets="{ ...toolPresets, text: textPreset }"
-        :inputSettings="inputSettings"
-        :templateId="currentTemplate"
-        :lassoMode="lassoMode"
-        :recorder="replayRecorder"
-        @update:canUndo="canUndo = $event"
-        @update:canRedo="canRedo = $event"
-        @heightChanged="onHeightChanged"
-        @pagesChanged="onPagesChanged"
-        @stroke="onStroke"
-      />
+        class="sketch-live-canvas-wrap"
+      >
+        <SketchCanvas
+          ref="canvasRef"
+          :initialData="loadedData"
+          :tool="activeTool"
+          :toolPresets="{ ...toolPresets, text: textPreset }"
+          :inputSettings="inputSettings"
+          :templateId="currentTemplate"
+          :lassoMode="lassoMode"
+          :recorder="replayRecorder"
+          @update:canUndo="canUndo = $event"
+          @update:canRedo="canRedo = $event"
+          @heightChanged="onHeightChanged"
+          @pagesChanged="onPagesChanged"
+          @stroke="onStroke"
+        />
+      </div>
       <div
         v-if="isReplayMode"
         class="sketch-replay-canvas-wrap"
@@ -131,7 +135,7 @@
       @exit="exitReplayMode"
     />
     <FloatingToolbar
-      v-if="!isZenMode"
+      v-if="!isZenMode && !isReplayMode"
       v-model:lassoMode="lassoMode"
       :activeTool="activeTool"
       :colors="colors"
