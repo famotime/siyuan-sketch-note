@@ -1,5 +1,6 @@
-import type { ReplayEvent, StrokeReplayEvent, ShapeReplayEvent, ToolSwitchReplayEvent } from "./types";
+import type { ReplayEvent, StrokeReplayEvent, ShapeReplayEvent, ToolSwitchReplayEvent, ImageTransformReplayEvent } from "./types";
 import type { Stroke, StrokePoint } from "@/types/sketch";
+import type { ImageElement } from "@/elements/image";
 import { getPressureWidth, getSmoothedSegments } from "@/engine/strokeSmoothing";
 
 export type PlaybackState = "idle" | "playing" | "paused";
@@ -7,6 +8,7 @@ export type PlaybackSpeed = 1 | 2 | 4;
 
 const CHAR_DELAY_MS = 30;
 const IMAGE_FADE_MS = 200;
+const IMAGE_TRANSFORM_MS = 300;
 const TOOL_SWITCH_FADE_MS = 500;
 
 export interface ReplayPlayerOptions {
@@ -37,9 +39,29 @@ export class ReplayPlayer {
   // Completed strokes for erase visualization
   private completedStrokes: Map<string, Stroke> = new Map();
 
+  // Image state tracking and caching
+  private imageStates: Map<string, ImageElement> = new Map();
+  private imageCache: Map<string, HTMLImageElement> = new Map();
+  private imageTransformAnim: {
+    elementId: string;
+    op: string;
+    fromBounds: { x: number; y: number; width: number; height: number };
+    toBounds: { x: number; y: number; width: number; height: number };
+    fromRotation: number;
+    toRotation: number;
+    fromOpacity: number;
+    toOpacity: number;
+    points: Array<{ x: number; y: number }>;
+    pointIndex: number;
+    progress: number;
+  } | null = null;
+
+  private imageDeleteAnim: { elementId: string; progress: number } | null = null;
+
   onStateChange?: (state: PlaybackState) => void;
   onProgress?: (current: number, total: number) => void;
   onComplete?: () => void;
+  onToolSwitch?: (tool: string) => void;
 
   constructor(events: ReplayEvent[], canvas: HTMLCanvasElement, options: ReplayPlayerOptions = {}) {
     this.events = events;
@@ -62,7 +84,9 @@ export class ReplayPlayer {
       this.currentIndex = 0;
       this.clearCanvas();
       this.completedStrokes.clear();
+      this.imageStates.clear();
     }
+    this.preloadAllImages();
     this.state = "playing";
     this.onStateChange?.("playing");
     this.lastFrameTime = performance.now();
@@ -90,6 +114,9 @@ export class ReplayPlayer {
     this.toolSwitchProgress = 0;
     this.toolSwitchLabel = "";
     this.completedStrokes.clear();
+    this.imageStates.clear();
+    this.imageTransformAnim = null;
+    this.imageDeleteAnim = null;
     this.clearCanvas();
     this.onStateChange?.("idle");
     this.onProgress?.(0, this.events.length);
@@ -103,6 +130,9 @@ export class ReplayPlayer {
 
     this.clearCanvas();
     this.completedStrokes.clear();
+    this.imageStates.clear();
+    this.imageTransformAnim = null;
+    this.imageDeleteAnim = null;
     this.currentIndex = Math.max(0, Math.min(index, this.events.length));
     this.strokeAnimIndex = 0;
     this.textAnimIndex = 0;
@@ -166,7 +196,11 @@ export class ReplayPlayer {
       case "text":
         return this.animateText(event.element.text, event.element);
       case "image":
-        return this.animateImage(event.element);
+        return this.animateImageInsert(event.element);
+      case "imageTransform":
+        return this.animateImageTransform(event);
+      case "imageDelete":
+        return this.animateImageDeleteEvent(event.elementId);
       case "toolSwitch":
         return this.animateToolSwitch(event);
     }
@@ -230,52 +264,156 @@ export class ReplayPlayer {
     return this.textAnimIndex >= text.length;
   }
 
-  private animateImage(element: { src: string; bounds: { x: number; y: number; width: number; height: number }; opacity?: number }): boolean {
+  private animateImageInsert(element: ImageElement): boolean {
+    if (this.imageAnimProgress === 0) {
+      this.imageStates.set(element.id, element);
+      this.loadImage(element.src);
+    }
     this.imageAnimProgress += 16 / IMAGE_FADE_MS;
     if (this.imageAnimProgress > 1) this.imageAnimProgress = 1;
 
-    const ctx = this.getDrawingContext();
-    ctx.save();
-    ctx.globalAlpha = (element.opacity ?? 1) * this.imageAnimProgress;
-    ctx.fillStyle = "#f4f4f4";
-    ctx.strokeStyle = "#c8c8c8";
-    ctx.lineWidth = 1;
-    ctx.fillRect(element.bounds.x, element.bounds.y, element.bounds.width, element.bounds.height);
-    ctx.strokeRect(element.bounds.x, element.bounds.y, element.bounds.width, element.bounds.height);
-    ctx.restore();
+    this.drawImageWithTransform(element, this.imageAnimProgress);
     this.presentLayer();
 
-    return this.imageAnimProgress >= 1;
+    if (this.imageAnimProgress >= 1) {
+      return true;
+    }
+    return false;
+  }
+
+  private animateImageTransform(event: ImageTransformReplayEvent): boolean {
+    const current = this.imageStates.get(event.elementId);
+    if (!current) {
+      this.imageStates.set(event.elementId, event.finalElement);
+      return true;
+    }
+
+    if (!this.imageTransformAnim) {
+      this.imageTransformAnim = {
+        elementId: event.elementId,
+        op: event.op,
+        fromBounds: { ...current.bounds },
+        toBounds: { ...event.finalElement.bounds },
+        fromRotation: current.transform?.rotation ?? 0,
+        toRotation: event.finalElement.transform?.rotation ?? 0,
+        fromOpacity: current.opacity ?? 1,
+        toOpacity: event.finalElement.opacity ?? 1,
+        points: event.points?.map((p) => ({ x: p.x, y: p.y })) ?? [],
+        pointIndex: 0,
+        progress: 0,
+      };
+    }
+
+    const anim = this.imageTransformAnim;
+    anim.progress += 16 / IMAGE_TRANSFORM_MS;
+    if (anim.progress > 1) anim.progress = 1;
+
+    const t = anim.progress;
+    const lerpedElement: ImageElement = {
+      ...current,
+      bounds: {
+        x: anim.fromBounds.x + (anim.toBounds.x - anim.fromBounds.x) * t,
+        y: anim.fromBounds.y + (anim.toBounds.y - anim.fromBounds.y) * t,
+        width: anim.fromBounds.width + (anim.toBounds.width - anim.fromBounds.width) * t,
+        height: anim.fromBounds.height + (anim.toBounds.height - anim.fromBounds.height) * t,
+      },
+      opacity: anim.fromOpacity + (anim.toOpacity - anim.fromOpacity) * t,
+      transform: {
+        ...(current.transform ?? { x: 0, y: 0, scaleX: 1, scaleY: 1, rotation: 0 }),
+        rotation: anim.fromRotation + (anim.toRotation - anim.fromRotation) * t,
+      },
+    };
+
+    this.drawImageWithTransform(lerpedElement, 1);
+    this.presentLayer();
+
+    if (anim.progress >= 1) {
+      this.imageStates.set(event.elementId, event.finalElement);
+      this.imageTransformAnim = null;
+      return true;
+    }
+    return false;
+  }
+
+  private animateImageDeleteEvent(elementId: string): boolean {
+    const element = this.imageStates.get(elementId);
+    if (!element) return true;
+
+    if (!this.imageDeleteAnim) {
+      this.imageDeleteAnim = { elementId, progress: 0 };
+    }
+
+    this.imageDeleteAnim.progress += 16 / IMAGE_FADE_MS;
+    if (this.imageDeleteAnim.progress > 1) this.imageDeleteAnim.progress = 1;
+
+    this.drawImageWithTransform(element, 1 - this.imageDeleteAnim.progress);
+    this.presentLayer();
+
+    if (this.imageDeleteAnim.progress >= 1) {
+      this.imageStates.delete(elementId);
+      this.imageDeleteAnim = null;
+      return true;
+    }
+    return false;
   }
 
   private animateToolSwitch(event: ToolSwitchReplayEvent): boolean {
     if (this.toolSwitchProgress === 0) {
-      this.toolSwitchLabel = this.getToolDisplayName(event.tool);
+      this.onToolSwitch?.(event.tool);
     }
     this.toolSwitchProgress += 16 / TOOL_SWITCH_FADE_MS;
     if (this.toolSwitchProgress > 1) this.toolSwitchProgress = 1;
-
-    const alpha = 1 - this.toolSwitchProgress;
-    const ctx = this.getDrawingContext();
-    const dpr = this.getCanvasScale();
-    const w = this.canvas.width / dpr;
-    ctx.save();
-    ctx.globalAlpha = alpha * 0.85;
-    ctx.fillStyle = "rgba(0,0,0,0.7)";
-    ctx.font = "bold 14px sans-serif";
-    ctx.textAlign = "center";
-    ctx.textBaseline = "top";
-    const textW = ctx.measureText(this.toolSwitchLabel).width + 24;
-    const x = (w - textW) / 2;
-    ctx.beginPath();
-    ctx.roundRect(x, 8, textW, 28, 6);
-    ctx.fill();
-    ctx.fillStyle = "#fff";
-    ctx.fillText(this.toolSwitchLabel, w / 2, 12);
-    ctx.restore();
-    this.presentLayer();
-
     return this.toolSwitchProgress >= 1;
+  }
+
+  private preloadAllImages(): void {
+    for (const event of this.events) {
+      if (event.type === "image") {
+        this.loadImage(event.element.src);
+      } else if (event.type === "imageTransform") {
+        this.loadImage(event.finalElement.src);
+      }
+    }
+  }
+
+  private loadImage(src: string): void {
+    if (this.imageCache.has(src)) return;
+    const img = new Image();
+    img.crossOrigin = "anonymous";
+    img.src = src;
+    this.imageCache.set(src, img);
+  }
+
+  private drawImageWithTransform(element: ImageElement, alpha: number): void {
+    const img = this.imageCache.get(element.src);
+    const ctx = this.getDrawingContext();
+    const cx = element.bounds.x + element.bounds.width / 2;
+    const cy = element.bounds.y + element.bounds.height / 2;
+    const rotation = element.transform?.rotation ?? 0;
+
+    ctx.save();
+    ctx.globalAlpha = (element.opacity ?? 1) * alpha;
+
+    if (img && img.complete && img.naturalWidth > 0) {
+      ctx.translate(cx, cy);
+      if (rotation) ctx.rotate(rotation);
+      ctx.drawImage(
+        img,
+        -element.bounds.width / 2,
+        -element.bounds.height / 2,
+        element.bounds.width,
+        element.bounds.height,
+      );
+    } else {
+      ctx.fillStyle = "#f4f4f4";
+      ctx.strokeStyle = "#c8c8c8";
+      ctx.lineWidth = 1;
+      ctx.translate(cx, cy);
+      if (rotation) ctx.rotate(rotation);
+      ctx.fillRect(-element.bounds.width / 2, -element.bounds.height / 2, element.bounds.width, element.bounds.height);
+      ctx.strokeRect(-element.bounds.width / 2, -element.bounds.height / 2, element.bounds.width, element.bounds.height);
+    }
+    ctx.restore();
   }
 
   private getToolDisplayName(tool: string): string {
@@ -304,12 +442,14 @@ export class ReplayPlayer {
     if (this.layerCtx) {
       this.clearLayer();
       for (const stroke of this.completedStrokes.values()) this.renderStrokeFull(stroke);
+      for (const element of this.imageStates.values()) this.drawImageWithTransform(element, 1);
       this.presentLayer();
       return;
     }
 
     this.clearCanvas();
     for (const stroke of this.completedStrokes.values()) this.renderStrokeFull(stroke);
+    for (const element of this.imageStates.values()) this.drawImageWithTransform(element, 1);
   }
 
   private renderEventInstant(event: ReplayEvent): void {
@@ -328,15 +468,19 @@ export class ReplayPlayer {
         this.presentLayer();
         break;
       case "image":
-        {
-          const ctx = this.getDrawingContext();
-          ctx.save();
-          ctx.globalAlpha = event.element.opacity ?? 1;
-          ctx.fillStyle = "#f4f4f4";
-          ctx.fillRect(event.element.bounds.x, event.element.bounds.y, event.element.bounds.width, event.element.bounds.height);
-          ctx.restore();
-          this.presentLayer();
-        }
+        this.imageStates.set(event.element.id, event.element);
+        this.loadImage(event.element.src);
+        this.drawImageWithTransform(event.element, 1);
+        this.presentLayer();
+        break;
+      case "imageTransform":
+        this.imageStates.set(event.elementId, event.finalElement);
+        this.loadImage(event.finalElement.src);
+        this.drawImageWithTransform(event.finalElement, 1);
+        this.presentLayer();
+        break;
+      case "imageDelete":
+        this.imageStates.delete(event.elementId);
         break;
       case "toolSwitch":
         break;

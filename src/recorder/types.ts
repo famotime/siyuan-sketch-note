@@ -1,5 +1,6 @@
 import type { Stroke, ToolPreset } from "@/types/sketch";
 import type { SketchElement } from "@/elements/model";
+import type { ImageElement } from "@/elements/image";
 
 export type ReplayEventType = ReplayEvent["type"];
 
@@ -9,6 +10,8 @@ export type ReplayEvent =
   | ShapeReplayEvent
   | TextReplayEvent
   | ImageReplayEvent
+  | ImageTransformReplayEvent
+  | ImageDeleteReplayEvent
   | ToolSwitchReplayEvent;
 
 export interface StrokeReplayEvent {
@@ -46,6 +49,23 @@ export interface ImageReplayEvent {
   element: Extract<SketchElement, { type: "image" }>;
 }
 
+export interface ImageTransformReplayEvent {
+  type: "imageTransform";
+  id: string;
+  timestamp: number;
+  elementId: string;
+  op: "move" | "resize" | "rotate" | "opacity";
+  finalElement: ImageElement;
+  points?: Array<{ x: number; y: number; timestamp: number }>;
+}
+
+export interface ImageDeleteReplayEvent {
+  type: "imageDelete";
+  id: string;
+  timestamp: number;
+  elementId: string;
+}
+
 export interface ToolSwitchReplayEvent {
   type: "toolSwitch";
   id: string;
@@ -60,6 +80,8 @@ export interface ReplayRecorderConfig {
   shape: boolean;
   text: boolean;
   image: boolean;
+  imageTransform: boolean;
+  imageDelete: boolean;
   toolSwitch: boolean;
 }
 
@@ -69,5 +91,7 @@ export const DEFAULT_RECORDER_CONFIG: ReplayRecorderConfig = {
   shape: true,
   text: true,
   image: true,
+  imageTransform: true,
+  imageDelete: true,
   toolSwitch: true,
 };

@@ -1,12 +1,16 @@
 <template>
   <div class="sketch-editor__row sketch-editor__row--tools">
-    <div class="sketch-toolbar-group">
+    <div
+      class="sketch-toolbar-group"
+      :class="{ 'sketch-toolbar-group--replay': replayActive }"
+    >
       <!-- 画笔 -->
       <button
         class="sketch-btn sketch-btn--tool sketch-btn--icon-tool"
         :class="{ 'sketch-btn--tool-active': getToolButtonActiveState(activeTool, 'pen') }"
         :title="t('pen')"
         :aria-label="t('pen')"
+        data-tool="pen"
         @click="$emit('selectTool', 'pen')"
       >
         <span
@@ -23,6 +27,7 @@
         :class="{ 'sketch-btn--tool-active': getToolButtonActiveState(activeTool, 'highlighter') }"
         :title="t('highlighter')"
         :aria-label="t('highlighter')"
+        data-tool="highlighter"
         @click="$emit('selectTool', 'highlighter')"
       >
         <span
@@ -39,6 +44,7 @@
         :class="{ 'sketch-btn--tool-active': getToolButtonActiveState(activeTool, 'eraser') }"
         :title="t('eraser')"
         :aria-label="t('eraser')"
+        data-tool="eraser"
         @click="$emit('selectTool', 'eraser')"
       >
         <span
@@ -89,6 +95,7 @@
         :class="{ 'sketch-btn--tool-active': getToolButtonActiveState(activeTool, 'lasso') }"
         :title="t('lasso')"
         :aria-label="t('lasso')"
+        data-tool="lasso"
         @click="$emit('selectTool', 'lasso')"
       >
         <span
@@ -105,6 +112,7 @@
         :class="{ 'sketch-btn--tool-active': getToolButtonActiveState(activeTool, lastShapeTool) }"
         :title="t('shape')"
         :aria-label="t('shape')"
+        data-tool="shape"
         @click="$emit('selectTool', lastShapeTool)"
       >
         <span
@@ -121,6 +129,7 @@
         :class="{ 'sketch-btn--tool-active': getToolButtonActiveState(activeTool, 'text') }"
         :title="t('text')"
         :aria-label="t('text')"
+        data-tool="text"
         @click="$emit('selectTool', 'text')"
       >
         <span
@@ -161,6 +170,7 @@ const props = defineProps<{
   activeTool: EditorTool;
   lastShapeTool: ShapeEditorTool;
   t: (key: string) => string;
+  replayActive?: boolean;
 }>();
 
 defineEmits<{
@@ -244,6 +254,21 @@ const currentShapeIcon = computed<IconParkName>(() => {
   width: 1em;
   height: 1em;
   fill: none;
+}
+
+/* 回放点击动画 */
+@keyframes sketch-replay-click {
+  0% { transform: scale(1); }
+  40% { transform: scale(0.85); }
+  100% { transform: scale(1); }
+}
+.sketch-btn--replay-click {
+  animation: sketch-replay-click 250ms cubic-bezier(0.25, 0.8, 0.25, 1);
+}
+
+/* 回放时禁止交互 */
+.sketch-toolbar-group--replay {
+  pointer-events: none;
 }
 
 </style>

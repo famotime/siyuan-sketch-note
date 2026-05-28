@@ -189,6 +189,7 @@ const interaction = {
     corner?: ResizeCorner;
     startAngle?: number;
     startRotation?: number;
+    points: Array<{ x: number; y: number; timestamp: number }>;
   } | null,
   elementTransform: null as { elementId: string; lastPoint: StrokePoint; mode: "move" | "resize" } | null,
   textMove: null as { elementId: string; startPoint: StrokePoint; lastPoint: StrokePoint; moved: boolean } | null,
@@ -413,6 +414,14 @@ function onPointerDown(e: PointerEvent) {
       return;
     }
     if (action?.mode === "delete") {
+      if (props.recorder) {
+        props.recorder.record({
+          type: "imageDelete",
+          id: `id-${Date.now()}`,
+          timestamp: Date.now(),
+          elementId: action.element.id,
+        });
+      }
       pushHistorySnapshot(state);
       state.elements = state.elements.filter((element) => element.id !== action.element.id);
       interaction.selectedElementId = null;
@@ -430,6 +439,7 @@ function onPointerDown(e: PointerEvent) {
         corner: action.corner,
         startAngle: angleFromElementCenter(action.element, point.x, point.y),
         startRotation: action.element.transform.rotation || 0,
+        points: [{ x: point.x, y: point.y, timestamp: Date.now() }],
       };
       pushHistorySnapshot(state);
     }
@@ -528,6 +538,7 @@ function onPointerMove(e: PointerEvent) {
       return rotateElement(element, rotation);
     });
     interaction.imageTransform.lastPoint = point;
+    interaction.imageTransform.points.push({ x: point.x, y: point.y, timestamp: Date.now() });
     state.isDirty = true;
     fullRedrawStrokeCanvas(getCanvas(), state);
     drawSelectionOutline();
@@ -636,7 +647,25 @@ function onPointerUp(e: PointerEvent) {
     }
   }
 
-  if (interaction.imageTransform) { interaction.imageTransform = null; updateUndoRedoState(); emit("stroke"); return; }
+  if (interaction.imageTransform) {
+    const imgTransform = interaction.imageTransform;
+    const element = state.elements.find((el) => el.id === imgTransform.elementId);
+    if (element && element.type === "image" && props.recorder) {
+      props.recorder.record({
+        type: "imageTransform",
+        id: `it-${Date.now()}`,
+        timestamp: Date.now(),
+        elementId: imgTransform.elementId,
+        op: imgTransform.mode,
+        finalElement: element,
+        points: imgTransform.points,
+      });
+    }
+    interaction.imageTransform = null;
+    updateUndoRedoState();
+    emit("stroke");
+    return;
+  }
   if (interaction.textMove) {
     const textMove = interaction.textMove;
     interaction.textMove = null;
@@ -1134,6 +1163,19 @@ function cycleImageOpacity(elementId: string) {
   if (props.tool === "lasso") drawLassoSelectionOutline();
   else drawSelectionOutline();
   updateUndoRedoState();
+  if (props.recorder) {
+    const updated = state.elements.find((el) => el.id === elementId);
+    if (updated && updated.type === "image") {
+      props.recorder.record({
+        type: "imageTransform",
+        id: `io-${Date.now()}`,
+        timestamp: Date.now(),
+        elementId,
+        op: "opacity",
+        finalElement: updated,
+      });
+    }
+  }
   emit("stroke");
 }
 

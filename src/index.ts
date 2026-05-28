@@ -123,11 +123,13 @@ export default class SketchNotePlugin extends Plugin {
       erase: () => this.i18n?.replayRecordErase ?? "Eraser",
       shape: () => this.i18n?.replayRecordShape ?? "Shapes",
       text: () => this.i18n?.replayRecordText ?? "Text",
-      image: () => this.i18n?.replayImageOp ?? "Image Operation",
+      image: () => this.i18n?.replayImageOp ?? "Image Insert",
+      imageTransform: () => this.i18n?.replayImageTransform ?? "Image Transform",
+      imageDelete: () => this.i18n?.replayImageDelete ?? "Image Delete",
       toolSwitch: () => this.i18n?.replayToolSwitch ?? "Tool Switch",
     };
 
-    const recordTypes: ReplayEventType[] = ["stroke", "erase", "shape", "text", "image", "toolSwitch"];
+    const recordTypes: ReplayEventType[] = ["stroke", "erase", "shape", "text", "image", "imageTransform", "imageDelete", "toolSwitch"];
 
     for (const type of recordTypes) {
       setting.addItem({

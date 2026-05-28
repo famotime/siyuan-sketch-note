@@ -54,9 +54,11 @@
         @update:templateId="onTemplateChange"
       />
       <ToolBar
+        ref="toolbarRef"
         :activeTool="activeTool"
         :lastShapeTool="lastShapeTool"
         :t="t"
+        :replayActive="isReplayMode"
         @selectTool="selectTool"
       />
       <input
@@ -224,6 +226,7 @@ const visible = ref(false);
 const editorRootRef = ref<HTMLDivElement>();
 const canvasRef = ref<InstanceType<typeof SketchCanvas>>();
 const bodyRef = ref<HTMLDivElement>();
+const toolbarRef = ref<InstanceType<typeof ToolBar>>();
 const zenToggleRef = ref<HTMLButtonElement>();
 const imageInputRef = ref<HTMLInputElement>();
 const jsonInputRef = ref<HTMLInputElement>();
@@ -257,6 +260,7 @@ const replayState = ref<"idle" | "playing" | "paused">("idle");
 const replayCurrent = ref(0);
 const replayTotal = ref(0);
 const replaySpeed = ref<PlaybackSpeed>(1);
+let preReplayTool: EditorTool = "pen";
 
 // ─── Derived state ───
 const activePreset = computed(() => {
@@ -614,6 +618,7 @@ function enterReplayMode() {
 
   if (events.length === 0) return;
 
+  preReplayTool = activeTool.value;
   isReplayMode.value = true;
   replayTotal.value = events.length;
   replayCurrent.value = 0;
@@ -646,8 +651,26 @@ function enterReplayMode() {
     player.onComplete = () => {
       replayState.value = "idle";
     };
+    player.onToolSwitch = (tool) => {
+      activeTool.value = tool as EditorTool;
+      triggerToolbarClickAnimation(tool);
+    };
     replayPlayer.value = player;
     player.play();
+  });
+}
+
+function triggerToolbarClickAnimation(tool: string) {
+  nextTick(() => {
+    const toolbarEl = toolbarRef.value?.$el as HTMLElement | undefined;
+    if (!toolbarEl) return;
+    const targetTool = isShapeEditorTool(tool as EditorTool) ? "shape" : tool;
+    const btn = toolbarEl.querySelector(`[data-tool="${targetTool}"]`) as HTMLElement | null;
+    if (!btn) return;
+    btn.classList.remove("sketch-btn--replay-click");
+    void btn.offsetWidth; // force reflow to restart animation
+    btn.classList.add("sketch-btn--replay-click");
+    setTimeout(() => btn.classList.remove("sketch-btn--replay-click"), 300);
   });
 }
 
@@ -657,6 +680,7 @@ function exitReplayMode() {
   isReplayMode.value = false;
   replayState.value = "idle";
   replayCurrent.value = 0;
+  activeTool.value = preReplayTool;
 }
 
 function toggleReplayPlay() {
