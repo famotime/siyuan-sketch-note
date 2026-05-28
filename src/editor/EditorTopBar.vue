@@ -31,13 +31,6 @@
     </button>
     <button
       class="sketch-btn sketch-btn--action"
-      :title="t('clear')"
-      @click="$emit('clear')"
-    >
-      <IconParkIcon name="Clear" />
-    </button>
-    <button
-      class="sketch-btn sketch-btn--action"
       :title="t('replay')"
       @click="$emit('replay')"
     >
@@ -79,6 +72,14 @@
         v-if="moreOpen"
         class="sketch-more-popover"
       >
+        <div
+          class="sketch-more-row sketch-more-row--action"
+          @click="$emit('clear'); moreOpen = false"
+        >
+          <span class="sketch-more-label">{{ t("clear") }}</span>
+          <IconParkIcon name="Clear" />
+        </div>
+        <div class="sketch-more-divider" />
         <label class="sketch-more-row sketch-more-row--select">
           <span class="sketch-more-label">{{ t("noteBackground") }}</span>
           <select
@@ -184,8 +185,20 @@ function onDocClick(e: MouseEvent) {
   }
 }
 
-onMounted(() => document.addEventListener("mousedown", onDocClick));
-onUnmounted(() => document.removeEventListener("mousedown", onDocClick));
+onMounted(() => {
+  document.addEventListener("mousedown", onDocClick);
+  document.addEventListener("pointerdown", onCanvasPointerDown as EventListener);
+});
+onUnmounted(() => {
+  document.removeEventListener("mousedown", onDocClick);
+  document.removeEventListener("pointerdown", onCanvasPointerDown as EventListener);
+});
+
+function onCanvasPointerDown(e: PointerEvent) {
+  if (!moreOpen.value) return;
+  const canvas = (e.target as HTMLElement)?.closest?.("canvas");
+  if (canvas) moreOpen.value = false;
+}
 </script>
 
 <style scoped>
@@ -353,6 +366,19 @@ onUnmounted(() => document.removeEventListener("mousedown", onDocClick));
 }
 .sketch-select--menu {
   width: 100%;
+}
+
+.sketch-more-row--action {
+  padding: 6px 14px;
+  border-radius: 0;
+}
+.sketch-more-row--action:hover {
+  color: var(--sketch-toolbar-strong-text);
+}
+.sketch-more-divider {
+  height: 1px;
+  background: var(--sketch-toolbar-control-border);
+  margin: 2px 0;
 }
 
 /* ── iOS 风格 Toggle 开关 ── */
