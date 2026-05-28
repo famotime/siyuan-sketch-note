@@ -106,9 +106,35 @@ it("keeps active tool highlight visible while the button is hovered", () => {
 
 it("defines replay click animation where top bar buttons can use it", () => {
   const editor = readFileSync(resolve(process.cwd(), "src/editor/SketchEditor.vue"), "utf8");
+  const topBar = readFileSync(resolve(process.cwd(), "src/editor/EditorTopBar.vue"), "utf8");
 
   expect(editor).toContain("@keyframes sketch-replay-click");
-  expect(editor).toContain(".sketch-editor .sketch-btn--replay-click");
+  expect(editor).toContain(":deep(.sketch-btn--replay-click)");
+  expect(topBar).toContain("sketch-btn--replay-click");
+});
+
+it("keeps replay click selectors available for toolbar playback", () => {
+  const topBar = readFileSync(resolve(process.cwd(), "src/editor/EditorTopBar.vue"), "utf8");
+  const toolbar = readFileSync(resolve(process.cwd(), "src/editor/ToolBar.vue"), "utf8");
+  const floatingToolbar = readFileSync(resolve(process.cwd(), "src/editor/FloatingToolbar.vue"), "utf8");
+  const editor = readFileSync(resolve(process.cwd(), "src/editor/SketchEditor.vue"), "utf8");
+
+  expect(topBar).toContain('data-replay-target="topbar-image"');
+  for (const tool of ["pen", "highlighter", "eraser", "lasso", "shape", "text"]) {
+    expect(toolbar).toContain(`data-tool="${tool}"`);
+  }
+  for (const shape of ["line", "arrow", "rectangle", "ellipse", "triangle"]) {
+    expect(floatingToolbar).toContain(`:data-tool="shape.tool"`);
+    expect(floatingToolbar).toContain(shape);
+  }
+  expect(editor).toContain("triggerToolbarClickAnimation(tool, source)");
+  expect(editor).toContain("triggerToolbarClickAnimation(\"image\", source)");
+});
+
+it("restores saved replay events into the active recorder", () => {
+  const editor = readFileSync(resolve(process.cwd(), "src/editor/SketchEditor.vue"), "utf8");
+
+  expect(editor).toContain("new ReplayRecorder(props.replayRecordConfig, props.initialData?.replayEvents ?? [])");
 });
 
 it("keeps active tool icons white in light theme", () => {

@@ -129,4 +129,19 @@ describe("replayRecorder", () => {
     events.pop();
     expect(recorder.getEvents()).toHaveLength(1);
   });
+
+  it("starts with restored events from saved sketch data", () => {
+    const restoredEvent: ToolSwitchReplayEvent = {
+      type: "toolSwitch",
+      id: "saved-tool",
+      timestamp: 1000,
+      tool: "highlighter",
+      preset: { tool: "highlighter", color: "#ff0", width: 18, opacity: 0.45, mode: "marker" },
+      source: "mainToolbar",
+    };
+
+    const recorder = new ReplayRecorder({}, [restoredEvent]);
+
+    expect(recorder.getEvents()).toEqual([restoredEvent]);
+  });
 });

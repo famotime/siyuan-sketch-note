@@ -258,7 +258,7 @@ const ocrIndex = ref<SketchData["ocrIndex"]>(props.initialData?.ocrIndex);
 
 // ─── Replay ───
 const isReplayMode = ref(false);
-const replayRecorder = new ReplayRecorder(props.replayRecordConfig);
+const replayRecorder = new ReplayRecorder(props.replayRecordConfig, props.initialData?.replayEvents ?? []);
 const replayPlayer = ref<InstanceType<typeof ReplayPlayer> | null>(null);
 const replayCanvasWrapRef = ref<HTMLDivElement>();
 const replayCanvasRef = ref<HTMLCanvasElement>();
@@ -1369,7 +1369,7 @@ function onHeightChanged(_h: number) {}
   40% { transform: scale(0.85); }
   100% { transform: scale(1); }
 }
-.sketch-editor .sketch-btn--replay-click {
+.sketch-editor :deep(.sketch-btn--replay-click) {
   animation: sketch-replay-click 250ms cubic-bezier(0.25, 0.8, 0.25, 1);
 }
 .sketch-replay-canvas-wrap {

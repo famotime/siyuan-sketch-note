@@ -6,8 +6,9 @@ export class ReplayRecorder {
   private config: ReplayRecorderConfig;
   private suspended = false;
 
-  constructor(config: Partial<ReplayRecorderConfig> = {}) {
+  constructor(config: Partial<ReplayRecorderConfig> = {}, initialEvents: ReplayEvent[] = []) {
     this.config = { ...DEFAULT_RECORDER_CONFIG, ...config };
+    this.events = [...initialEvents];
   }
 
   record(event: ReplayEvent): void {

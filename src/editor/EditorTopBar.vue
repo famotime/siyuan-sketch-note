@@ -237,6 +237,16 @@ function onCanvasPointerDown(e: PointerEvent) {
   transform: scale(0.96);
 }
 
+@keyframes sketch-replay-click {
+  0% { transform: scale(1); }
+  40% { transform: scale(0.85); }
+  100% { transform: scale(1); }
+}
+
+.sketch-btn--replay-click {
+  animation: sketch-replay-click 250ms cubic-bezier(0.25, 0.8, 0.25, 1);
+}
+
 .sketch-btn--back {
   background: var(--sketch-toolbar-control-border) !important;
   border-color: var(--sketch-toolbar-border) !important;
