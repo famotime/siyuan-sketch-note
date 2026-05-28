@@ -42,6 +42,7 @@ function createMockCanvas(): HTMLCanvasElement {
     quadraticCurveTo: vi.fn(),
     stroke: vi.fn(),
     fillText: vi.fn(),
+    drawImage: vi.fn(),
     setTransform: vi.fn(),
     globalAlpha: 1,
     globalCompositeOperation: "source-over",
@@ -160,5 +161,63 @@ describe("replayPlayer", () => {
 
     player.goToEvent(1);
     expect(redrawBackground).toHaveBeenCalledTimes(2);
+  });
+
+  it("does not draw stored eraser strokes as visible black replay paths", () => {
+    const eraserEvents: ReplayEvent[] = [
+      {
+        type: "stroke",
+        id: "eraser-event",
+        timestamp: 1000,
+        stroke: {
+          id: "eraser-stroke",
+          points: [
+            { x: 0, y: 0, pressure: 0.5, timestamp: 1000 },
+            { x: 20, y: 20, pressure: 0.5, timestamp: 1010 },
+          ],
+          color: "#000000",
+          width: 20,
+          tool: "eraser",
+        },
+      },
+    ];
+    const canvas = createMockCanvas();
+    const ctx = canvas.getContext("2d")!;
+    const player = new ReplayPlayer(eraserEvents, canvas);
+
+    player.play();
+    tickFrame(16);
+    tickFrame(32);
+
+    expect(ctx.stroke).not.toHaveBeenCalled();
+  });
+
+  it("animates text without clearing a black rectangle behind the text", () => {
+    const textEvents: ReplayEvent[] = [
+      {
+        type: "text",
+        id: "text-event",
+        timestamp: 1000,
+        element: {
+          id: "text-1",
+          type: "text",
+          text: "hello",
+          bounds: { x: 10, y: 20, width: 160, height: 30 },
+          style: { color: "#123456", fontSize: 18, fontFamily: "sans-serif" },
+          transform: { x: 0, y: 0, scaleX: 1, scaleY: 1, rotation: 0 },
+          zIndex: 0,
+        },
+      },
+    ];
+    const canvas = createMockCanvas();
+    const ctx = canvas.getContext("2d")!;
+    const player = new ReplayPlayer(textEvents, canvas);
+
+    player.play();
+    tickFrame(16);
+    tickFrame(32);
+
+    expect(ctx.clearRect).not.toHaveBeenCalled();
+    expect(ctx.fillText).toHaveBeenCalled();
   });
 });

@@ -16,6 +16,8 @@ export class ReplayPlayer {
   private events: ReplayEvent[];
   private canvas: HTMLCanvasElement;
   private ctx: CanvasRenderingContext2D;
+  private layerCanvas: HTMLCanvasElement | null;
+  private layerCtx: CanvasRenderingContext2D | null;
   private options: ReplayPlayerOptions;
   private state: PlaybackState = "idle";
   private speed: PlaybackSpeed = 1;
@@ -41,6 +43,8 @@ export class ReplayPlayer {
     this.canvas = canvas;
     this.options = options;
     this.ctx = canvas.getContext("2d")!;
+    this.layerCanvas = this.createLayerCanvas();
+    this.layerCtx = this.layerCanvas?.getContext("2d") ?? null;
   }
 
   getState(): PlaybackState { return this.state; }
@@ -166,6 +170,7 @@ export class ReplayPlayer {
 
     if (this.strokeAnimIndex >= pts.length) {
       this.renderStrokeFull(stroke);
+      this.presentLayer();
       this.completedStrokes.set(stroke.id, stroke);
       return true;
     }
@@ -179,6 +184,7 @@ export class ReplayPlayer {
     for (let i = Math.max(1, this.strokeAnimIndex); i < end; i++) {
       this.renderStrokeSegment(stroke, pts[i - 1], pts[i]);
     }
+    this.presentLayer();
     this.strokeAnimIndex = end;
 
     if (this.strokeAnimIndex >= pts.length) {
@@ -191,6 +197,7 @@ export class ReplayPlayer {
   private animateText(text: string, element: { bounds: { x: number; y: number; width: number; height: number }; style: { color: string; fontSize: number; fontFamily: string } }): boolean {
     if (this.speed >= 2) {
       this.renderTextFull(text, element);
+      this.presentLayer();
       return true;
     }
     if (this.textAnimIndex >= text.length) return true;
@@ -202,13 +209,14 @@ export class ReplayPlayer {
     this.textAnimIndex++;
     const partial = text.slice(0, this.textAnimIndex);
 
-    this.ctx.save();
-    this.ctx.fillStyle = element.style.color;
-    this.ctx.font = `${element.style.fontSize}px ${element.style.fontFamily}`;
-    this.ctx.textBaseline = "top";
-    this.ctx.clearRect(element.bounds.x - 2, element.bounds.y - 2, element.bounds.width + 4, element.bounds.height + 4);
-    this.ctx.fillText(partial, element.bounds.x, element.bounds.y, element.bounds.width);
-    this.ctx.restore();
+    const ctx = this.getDrawingContext();
+    ctx.save();
+    ctx.fillStyle = element.style.color;
+    ctx.font = `${element.style.fontSize}px ${element.style.fontFamily}`;
+    ctx.textBaseline = "top";
+    ctx.fillText(partial, element.bounds.x, element.bounds.y, element.bounds.width);
+    ctx.restore();
+    this.presentLayer();
 
     return this.textAnimIndex >= text.length;
   }
@@ -217,14 +225,16 @@ export class ReplayPlayer {
     this.imageAnimProgress += 16 / IMAGE_FADE_MS;
     if (this.imageAnimProgress > 1) this.imageAnimProgress = 1;
 
-    this.ctx.save();
-    this.ctx.globalAlpha = (element.opacity ?? 1) * this.imageAnimProgress;
-    this.ctx.fillStyle = "#f4f4f4";
-    this.ctx.strokeStyle = "#c8c8c8";
-    this.ctx.lineWidth = 1;
-    this.ctx.fillRect(element.bounds.x, element.bounds.y, element.bounds.width, element.bounds.height);
-    this.ctx.strokeRect(element.bounds.x, element.bounds.y, element.bounds.width, element.bounds.height);
-    this.ctx.restore();
+    const ctx = this.getDrawingContext();
+    ctx.save();
+    ctx.globalAlpha = (element.opacity ?? 1) * this.imageAnimProgress;
+    ctx.fillStyle = "#f4f4f4";
+    ctx.strokeStyle = "#c8c8c8";
+    ctx.lineWidth = 1;
+    ctx.fillRect(element.bounds.x, element.bounds.y, element.bounds.width, element.bounds.height);
+    ctx.strokeRect(element.bounds.x, element.bounds.y, element.bounds.width, element.bounds.height);
+    ctx.restore();
+    this.presentLayer();
 
     return this.imageAnimProgress >= 1;
   }
@@ -235,10 +245,14 @@ export class ReplayPlayer {
   }
 
   private fullRedraw(): void {
-    this.ctx.save();
-    this.ctx.setTransform(1, 0, 0, 1, 0, 0);
-    this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
-    this.ctx.restore();
+    if (this.layerCtx) {
+      this.clearLayer();
+      for (const stroke of this.completedStrokes.values()) this.renderStrokeFull(stroke);
+      this.presentLayer();
+      return;
+    }
+
+    this.clearCanvas();
     for (const stroke of this.completedStrokes.values()) this.renderStrokeFull(stroke);
   }
 
@@ -247,6 +261,7 @@ export class ReplayPlayer {
       case "stroke":
       case "shape":
         this.renderStrokeFull(event.stroke);
+        this.presentLayer();
         this.completedStrokes.set(event.stroke.id, event.stroke);
         break;
       case "erase":
@@ -254,13 +269,18 @@ export class ReplayPlayer {
         break;
       case "text":
         this.renderTextFull(event.element.text, event.element);
+        this.presentLayer();
         break;
       case "image":
-        this.ctx.save();
-        this.ctx.globalAlpha = event.element.opacity ?? 1;
-        this.ctx.fillStyle = "#f4f4f4";
-        this.ctx.fillRect(event.element.bounds.x, event.element.bounds.y, event.element.bounds.width, event.element.bounds.height);
-        this.ctx.restore();
+        {
+          const ctx = this.getDrawingContext();
+          ctx.save();
+          ctx.globalAlpha = event.element.opacity ?? 1;
+          ctx.fillStyle = "#f4f4f4";
+          ctx.fillRect(event.element.bounds.x, event.element.bounds.y, event.element.bounds.width, event.element.bounds.height);
+          ctx.restore();
+          this.presentLayer();
+        }
         break;
       case "toolSwitch":
         break;
@@ -270,87 +290,138 @@ export class ReplayPlayer {
   private renderStrokeFull(stroke: Stroke): void {
     const { points, color, width, tool, isShape } = stroke;
     if (points.length < 2) return;
+    if (tool === "eraser" && !this.layerCtx) return;
 
-    this.ctx.save();
+    const ctx = this.getDrawingContext();
+    ctx.save();
     if (tool === "eraser") {
-      this.ctx.globalCompositeOperation = "destination-out";
-      this.ctx.strokeStyle = "rgba(0,0,0,1)";
+      ctx.globalCompositeOperation = "destination-out";
+      ctx.strokeStyle = "rgba(0,0,0,1)";
     } else {
-      this.ctx.globalAlpha = stroke.opacity ?? 1;
-      this.ctx.globalCompositeOperation = "source-over";
-      this.ctx.strokeStyle = color;
+      ctx.globalAlpha = stroke.opacity ?? 1;
+      ctx.globalCompositeOperation = "source-over";
+      ctx.strokeStyle = color;
     }
-    this.ctx.lineJoin = "round";
-    this.ctx.lineCap = "round";
+    ctx.lineJoin = "round";
+    ctx.lineCap = "round";
 
     const firstPressure = points[0].pressure;
     const allSame = points.every((p) => p.pressure === firstPressure);
 
     if (isShape) {
-      this.ctx.lineWidth = getPressureWidth(width, firstPressure);
-      this.ctx.beginPath();
-      this.ctx.moveTo(points[0].x, points[0].y);
-      for (let i = 1; i < points.length; i++) this.ctx.lineTo(points[i].x, points[i].y);
-      this.ctx.stroke();
+      ctx.lineWidth = getPressureWidth(width, firstPressure);
+      ctx.beginPath();
+      ctx.moveTo(points[0].x, points[0].y);
+      for (let i = 1; i < points.length; i++) ctx.lineTo(points[i].x, points[i].y);
+      ctx.stroke();
     } else if (allSame) {
-      this.ctx.lineWidth = getPressureWidth(width, firstPressure);
-      this.ctx.beginPath();
-      this.ctx.moveTo(points[0].x, points[0].y);
+      ctx.lineWidth = getPressureWidth(width, firstPressure);
+      ctx.beginPath();
+      ctx.moveTo(points[0].x, points[0].y);
       for (const segment of getSmoothedSegments(points)) {
-        this.ctx.quadraticCurveTo(segment.control.x, segment.control.y, segment.end.x, segment.end.y);
+        ctx.quadraticCurveTo(segment.control.x, segment.control.y, segment.end.x, segment.end.y);
       }
-      this.ctx.stroke();
+      ctx.stroke();
     } else {
       const segments = getSmoothedSegments(points);
       let currentX = points[0].x;
       let currentY = points[0].y;
       for (const segment of segments) {
-        this.ctx.lineWidth = getPressureWidth(width, segment.control.pressure);
-        this.ctx.beginPath();
-        this.ctx.moveTo(currentX, currentY);
-        this.ctx.quadraticCurveTo(segment.control.x, segment.control.y, segment.end.x, segment.end.y);
-        this.ctx.stroke();
+        ctx.lineWidth = getPressureWidth(width, segment.control.pressure);
+        ctx.beginPath();
+        ctx.moveTo(currentX, currentY);
+        ctx.quadraticCurveTo(segment.control.x, segment.control.y, segment.end.x, segment.end.y);
+        ctx.stroke();
         currentX = segment.end.x;
         currentY = segment.end.y;
       }
     }
-    this.ctx.restore();
+    ctx.restore();
   }
 
   private renderStrokeSegment(stroke: Stroke, prev: StrokePoint, curr: StrokePoint): void {
-    this.ctx.save();
+    if (stroke.tool === "eraser" && !this.layerCtx) return;
+
+    const ctx = this.getDrawingContext();
+    ctx.save();
     if (stroke.tool === "eraser") {
-      this.ctx.globalCompositeOperation = "destination-out";
-      this.ctx.strokeStyle = "rgba(0,0,0,1)";
+      ctx.globalCompositeOperation = "destination-out";
+      ctx.strokeStyle = "rgba(0,0,0,1)";
     } else {
-      this.ctx.globalAlpha = stroke.opacity ?? 1;
-      this.ctx.globalCompositeOperation = "source-over";
-      this.ctx.strokeStyle = stroke.color;
+      ctx.globalAlpha = stroke.opacity ?? 1;
+      ctx.globalCompositeOperation = "source-over";
+      ctx.strokeStyle = stroke.color;
     }
-    this.ctx.lineWidth = getPressureWidth(stroke.width, curr.pressure);
-    this.ctx.lineJoin = "round";
-    this.ctx.lineCap = "round";
-    this.ctx.beginPath();
-    this.ctx.moveTo(prev.x, prev.y);
-    this.ctx.lineTo(curr.x, curr.y);
-    this.ctx.stroke();
-    this.ctx.restore();
+    ctx.lineWidth = getPressureWidth(stroke.width, curr.pressure);
+    ctx.lineJoin = "round";
+    ctx.lineCap = "round";
+    ctx.beginPath();
+    ctx.moveTo(prev.x, prev.y);
+    ctx.lineTo(curr.x, curr.y);
+    ctx.stroke();
+    ctx.restore();
   }
 
   private renderTextFull(text: string, element: { bounds: { x: number; y: number; width: number }; style: { color: string; fontSize: number; fontFamily: string } }): void {
-    this.ctx.save();
-    this.ctx.fillStyle = element.style.color;
-    this.ctx.font = `${element.style.fontSize}px ${element.style.fontFamily}`;
-    this.ctx.textBaseline = "top";
-    this.ctx.fillText(text, element.bounds.x, element.bounds.y, element.bounds.width);
-    this.ctx.restore();
+    const ctx = this.getDrawingContext();
+    ctx.save();
+    ctx.fillStyle = element.style.color;
+    ctx.font = `${element.style.fontSize}px ${element.style.fontFamily}`;
+    ctx.textBaseline = "top";
+    ctx.fillText(text, element.bounds.x, element.bounds.y, element.bounds.width);
+    ctx.restore();
   }
 
   private clearCanvas(): void {
+    this.clearLayer();
     this.ctx.save();
     this.ctx.setTransform(1, 0, 0, 1, 0, 0);
     this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
     this.ctx.restore();
     this.options.redrawBackground?.(this.ctx, this.canvas);
+  }
+
+  private getDrawingContext(): CanvasRenderingContext2D {
+    return this.layerCtx ?? this.ctx;
+  }
+
+  private createLayerCanvas(): HTMLCanvasElement | null {
+    if (typeof document === "undefined") return null;
+    const layer = document.createElement("canvas");
+    layer.width = this.canvas.width;
+    layer.height = this.canvas.height;
+    const dpr = this.getCanvasScale();
+    layer.getContext("2d")?.scale(dpr, dpr);
+    return layer;
+  }
+
+  private clearLayer(): void {
+    if (!this.layerCtx || !this.layerCanvas) return;
+    this.layerCtx.save();
+    this.layerCtx.setTransform(1, 0, 0, 1, 0, 0);
+    this.layerCtx.clearRect(0, 0, this.layerCanvas.width, this.layerCanvas.height);
+    this.layerCtx.restore();
+  }
+
+  private presentLayer(): void {
+    if (!this.layerCanvas) return;
+
+    this.ctx.save();
+    this.ctx.setTransform(1, 0, 0, 1, 0, 0);
+    this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+    this.ctx.restore();
+    this.options.redrawBackground?.(this.ctx, this.canvas);
+
+    const dpr = this.getCanvasScale();
+    this.ctx.save();
+    this.ctx.drawImage(this.layerCanvas, 0, 0, this.canvas.width / dpr, this.canvas.height / dpr);
+    this.ctx.restore();
+  }
+
+  private getCanvasScale(): number {
+    const cssWidth = Number.parseFloat(this.canvas.style.width);
+    if (Number.isFinite(cssWidth) && cssWidth > 0) return this.canvas.width / cssWidth;
+    if (typeof window !== "undefined" && window.devicePixelRatio) return window.devicePixelRatio;
+    return 1;
   }
 }
