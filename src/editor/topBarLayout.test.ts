@@ -142,7 +142,7 @@ it("hides the replay button when replay playback is disabled", () => {
   const editor = readFileSync(resolve(process.cwd(), "src/editor/SketchEditor.vue"), "utf8");
 
   expect(topBar).toContain("showReplay");
-  expect(topBar).toContain('v-if="showReplay"');
+  expect(topBar).toContain("showReplay && !hiddenTopbarKeys.has('replay')");
   expect(editor).toContain(':showReplay="replayPlaybackEnabled"');
 });
 

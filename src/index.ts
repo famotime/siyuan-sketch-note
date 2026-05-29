@@ -8,11 +8,12 @@ import {
 } from "siyuan";
 import "@/index.scss";
 import { init, destroy } from "./main";
-import { openSketchEditor, setI18n, setReplayPlaybackEnabled, setReplayRecordConfig, setReplayRecordingEnabled, setHideReplayControls } from "./App.vue";
+import { openSketchEditor, setI18n, setReplayPlaybackEnabled, setReplayRecordConfig, setReplayRecordingEnabled, setHideReplayControls, setHiddenTopbarKeys } from "./App.vue";
 import { storageKey, createEmptySketchData, loadEditorPreferences, loadSketchData } from "./storage";
 import { loadPluginSettings, savePluginSettings } from "./storage/pluginSettings";
 import type { ReplayEventType, ReplayRecorderConfig } from "./recorder/types";
 import { setDebugLogEnabled } from "./utils/logger";
+import { isSettingHidden, getHiddenTopbarKeySet } from "./feature-flags/alpha-feature-config";
 import {
   createPlaceholderPng,
   uploadPngToAssets,
@@ -49,6 +50,7 @@ export default class SketchNotePlugin extends Plugin {
     setReplayRecordingEnabled(pluginSettings.replayRecordingEnabled);
     setReplayRecordConfig(pluginSettings.replayRecordConfig);
     setHideReplayControls(pluginSettings.hideReplayControls);
+    setHiddenTopbarKeys(getHiddenTopbarKeySet());
 
     // Initialize Vue app
     init(this);
@@ -120,94 +122,100 @@ export default class SketchNotePlugin extends Plugin {
       },
     });
 
-    const createSwitch = (checked: boolean, onChange: (checked: boolean) => Promise<void> | void): HTMLInputElement => {
-      const checkbox = document.createElement("input");
-      checkbox.type = "checkbox";
-      checkbox.className = "b3-switch fn__flex-center";
-      checkbox.checked = checked;
-      checkbox.addEventListener("change", () => {
-        void onChange(checkbox.checked);
+    const replayHidden = isSettingHidden('replay');
+
+    if (!replayHidden) {
+      const createSwitch = (checked: boolean, onChange: (checked: boolean) => Promise<void> | void): HTMLInputElement => {
+        const checkbox = document.createElement("input");
+        checkbox.type = "checkbox";
+        checkbox.className = "b3-switch fn__flex-center";
+        checkbox.checked = checked;
+        checkbox.addEventListener("change", () => {
+          void onChange(checkbox.checked);
+        });
+        return checkbox;
+      };
+
+      const setImageReplayEnabled = (config: ReplayRecorderConfig, enabled: boolean): ReplayRecorderConfig => ({
+        ...config,
+        image: enabled,
+        imageTransform: enabled,
+        imageDelete: enabled,
       });
-      return checkbox;
-    };
+      const replayChildSwitches: HTMLInputElement[] = [];
+      let hideReplayControlsSwitch: HTMLInputElement | undefined;
+      const syncReplayChildrenDisabled = (enabled: boolean) => {
+        for (const childSwitch of replayChildSwitches) {
+          childSwitch.disabled = !enabled;
+          childSwitch.closest(".config__item")?.classList.toggle("sketch-note-settings--disabled", !enabled);
+        }
+      };
 
-    const setImageReplayEnabled = (config: ReplayRecorderConfig, enabled: boolean): ReplayRecorderConfig => ({
-      ...config,
-      image: enabled,
-      imageTransform: enabled,
-      imageDelete: enabled,
-    });
-    const replayChildSwitches: HTMLInputElement[] = [];
-    let hideReplayControlsSwitch: HTMLInputElement | undefined;
-    const syncReplayChildrenDisabled = (enabled: boolean) => {
-      for (const childSwitch of replayChildSwitches) {
-        childSwitch.disabled = !enabled;
-        childSwitch.closest(".config__item")?.classList.toggle("sketch-note-settings--disabled", !enabled);
-      }
-    };
-
-    setting.addItem({
-      title: this.i18n?.replayRecording ?? "Recording",
-      description: this.i18n?.replayRecordingDesc ?? "Save replay operation records for new edits.",
-      actionElement: createSwitch(settings.replayRecordingEnabled, async (checked) => {
-        settings.replayRecordingEnabled = checked;
-        setReplayRecordingEnabled(checked);
-        await savePluginSettings((key, data) => this.saveData(key, data), settings);
-      }),
-    });
-    setting.addItem({
-      title: this.i18n?.replayRecord ?? "Replay",
-      description: this.i18n?.replaySettingsDesc ?? "Control whether replay is shown and which saved operation types are played.",
-      actionElement: createSwitch(settings.replayPlaybackEnabled, async (checked) => {
-        settings.replayPlaybackEnabled = checked;
-        setReplayPlaybackEnabled(checked);
-        syncReplayChildrenDisabled(checked);
-        await savePluginSettings((key, data) => this.saveData(key, data), settings);
-      }),
-    });
-
-    const recordTypeLabels: Record<Exclude<ReplayEventType, "imageTransform" | "imageDelete">, () => string> = {
-      stroke: () => this.i18n?.replayRecordStroke ?? "Strokes",
-      erase: () => this.i18n?.replayRecordErase ?? "Eraser",
-      shape: () => this.i18n?.replayRecordShape ?? "Shapes",
-      text: () => this.i18n?.replayRecordText ?? "Text",
-      image: () => this.i18n?.replayRecordImage ?? "Images",
-      toolSwitch: () => this.i18n?.replayToolSwitch ?? "Tool Switch",
-    };
-
-    const recordTypes: Array<Exclude<ReplayEventType, "imageTransform" | "imageDelete">> = ["stroke", "erase", "shape", "text", "image", "toolSwitch"];
-
-    for (const type of recordTypes) {
-      const childSwitch = createSwitch(settings.replayRecordConfig[type], async (checked) => {
-        settings.replayRecordConfig = type === "image"
-          ? setImageReplayEnabled(settings.replayRecordConfig, checked)
-          : { ...settings.replayRecordConfig, [type]: checked };
-        setReplayRecordConfig(settings.replayRecordConfig);
-        await savePluginSettings((key, data) => this.saveData(key, data), settings);
-      });
-      childSwitch.disabled = !settings.replayPlaybackEnabled;
-      replayChildSwitches.push(childSwitch);
       setting.addItem({
-        title: recordTypeLabels[type](),
-        actionElement: childSwitch,
+        title: this.i18n?.replayRecording ?? "Recording",
+        description: this.i18n?.replayRecordingDesc ?? "Save replay operation records for new edits.",
+        actionElement: createSwitch(settings.replayRecordingEnabled, async (checked) => {
+          settings.replayRecordingEnabled = checked;
+          setReplayRecordingEnabled(checked);
+          await savePluginSettings((key, data) => this.saveData(key, data), settings);
+        }),
+      });
+      setting.addItem({
+        title: this.i18n?.replayRecord ?? "Replay",
+        description: this.i18n?.replaySettingsDesc ?? "Control whether replay is shown and which saved operation types are played.",
+        actionElement: createSwitch(settings.replayPlaybackEnabled, async (checked) => {
+          settings.replayPlaybackEnabled = checked;
+          setReplayPlaybackEnabled(checked);
+          syncReplayChildrenDisabled(checked);
+          await savePluginSettings((key, data) => this.saveData(key, data), settings);
+        }),
+      });
+
+      const recordTypeLabels: Record<Exclude<ReplayEventType, "imageTransform" | "imageDelete">, () => string> = {
+        stroke: () => this.i18n?.replayRecordStroke ?? "Strokes",
+        erase: () => this.i18n?.replayRecordErase ?? "Eraser",
+        shape: () => this.i18n?.replayRecordShape ?? "Shapes",
+        text: () => this.i18n?.replayRecordText ?? "Text",
+        image: () => this.i18n?.replayRecordImage ?? "Images",
+        toolSwitch: () => this.i18n?.replayToolSwitch ?? "Tool Switch",
+      };
+
+      const recordTypes: Array<Exclude<ReplayEventType, "imageTransform" | "imageDelete">> = ["stroke", "erase", "shape", "text", "image", "toolSwitch"];
+
+      for (const type of recordTypes) {
+        const childSwitch = createSwitch(settings.replayRecordConfig[type], async (checked) => {
+          settings.replayRecordConfig = type === "image"
+            ? setImageReplayEnabled(settings.replayRecordConfig, checked)
+            : { ...settings.replayRecordConfig, [type]: checked };
+          setReplayRecordConfig(settings.replayRecordConfig);
+          await savePluginSettings((key, data) => this.saveData(key, data), settings);
+        });
+        childSwitch.disabled = !settings.replayPlaybackEnabled;
+        replayChildSwitches.push(childSwitch);
+        setting.addItem({
+          title: recordTypeLabels[type](),
+          actionElement: childSwitch,
+        });
+      }
+
+      hideReplayControlsSwitch = createSwitch(settings.hideReplayControls, async (checked) => {
+        settings.hideReplayControls = checked;
+        setHideReplayControls(checked);
+        await savePluginSettings((key, data) => this.saveData(key, data), settings);
+      });
+      hideReplayControlsSwitch.disabled = !settings.replayPlaybackEnabled;
+      replayChildSwitches.push(hideReplayControlsSwitch);
+      setting.addItem({
+        title: this.i18n?.hideReplayControls ?? "Hide replay controls",
+        description: this.i18n?.hideReplayControlsDesc ?? "Hide the replay control bar during playback.",
+        actionElement: hideReplayControlsSwitch,
       });
     }
 
-    hideReplayControlsSwitch = createSwitch(settings.hideReplayControls, async (checked) => {
-      settings.hideReplayControls = checked;
-      setHideReplayControls(checked);
-      await savePluginSettings((key, data) => this.saveData(key, data), settings);
-    });
-    hideReplayControlsSwitch.disabled = !settings.replayPlaybackEnabled;
-    replayChildSwitches.push(hideReplayControlsSwitch);
-    setting.addItem({
-      title: this.i18n?.hideReplayControls ?? "Hide replay controls",
-      description: this.i18n?.hideReplayControlsDesc ?? "Hide the replay control bar during playback.",
-      actionElement: hideReplayControlsSwitch,
-    });
-
     setting.open(this.name);
-    this.compactReplaySettingItems();
+    if (!replayHidden) {
+      this.compactReplaySettingItems();
+    }
   }
 
   private compactReplaySettingItems(): void {

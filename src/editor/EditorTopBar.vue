@@ -14,6 +14,7 @@
     >{{ t("dataRecovered") }}</span>
 
     <button
+      v-if="!hiddenTopbarKeys.has('undo')"
       class="sketch-btn sketch-btn--action"
       :disabled="!canUndo"
       :title="t('undo')"
@@ -22,6 +23,7 @@
       <IconParkIcon name="Undo" />
     </button>
     <button
+      v-if="!hiddenTopbarKeys.has('redo')"
       class="sketch-btn sketch-btn--action"
       :disabled="!canRedo"
       :title="t('redo')"
@@ -30,7 +32,7 @@
       <IconParkIcon name="Redo" />
     </button>
     <button
-      v-if="showReplay"
+      v-if="showReplay && !hiddenTopbarKeys.has('replay')"
       class="sketch-btn sketch-btn--action"
       :title="t('replay')"
       @click="$emit('replay')"
@@ -40,6 +42,7 @@
     <span class="sketch-spacer" />
     <span class="sketch-sep" />
     <button
+      v-if="!hiddenTopbarKeys.has('insertImage')"
       class="sketch-btn sketch-btn--add-image"
       :title="t('image')"
       :aria-label="t('image')"
@@ -49,6 +52,7 @@
       <IconParkIcon name="Plus" />
     </button>
     <button
+      v-if="!hiddenTopbarKeys.has('zenMode')"
       class="sketch-btn sketch-btn--zen"
       :aria-label="t(zenToggleState.ariaLabelKey)"
       :aria-pressed="zenToggleState.isPressed"
@@ -58,6 +62,7 @@
       <IconParkIcon :name="zenToggleState.icon" />
     </button>
     <div
+      v-if="!hiddenTopbarKeys.has('moreMenu')"
       ref="moreWrapRef"
       class="sketch-more-wrap"
     >
@@ -149,6 +154,7 @@ defineProps<{
   canRedo: boolean;
   canUndo: boolean;
   exportIncludeBackground: boolean;
+  hiddenTopbarKeys: Set<string>;
   ocrState: "idle" | "recognizing" | "completed" | "error";
   pageOverview: PageOverviewItem[];
   pageState: { current: number; total: number };

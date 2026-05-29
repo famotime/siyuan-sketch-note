@@ -14,6 +14,7 @@
         :canRedo="canRedo"
         :canUndo="canUndo"
         :exportIncludeBackground="exportIncludeBackground"
+        :hiddenTopbarKeys="hiddenTopbarKeys"
         :ocrState="ocrState"
         :pageOverview="pageOverview"
         :pageState="pageState"
@@ -217,6 +218,7 @@ const props = defineProps<{
   saveData: (key: string, data: any) => Promise<void>;
   ocrProvider?: OcrProvider;
   themeMode: 'light' | 'dark';
+  hiddenTopbarKeys?: Set<string>;
   replayPlaybackEnabled?: boolean;
   replayRecordingEnabled?: boolean;
   replayRecordConfig?: Partial<ReplayRecorderConfig>;
@@ -275,6 +277,7 @@ const replayDisplayPreset = ref<ToolPreset | null>(null);
 let preReplayTool: EditorTool = "pen";
 const replayPlaybackEnabled = computed(() => props.replayPlaybackEnabled !== false);
 const replayRecordingEnabled = computed(() => props.replayRecordingEnabled === true);
+const hiddenTopbarKeys = computed(() => props.hiddenTopbarKeys ?? new Set<string>());
 
 // ─── Derived state ───
 const activePreset = computed(() => {
