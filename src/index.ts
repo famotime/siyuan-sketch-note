@@ -406,7 +406,6 @@ export default class SketchNotePlugin extends Plugin {
         showMessage(this.i18n?.duplicateSketchCopyFailed ?? "Failed to copy sketch", 5000, "error");
         return;
       }
-      showMessage(this.i18n?.duplicateSketchCopySuccess ?? "Copied as independent sketch", 3000, "info");
     } catch (e) {
       console.error("[Sketch Note] 复制手写副本失败:", e);
       showMessage(this.i18n?.duplicateSketchCopyFailed ?? "Failed to copy sketch", 5000, "error");

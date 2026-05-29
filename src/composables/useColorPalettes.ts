@@ -2,7 +2,6 @@ import { ref, computed } from "vue";
 import type { Ref } from "vue";
 import { PRESET_COLORS } from "@/types/sketch";
 import { addRecentColor, appendRecentColor, normalizeToolColorPalettes } from "@/tools/palette";
-import { showMessage } from "siyuan";
 import type { EditorTool } from "@/editor/tools";
 
 export function useColorPalettes(ctx: {
@@ -70,8 +69,6 @@ export function useColorPalettes(ctx: {
         pen: ctx.colorPalettes.value.pen.filter((c) => c !== color),
       };
     }
-    showMessage(ctx.t("colorDeleted") || "已删除该颜色", 3000, "info");
-
     if (ctx.activePreset.value.color === color) {
       const fallback = colors.value[0] ?? PRESET_COLORS[0];
       selectColor(fallback);
@@ -91,8 +88,6 @@ export function useColorPalettes(ctx: {
         pen: normalizeToolColorPalettes().pen,
       };
     }
-    showMessage(ctx.t("colorReset") || "已恢复默认颜色设置", 3000, "info");
-
     selectColor(colors.value[0] ?? PRESET_COLORS[0]);
     ctx.markAndSchedule();
   }
