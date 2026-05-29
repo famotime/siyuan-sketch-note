@@ -74,6 +74,7 @@
   "enablePressure": "Pressure Sensitivity",
   "unsavedConfirm": "You have unsaved changes. Discard and exit?",
   "saveFailed": "Save failed, please retry",
+  "insertSketchFailed": "Failed to insert sketch block. Please open a document and retry",
   "loadFailed": "Failed to load sketch data",
   "editSketch": "Edit Sketch",
   "duplicateSketchCopy": "Copy as Independent Sketch",

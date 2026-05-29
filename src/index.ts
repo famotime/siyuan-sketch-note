@@ -437,6 +437,7 @@ export default class SketchNotePlugin extends Plugin {
     const docId = this.getCurrentDocId();
     if (!docId) {
       console.error("[Sketch Note] 无法获取当前文档。请先打开一个文档。");
+      showMessage(this.i18n?.insertSketchFailed ?? "Failed to insert sketch block", 5000, "error");
       return;
     }
 
@@ -529,6 +530,7 @@ export default class SketchNotePlugin extends Plugin {
 
       if (result.code !== 0) {
         console.error("[Sketch Note] 插入图片块失败:", result.msg);
+        showMessage(this.i18n?.insertSketchFailed ?? "Failed to insert sketch block", 5000, "error");
         return;
       }
 
@@ -539,6 +541,7 @@ export default class SketchNotePlugin extends Plugin {
       await openSketchEditor(sketchId);
     } catch (e) {
       console.error("[Sketch Note] 插入手写块失败:", e);
+      showMessage(this.i18n?.insertSketchFailed ?? "Failed to insert sketch block", 5000, "error");
     }
   }
 }

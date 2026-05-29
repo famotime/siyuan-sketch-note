@@ -276,6 +276,7 @@ function onCanvasPointerDown(e: PointerEvent) {
 
 /* ── 下拉选择菜单 ── */
 .sketch-select {
+  color-scheme: light dark;
   background: var(--sketch-toolbar-control-bg) !important;
   border: 1px solid var(--sketch-toolbar-control-border) !important;
   color: var(--sketch-toolbar-text) !important;
@@ -294,7 +295,7 @@ function onCanvasPointerDown(e: PointerEvent) {
   color: var(--sketch-toolbar-strong-text) !important;
 }
 .sketch-select option {
-  background: #1c1c1e;
+  background: var(--sketch-toolbar-popover-surface);
   color: var(--sketch-toolbar-strong-text);
 }
 

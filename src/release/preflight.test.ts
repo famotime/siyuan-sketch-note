@@ -15,6 +15,7 @@ function readJson<T>(path: string): T {
 interface PluginJson {
   author: string;
   backends: string[];
+  disabledInPublish: boolean;
   frontends: string[];
   funding?: unknown;
   url: string;
@@ -30,6 +31,15 @@ describe("release preflight configuration", () => {
     expect(plugin.funding).toBeUndefined();
     expect(plugin.frontends).toEqual(["all"]);
     expect(plugin.backends).toEqual(["all"]);
+    expect(plugin.disabledInPublish).toBe(true);
+  });
+
+  it("keeps README videos playable in Bazaar preview", () => {
+    const readme = readText("README.md");
+    const videos = readme.match(/<video\b[^>]*>/g) ?? [];
+
+    expect(videos.length).toBeGreaterThan(0);
+    expect(videos.every((video) => /\bcontrols\b/.test(video))).toBe(true);
   });
 
   it("keeps release assets within Bazaar limits", () => {

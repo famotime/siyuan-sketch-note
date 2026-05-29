@@ -184,6 +184,7 @@ defineEmits<{
 
 .replay-speed {
   appearance: none;
+  color-scheme: light dark;
   background: var(--sketch-toolbar-control-bg);
   border: 1px solid var(--sketch-toolbar-control-border);
   color: var(--sketch-toolbar-text);
@@ -198,8 +199,8 @@ defineEmits<{
   background: var(--sketch-toolbar-hover-bg);
 }
 .replay-speed option {
-  background: #1c1c1e;
-  color: #fff;
+  background: var(--sketch-toolbar-popover-surface);
+  color: var(--sketch-toolbar-strong-text);
 }
 
 @media (max-width: 520px) {

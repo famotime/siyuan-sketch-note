@@ -42,8 +42,8 @@
 
 ### 清单
 
-<video src="https://raw.githubusercontent.com/famotime/siyuan-sketch-note/master/assets/清单.mp4"></video>
+<video controls src="https://raw.githubusercontent.com/famotime/siyuan-sketch-note/master/assets/清单.mp4"></video>
 
 ### 涂画
 
-<video src="https://raw.githubusercontent.com/famotime/siyuan-sketch-note/master/assets/涂画.mp4"></video>
+<video controls src="https://raw.githubusercontent.com/famotime/siyuan-sketch-note/master/assets/涂画.mp4"></video>

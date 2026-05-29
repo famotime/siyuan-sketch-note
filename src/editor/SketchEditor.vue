@@ -1201,6 +1201,7 @@ function onHeightChanged(_h: number) {}
   white-space: nowrap;
 }
 .sketch-mode select {
+  color-scheme: light dark;
   min-height: 26px;
   border: 1px solid var(--b3-border-color);
   border-radius: 4px;
@@ -1208,14 +1209,23 @@ function onHeightChanged(_h: number) {}
   color: var(--b3-theme-on-surface);
   font-size: 12px;
 }
+.sketch-mode select option {
+  background: var(--b3-theme-surface);
+  color: var(--b3-theme-on-surface);
+}
 
 /* ── Select ── */
 .sketch-select {
+  color-scheme: light dark;
   pointer-events: auto !important;
   padding: 4px 8px; border-radius: 4px;
   border: 1px solid var(--b3-border-color);
-  background: var(--b3-theme-surface); font-size: 13px;
+  background: var(--b3-theme-surface); color: var(--b3-theme-on-surface); font-size: 13px;
   min-height: 30px;
+}
+.sketch-select option {
+  background: var(--b3-theme-surface);
+  color: var(--b3-theme-on-surface);
 }
 
 /* ── Colors ── */
