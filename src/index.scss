@@ -55,7 +55,7 @@
   background: var(--b3-theme-surface) !important;
 }
 
-.sketch-note-settings--compact .config__item-description {
+.sketch-note-settings--compact .b3-label__text {
   margin-top: 2px !important;
 }
 
@@ -90,8 +90,19 @@
   opacity: 0.45;
 }
 
-.sketch-note-settings--disabled .config__item-info,
+.sketch-note-settings--disabled .fn__flex-1,
 .sketch-note-settings--disabled input {
   cursor: not-allowed;
   pointer-events: none;
+}
+
+// Replay child indentation
+.sketch-note-settings--replay-child .fn__flex-1 {
+  padding-left: 16px;
+}
+
+// Divider between toolSwitch and hide-replay-controls
+.config__item.sketch-note-settings--replay-child-divider {
+  border-bottom: 1px solid var(--b3-theme-surface-lighter) !important;
+  box-shadow: none !important;
 }

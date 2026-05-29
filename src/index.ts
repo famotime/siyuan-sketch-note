@@ -138,6 +138,7 @@ export default class SketchNotePlugin extends Plugin {
       imageDelete: enabled,
     });
     const replayChildSwitches: HTMLInputElement[] = [];
+    let hideReplayControlsSwitch: HTMLInputElement | undefined;
     const syncReplayChildrenDisabled = (enabled: boolean) => {
       for (const childSwitch of replayChildSwitches) {
         childSwitch.disabled = !enabled;
@@ -192,21 +193,17 @@ export default class SketchNotePlugin extends Plugin {
       });
     }
 
+    hideReplayControlsSwitch = createSwitch(settings.hideReplayControls, async (checked) => {
+      settings.hideReplayControls = checked;
+      setHideReplayControls(checked);
+      await savePluginSettings((key, data) => this.saveData(key, data), settings);
+    });
+    hideReplayControlsSwitch.disabled = !settings.replayPlaybackEnabled;
+    replayChildSwitches.push(hideReplayControlsSwitch);
     setting.addItem({
       title: this.i18n?.hideReplayControls ?? "Hide replay controls",
       description: this.i18n?.hideReplayControlsDesc ?? "Hide the replay control bar during playback.",
-      createActionElement: () => {
-        const checkbox = document.createElement("input");
-        checkbox.type = "checkbox";
-        checkbox.className = "b3-switch fn__flex-center";
-        checkbox.checked = settings.hideReplayControls;
-        checkbox.addEventListener("change", async () => {
-          settings.hideReplayControls = checkbox.checked;
-          setHideReplayControls(checkbox.checked);
-          await savePluginSettings((key, data) => this.saveData(key, data), settings);
-        });
-        return checkbox;
-      },
+      actionElement: hideReplayControlsSwitch,
     });
 
     setting.open(this.name);
@@ -221,7 +218,7 @@ export default class SketchNotePlugin extends Plugin {
       let inReplay = false;
       const replayGroupItems: HTMLElement[] = [];
       for (const item of items) {
-        const title = item.querySelector(".config__item-title")?.textContent?.trim();
+        const title = item.querySelector(".fn__flex-1")?.childNodes[0]?.textContent?.trim();
         if (title === (this.i18n?.replayRecording ?? "Recording")) {
           item.classList.add("sketch-note-settings--recording");
           inReplay = false;
@@ -233,15 +230,16 @@ export default class SketchNotePlugin extends Plugin {
           inReplay = true;
           continue;
         }
-        if (title === (this.i18n?.hideReplayControls ?? "Hide replay controls")) {
-          item.classList.add("sketch-note-settings--compact");
-          inReplay = false;
-          continue;
-        }
         if (inReplay) {
           item.classList.add("sketch-note-settings--compact", "sketch-note-settings--replay-child");
           item.classList.toggle("sketch-note-settings--disabled", !item.querySelector("input")?.matches(":enabled"));
+          if (title === (this.i18n?.replayToolSwitch ?? "Tool Switch")) {
+            item.classList.add("sketch-note-settings--replay-child-divider");
+          }
           replayGroupItems.push(item);
+          if (title === (this.i18n?.hideReplayControls ?? "Hide replay controls")) {
+            inReplay = false;
+          }
         }
       }
       replayGroupItems.at(-1)?.classList.add("sketch-note-settings--replay-group-end");
