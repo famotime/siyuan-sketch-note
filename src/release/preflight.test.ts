@@ -69,6 +69,19 @@ describe("release preflight configuration", () => {
     expect(index).not.toMatch(/fill="#[0-9a-fA-F]{3,6}"/);
   });
 
+  it("removes injected editor DOM when the plugin is disabled", () => {
+    const index = readText("src/index.ts");
+    const unloadIndex = index.indexOf("onunload()");
+    const cleanupIndex = index.indexOf("this.removeInjectedEditButtons()");
+    const methodIndex = index.indexOf("private removeInjectedEditButtons()");
+
+    expect(unloadIndex).toBeGreaterThan(-1);
+    expect(cleanupIndex).toBeGreaterThan(unloadIndex);
+    expect(methodIndex).toBeGreaterThan(-1);
+    expect(index.slice(methodIndex)).toContain('document.querySelectorAll(".sketch-note-edit-btn")');
+    expect(index.slice(methodIndex)).toContain(".remove()");
+  });
+
   it("does not copy unused static i18n files into the release package", () => {
     const viteConfig = readText("vite.config.ts");
 

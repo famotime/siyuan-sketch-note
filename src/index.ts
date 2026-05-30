@@ -93,6 +93,7 @@ export default class SketchNotePlugin extends Plugin {
       this.eventBus.off("open-menu-image", this.onOpenMenuImage);
       this.onOpenMenuImage = null;
     }
+    this.removeInjectedEditButtons();
     destroy();
     delete window.sySketchNote;
   }
@@ -332,6 +333,12 @@ export default class SketchNotePlugin extends Plugin {
       openSketchEditor(sketchId);
     });
     actionBar.insertAdjacentElement("afterbegin", editBtn);
+  }
+
+  private removeInjectedEditButtons(): void {
+    document.querySelectorAll(".sketch-note-edit-btn").forEach((button) => {
+      button.remove();
+    });
   }
 
   /**
