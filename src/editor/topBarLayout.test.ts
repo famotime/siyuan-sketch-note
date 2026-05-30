@@ -158,6 +158,7 @@ it("adapts top and floating toolbars to SiYuan light and dark themes", () => {
   const editor = readFileSync(resolve(process.cwd(), "src/editor/SketchEditor.vue"), "utf8");
   const toolbar = readFileSync(resolve(process.cwd(), "src/editor/ToolBar.vue"), "utf8");
   const floatingToolbar = readFileSync(resolve(process.cwd(), "src/editor/FloatingToolbar.vue"), "utf8");
+  const topBar = readFileSync(resolve(process.cwd(), "src/editor/EditorTopBar.vue"), "utf8");
 
   expect(editor).toMatch(/color-scheme:\s*light dark/);
   expect(editor).toMatch(/--sketch-toolbar-surface-dark:/);
@@ -167,6 +168,10 @@ it("adapts top and floating toolbars to SiYuan light and dark themes", () => {
   expect(editor).toContain(".sketch-editor--theme-dark");
 
   expect(floatingToolbar).toContain("var(--sketch-toolbar-surface)");
+  expect(topBar).toContain("--sketch-more-popover-surface:");
+  expect(topBar).toContain("background-color: var(--sketch-more-popover-surface)");
+  expect(topBar).toContain(".sketch-select--menu option");
+  expect(topBar).not.toMatch(/\.sketch-more-popover\s*\{[^}]*background:\s*var\(--sketch-toolbar-popover-surface\)/);
 
   for (const source of [toolbar, floatingToolbar]) {
     expect(source).toContain("var(--sketch-toolbar-control-bg)");

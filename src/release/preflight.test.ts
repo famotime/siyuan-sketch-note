@@ -61,6 +61,14 @@ describe("release preflight configuration", () => {
     expect(index).not.toContain('hotkey: "Ctrl+Shift+S"');
   });
 
+  it("uses theme-aware SVG colors for top bar and injected edit buttons", () => {
+    const index = readText("src/index.ts");
+
+    expect(index).toContain('stroke="currentColor"');
+    expect(index).not.toMatch(/stroke="#[0-9a-fA-F]{3,6}"/);
+    expect(index).not.toMatch(/fill="#[0-9a-fA-F]{3,6}"/);
+  });
+
   it("does not copy unused static i18n files into the release package", () => {
     const viteConfig = readText("vite.config.ts");
 

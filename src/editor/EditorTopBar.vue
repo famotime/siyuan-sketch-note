@@ -211,6 +211,9 @@ function onCanvasPointerDown(e: PointerEvent) {
 
 <style scoped>
 .sketch-editor__row {
+  --sketch-more-popover-surface: var(--b3-menu-background, var(--sketch-toolbar-popover-surface));
+  --sketch-more-option-surface: var(--b3-theme-surface, var(--sketch-more-popover-surface));
+  --sketch-more-option-text: var(--b3-theme-on-surface, var(--sketch-toolbar-strong-text));
   display: flex;
   align-items: center;
   gap: 8px;
@@ -295,8 +298,12 @@ function onCanvasPointerDown(e: PointerEvent) {
   color: var(--sketch-toolbar-strong-text) !important;
 }
 .sketch-select option {
-  background: var(--sketch-toolbar-popover-surface);
-  color: var(--sketch-toolbar-strong-text);
+  background-color: var(--sketch-more-option-surface);
+  color: var(--sketch-more-option-text);
+}
+.sketch-select--menu option {
+  background-color: var(--sketch-more-option-surface);
+  color: var(--sketch-more-option-text);
 }
 
 /* 恢复损坏提示 */
@@ -344,7 +351,7 @@ function onCanvasPointerDown(e: PointerEvent) {
   top: calc(100% + 6px);
   right: 0;
   min-width: 180px;
-  background: var(--sketch-toolbar-popover-surface);
+  background-color: var(--sketch-more-popover-surface);
   backdrop-filter: blur(14px) saturate(160%);
   -webkit-backdrop-filter: blur(14px) saturate(160%);
   border: 1px solid var(--sketch-toolbar-border);
