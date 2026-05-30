@@ -57,6 +57,7 @@ export default class SketchNotePlugin extends Plugin {
 
     // MutationObserver: inject edit buttons into sketch-note image blocks
     this.mutationObserver = this.setupImageBlockObserver(document.body);
+    this.injectEditButtonsIntoExistingImageBlocks(document.body);
 
     // Right-click context menu for sketch-note images
     this.onOpenMenuImage = ({ detail }: { detail: any }) => {
@@ -333,6 +334,12 @@ export default class SketchNotePlugin extends Plugin {
       openSketchEditor(sketchId);
     });
     actionBar.insertAdjacentElement("afterbegin", editBtn);
+  }
+
+  private injectEditButtonsIntoExistingImageBlocks(target: ParentNode): void {
+    target.querySelectorAll?.('[data-type="NodeParagraph"]')?.forEach((block) => {
+      this.tryInjectEditButton(block as HTMLElement);
+    });
   }
 
   private removeInjectedEditButtons(): void {

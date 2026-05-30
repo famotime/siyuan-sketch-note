@@ -82,6 +82,21 @@ describe("release preflight configuration", () => {
     expect(index.slice(methodIndex)).toContain(".remove()");
   });
 
+  it("injects edit buttons into already open sketch images when the plugin is enabled", () => {
+    const index = readText("src/index.ts");
+    const onloadIndex = index.indexOf("async onload()");
+    const observerIndex = index.indexOf("this.setupImageBlockObserver(document.body)");
+    const scanCallIndex = index.indexOf("this.injectEditButtonsIntoExistingImageBlocks(document.body)");
+    const methodIndex = index.indexOf("private injectEditButtonsIntoExistingImageBlocks");
+
+    expect(onloadIndex).toBeGreaterThan(-1);
+    expect(observerIndex).toBeGreaterThan(onloadIndex);
+    expect(scanCallIndex).toBeGreaterThan(observerIndex);
+    expect(methodIndex).toBeGreaterThan(-1);
+    expect(index.slice(methodIndex)).toContain('querySelectorAll?.(\'[data-type="NodeParagraph"]\')');
+    expect(index.slice(methodIndex)).toContain("this.tryInjectEditButton");
+  });
+
   it("does not copy unused static i18n files into the release package", () => {
     const viteConfig = readText("vite.config.ts");
 
