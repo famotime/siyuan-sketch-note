@@ -50,6 +50,14 @@
       </option>
     </select>
     <button
+      class="replay-btn"
+      :title="t('replayRebirth')"
+      :disabled="!canRebirth"
+      @click="$emit('rebirth')"
+    >
+      <IconParkIcon name="Refresh" />
+    </button>
+    <button
       class="replay-btn replay-btn--exit"
       :title="t('replayExit')"
       @click="$emit('exit')"
@@ -70,6 +78,7 @@ defineProps<{
   speed: PlaybackSpeed;
   canStepBack: boolean;
   canStepForward: boolean;
+  canRebirth: boolean;
   t: (key: string) => string;
 }>();
 
@@ -79,6 +88,7 @@ defineEmits<{
   (e: "next"): void;
   (e: "seek", index: number): void;
   (e: "speedChange", speed: PlaybackSpeed): void;
+  (e: "rebirth"): void;
   (e: "exit"): void;
 }>();
 </script>

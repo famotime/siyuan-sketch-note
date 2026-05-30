@@ -21,6 +21,10 @@ export class ReplayRecorder {
     this.events = [];
   }
 
+  truncateAt(index: number): void {
+    this.events = this.events.slice(0, index);
+  }
+
   setSuspended(suspended: boolean): void {
     this.suspended = suspended;
   }

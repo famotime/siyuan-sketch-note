@@ -124,5 +124,7 @@
   "replayRecordText": "文本",
   "replayRecordImage": "图片",
   "hideReplayControls": "隐藏回放控制栏",
-  "hideReplayControlsDesc": "播放回放时不显示底部控制工具栏。"
+  "hideReplayControlsDesc": "播放回放时不显示底部控制工具栏。",
+  "replayRebirth": "重生",
+  "replayRebirthConfirm": "从当前步骤重生，将清除后续所有操作记录。确定继续？"
 }

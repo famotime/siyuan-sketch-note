@@ -1,6 +1,7 @@
 import type { ReplayEvent, StrokeReplayEvent, ShapeReplayEvent, ToolSwitchReplayEvent, ImageTransformReplayEvent, ReplayToolSource, ImageTransformSample, ImageReplayEvent } from "./types";
 import type { Stroke, StrokePoint } from "@/types/sketch";
 import type { ImageElement } from "@/elements/image";
+import type { TextElement } from "@/elements/text";
 import { getPressureWidth, getSmoothedSegments } from "@/engine/strokeSmoothing";
 
 export type PlaybackState = "idle" | "playing" | "paused";
@@ -43,6 +44,9 @@ export class ReplayPlayer {
 
   // Image state tracking and caching
   private imageStates: Map<string, ImageElement> = new Map();
+
+  // Text element tracking
+  private completedTextElements: Map<string, TextElement> = new Map();
   private imageCache: Map<string, HTMLImageElement> = new Map();
   private imageTransformAnim: {
     elementId: string;
@@ -84,6 +88,10 @@ export class ReplayPlayer {
   getTotalEvents(): number { return this.events.length; }
   getSpeed(): PlaybackSpeed { return this.speed; }
 
+  getCompletedStrokes(): Map<string, Stroke> { return this.completedStrokes; }
+  getImageStates(): Map<string, ImageElement> { return this.imageStates; }
+  getCompletedTextElements(): Map<string, TextElement> { return this.completedTextElements; }
+
   play(): void {
     if (this.state === "playing") return;
     if (this.currentIndex >= this.events.length) {
@@ -91,6 +99,7 @@ export class ReplayPlayer {
       this.clearCanvas();
       this.completedStrokes.clear();
       this.imageStates.clear();
+      this.completedTextElements.clear();
     }
     this.preloadAllImages();
     this.state = "playing";
@@ -122,6 +131,7 @@ export class ReplayPlayer {
     this.toolSwitchLabel = "";
     this.completedStrokes.clear();
     this.imageStates.clear();
+    this.completedTextElements.clear();
     this.imageTransformAnim = null;
     this.imageDeleteAnim = null;
     this.clearCanvas();
@@ -138,6 +148,7 @@ export class ReplayPlayer {
     this.clearCanvas();
     this.completedStrokes.clear();
     this.imageStates.clear();
+    this.completedTextElements.clear();
     this.imageTransformAnim = null;
     this.imageDeleteAnim = null;
     this.currentIndex = Math.max(0, Math.min(index, this.events.length));
@@ -542,6 +553,7 @@ export class ReplayPlayer {
       case "text":
         this.renderTextFull(event.element.text, event.element);
         this.presentLayer();
+        this.completedTextElements.set(event.element.id, event.element);
         break;
       case "image":
         this.imageStates.set(event.element.id, event.element);

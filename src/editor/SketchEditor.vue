@@ -130,6 +130,7 @@
       :speed="replaySpeed"
       :canStepBack="replayCurrent > 0"
       :canStepForward="replayCurrent < replayTotal"
+      :canRebirth="replayState !== 'playing' && replayCurrent > 0"
       :t="t"
       class="sketch-replay-bar"
       @togglePlay="toggleReplayPlay"
@@ -137,6 +138,7 @@
       @next="replayNext"
       @seek="replaySeek"
       @speedChange="replaySpeedChange"
+      @rebirth="replayRebirth"
       @exit="exitReplayMode"
     />
     <FloatingToolbar
@@ -201,6 +203,7 @@ import { DEFAULT_RECORDER_CONFIG } from "@/recorder/types";
 import { ReplayPlayer } from "@/recorder/player";
 import type { PlaybackSpeed } from "@/recorder/player";
 import { reconstructFromData } from "@/recorder/reconstruct";
+import { migrateStrokesToElements, withStrokeBounds } from "@/elements/model";
 import ReplayControls from "./ReplayControls.vue";
 
 import { useThemeDetection } from "@/composables/useThemeDetection";
@@ -840,6 +843,33 @@ function replaySeek(index: number) {
 function replaySpeedChange(speed: PlaybackSpeed) {
   replaySpeed.value = speed;
   replayPlayer.value?.setSpeed(speed);
+}
+
+function replayRebirth() {
+  const player = replayPlayer.value;
+  if (!player || replayState.value === "playing") return;
+  const current = replayCurrent.value;
+  if (current <= 0) return;
+  if (!confirm(t("replayRebirthConfirm"))) return;
+
+  const strokes = [...player.getCompletedStrokes().values()].map(withStrokeBounds);
+  const textElements = [...player.getCompletedTextElements().values()];
+  const imageElements = [...player.getImageStates().values()];
+  const elements = [...migrateStrokesToElements(strokes), ...textElements, ...imageElements];
+
+  const state = canvasRef.value?.getState();
+  const newData: SketchData = {
+    version: 1,
+    template: currentTemplate.value,
+    canvasWidth: state?.canvasWidth ?? 800,
+    canvasHeight: state?.canvasHeight ?? 600,
+    strokes,
+    elements,
+  };
+
+  replayRecorder.truncateAt(current);
+  exitReplayMode();
+  canvasRef.value?.restoreData(newData);
 }
 
 function onReplayKeyDown(event: KeyboardEvent) {
