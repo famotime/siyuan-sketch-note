@@ -662,20 +662,20 @@ const hasOpacityControl = computed(() => {
 });
 
 const rainbowPresetColors = [
-  "#000000",
-  "#ffffff",
-  "#ff3b30",
-  "#ff9500",
-  "#ffcc00",
-  "#34c759",
-  "#00c7be",
-  "#007aff",
-  "#5856d6",
-  "#af52de",
-  "#ff2d55",
-  "#5ac8fa",
-  "#30d158",
-  "#bf5af2",
+  "#e3747d",
+  "#e88e6f",
+  "#e8ad66",
+  "#dfbe62",
+  "#c1ca63",
+  "#96c971",
+  "#6bc789",
+  "#59bdb1",
+  "#5db0e6",
+  "#6a8be0",
+  "#8b76db",
+  "#b26acb",
+  "#d16cae",
+  "#db7090",
 ] as const;
 
 const shapeOptions = [
