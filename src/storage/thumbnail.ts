@@ -4,8 +4,7 @@ import type { PngExportPlan } from "@/export/png";
 import type { SketchData, Stroke } from "@/types/sketch";
 import type { SketchElement } from "@/elements/model";
 import { splitElementsForRender } from "@/elements/renderOrder";
-import { getBrushOpacity, getBrushPressureWidth, getSmoothedSegments } from "@/engine/strokeSmoothing";
-import { resolveBrushProfile } from "@/tools/brushProfiles";
+import { renderStroke } from "@/engine/strokeRenderer";
 import { getCustomBackgroundDrawRect, getCustomBackgroundSource, getCustomBackgroundTemplate } from "@/template/customBackground";
 import { translateElementsForRender } from "./renderElements";
 
@@ -76,6 +75,8 @@ function getCustomBackgroundViewportDrawRect(options: {
   return {
     sx: rect.sx + (left - rect.dx) * scaleX,
     sy: rect.sy + (top - rect.dy) * scaleY,
+
+
     sw: (right - left) * scaleX,
     sh: (bottom - top) * scaleY,
     dx: left - source.x,
@@ -91,7 +92,7 @@ function getCustomBackgroundViewportDrawRect(options: {
  */
 function compositeStrokes(ctx: CanvasRenderingContext2D, strokes: Stroke[]): void {
   for (const stroke of strokes) {
-    renderStrokeToCtx(ctx, stroke);
+    renderStroke(ctx, stroke);
   }
 }
 
@@ -559,41 +560,4 @@ function loadImage(src: string): Promise<HTMLImageElement> {
     image.onerror = () => reject(new Error("Failed to load image element"));
     image.src = src;
   });
-}
-
-function renderStrokeToCtx(ctx: CanvasRenderingContext2D, stroke: Stroke): void {
-  const { points, color, width, tool } = stroke;
-  if (points.length < 2) return;
-  const profile = resolveBrushProfile(stroke.brushProfileId, stroke.tool, {
-    tool: stroke.tool,
-    penSubtype: stroke.penSubtype,
-    highlighterSubtype: stroke.highlighterSubtype,
-  });
-
-  ctx.save();
-  if (tool === "eraser") {
-    ctx.globalCompositeOperation = profile.blendMode;
-    ctx.strokeStyle = "rgba(0,0,0,1)";
-  } else {
-    ctx.globalAlpha = getBrushOpacity(stroke.opacity ?? 1, points[0].pressure, profile);
-    ctx.globalCompositeOperation = profile.blendMode;
-    ctx.strokeStyle = color;
-  }
-
-  ctx.lineWidth = getBrushPressureWidth(width, points[0].pressure, profile);
-  ctx.lineJoin = profile.lineJoin;
-  ctx.lineCap = profile.lineCap;
-
-  ctx.beginPath();
-  ctx.moveTo(points[0].x, points[0].y);
-  for (const segment of getSmoothedSegments(points)) {
-    ctx.quadraticCurveTo(
-      segment.control.x,
-      segment.control.y,
-      segment.end.x,
-      segment.end.y,
-    );
-  }
-  ctx.stroke();
-  ctx.restore();
 }

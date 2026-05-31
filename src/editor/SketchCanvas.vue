@@ -172,6 +172,14 @@ const { viewportScale, viewportPanX, viewportPanY, showIndicator, zoomLocked, to
 // ── Interaction state ──
 let state: EngineState;
 
+function registerStateCallback(s: EngineState) {
+  s.onPushHistorySnapshot = () => {
+    if (props.recorder) {
+      props.recorder.pushUndoSnapshot();
+    }
+  };
+}
+
 const textEditing = useTextEditing({
   state: () => state,
   getCanvas: () => strokeCanvasRef.value!,
@@ -250,6 +258,7 @@ onMounted(async () => {
   state = props.initialData
     ? restoreEngineState(props.initialData)
     : createEngineState("blank");
+  registerStateCallback(state);
   await preloadElementImages(state.elements);
   setupBackgroundCanvas(bgCanvasRef.value, state);
   setupStrokeCanvas(strokeCanvasRef.value, state);
@@ -1113,9 +1122,37 @@ function onCanvasDoubleClick(e: MouseEvent) {
 
 // ── Public API ──
 
-function doUndo() { lasso.selectedIds = []; engineUndo(state); fullRedrawStrokeCanvas(getCanvas(), state); updateUndoRedoState(); emit("stroke"); }
-function doRedo() { lasso.selectedIds = []; engineRedo(state); fullRedrawStrokeCanvas(getCanvas(), state); updateUndoRedoState(); emit("stroke"); }
-function doClear() { lasso.selectedIds = []; engineClear(state); fullRedrawStrokeCanvas(getCanvas(), state); updateUndoRedoState(); emit("stroke"); }
+function doUndo() {
+  lasso.selectedIds = [];
+  if (props.recorder) {
+    props.recorder.undo();
+  }
+  engineUndo(state);
+  fullRedrawStrokeCanvas(getCanvas(), state);
+  updateUndoRedoState();
+  emit("stroke");
+}
+function doRedo() {
+  lasso.selectedIds = [];
+  if (props.recorder) {
+    props.recorder.redo();
+  }
+  engineRedo(state);
+  fullRedrawStrokeCanvas(getCanvas(), state);
+  updateUndoRedoState();
+  emit("stroke");
+}
+function doClear() {
+  lasso.selectedIds = [];
+  if (props.recorder) {
+    props.recorder.clear();
+    props.recorder.clearHistory();
+  }
+  engineClear(state);
+  fullRedrawStrokeCanvas(getCanvas(), state);
+  updateUndoRedoState();
+  emit("stroke");
+}
 function getData(): SketchData {
   const data = serializeState(state);
   if (props.recorder) {
@@ -1130,6 +1167,7 @@ async function restoreData(data: SketchData) {
   if (!bgCanvasRef.value || !strokeCanvasRef.value) return;
   clearInteractionState();
   state = restoreEngineState(data);
+  registerStateCallback(state);
   state.tool = getEngineTool(props.tool);
   state.toolPresets = data.toolPresets ?? props.toolPresets;
   state.customBackgrounds = data.customBackgrounds ?? [];

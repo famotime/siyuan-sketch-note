@@ -142,4 +142,57 @@ describe("replayRecorder", () => {
 
     expect(recorder.getEvents()).toEqual([restoredEvent]);
   });
+
+  it("supports undo, redo, and clearHistory operations", () => {
+    const recorder = new ReplayRecorder();
+    
+    // Action 1: Record stroke 1
+    recorder.pushUndoSnapshot();
+    recorder.record({
+      type: "stroke",
+      id: "e1",
+      timestamp: 1000,
+      stroke: { id: "s1", points: [], color: "#000", width: 3, tool: "pen" },
+    });
+    
+    // Action 2: Record stroke 2
+    recorder.pushUndoSnapshot();
+    recorder.record({
+      type: "stroke",
+      id: "e2",
+      timestamp: 2000,
+      stroke: { id: "s2", points: [], color: "#000", width: 3, tool: "pen" },
+    });
+    
+    expect(recorder.getEvents()).toHaveLength(2);
+    
+    // Perform Undo (reverts Stroke 2)
+    expect(recorder.undo()).toBe(true);
+    expect(recorder.getEvents()).toHaveLength(1);
+    expect(recorder.getEvents()[0].id).toBe("e1");
+    
+    // Perform Undo (reverts Stroke 1)
+    expect(recorder.undo()).toBe(true);
+    expect(recorder.getEvents()).toHaveLength(0);
+    
+    // No more undos possible
+    expect(recorder.undo()).toBe(false);
+    
+    // Perform Redo (restores Stroke 1)
+    expect(recorder.redo()).toBe(true);
+    expect(recorder.getEvents()).toHaveLength(1);
+    expect(recorder.getEvents()[0].id).toBe("e1");
+    
+    // Perform Redo (restores Stroke 2)
+    expect(recorder.redo()).toBe(true);
+    expect(recorder.getEvents()).toHaveLength(2);
+    expect(recorder.getEvents()[1].id).toBe("e2");
+    
+    // No more redos possible
+    expect(recorder.redo()).toBe(false);
+    
+    // Clear history
+    recorder.clearHistory();
+    expect(recorder.undo()).toBe(false);
+  });
 });
