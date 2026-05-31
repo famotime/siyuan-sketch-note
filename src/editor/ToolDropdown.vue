@@ -10,8 +10,8 @@
     >
       <slot name="trigger" />
       <span class="sketch-tool-dropdown__arrow">
-        <svg viewBox="0 0 6 6" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M1.5 1.5L4.5 4.5" />
+        <svg viewBox="0 0 8 8" fill="currentColor">
+          <path d="M2 8L8 8L8 2Z" />
         </svg>
       </span>
     </div>
@@ -29,7 +29,7 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted, onUnmounted, ref } from 'vue'
+import { nextTick, onMounted, onUnmounted, ref } from 'vue'
 
 const props = defineProps<{
   modelValue: boolean
@@ -40,8 +40,13 @@ const emit = defineEmits<{
 }>()
 
 const rootRef = ref<HTMLDivElement>()
+let justClosedByOutside = false
 
 function toggle() {
+  if (justClosedByOutside) {
+    justClosedByOutside = false
+    return
+  }
   emit('update:modelValue', !props.modelValue)
 }
 
@@ -51,6 +56,14 @@ function close() {
 
 function onClickOutside(e: MouseEvent) {
   if (rootRef.value && !rootRef.value.contains(e.target as Node)) {
+    if (props.modelValue) {
+      justClosedByOutside = true
+      nextTick(() => {
+        setTimeout(() => {
+          justClosedByOutside = false
+        }, 0)
+      })
+    }
     close()
   }
 }
@@ -79,11 +92,11 @@ onUnmounted(() => {
 
 .sketch-tool-dropdown__arrow {
   position: absolute;
-  right: 1px;
-  bottom: 1px;
-  width: 7px;
-  height: 7px;
-  opacity: 0.6;
+  right: 0;
+  bottom: 0;
+  width: 8px;
+  height: 8px;
+  opacity: 0.55;
   pointer-events: none;
   display: flex;
   align-items: center;
