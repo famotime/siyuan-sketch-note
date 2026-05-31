@@ -570,7 +570,44 @@ function deleteFavoriteColor(index: number) {
 }
 
 const widthPresets = computed(() => {
-  if (props.activeTool === "highlighter") {
+  /** 根据实际粗细值计算 UI 圆点大小（px），限制在 3-14 范围内 */
+  const dot = (val: number) => Math.min(14, Math.max(3, Math.round(val * 1.5)));
+
+  if (props.activeTool === "pen") {
+    const subtype = props.preset.penSubtype ?? "ballpoint";
+    switch (subtype) {
+      case "pencil":
+        return [
+          { val: 1, dotSize: 3, label: props.t("sizeThin") },
+          { val: 2, dotSize: 3, label: props.t("sizeMedium") },
+          { val: 4, dotSize: 6, label: props.t("sizeThick") },
+        ];
+      case "ballpoint":
+        return [
+          { val: 1, dotSize: 3, label: props.t("sizeThin") },
+          { val: 1.5, dotSize: 3, label: props.t("sizeMedium") },
+          { val: 3, dotSize: 5, label: props.t("sizeThick") },
+        ];
+      case "fountain":
+        return [
+          { val: 1, dotSize: 3, label: props.t("sizeThin") },
+          { val: 2, dotSize: 3, label: props.t("sizeMedium") },
+          { val: 5, dotSize: 8, label: props.t("sizeThick") },
+        ];
+      case "brush":
+        return [
+          { val: 1, dotSize: 3, label: props.t("sizeThin") },
+          { val: 3, dotSize: 5, label: props.t("sizeMedium") },
+          { val: 8, dotSize: 12, label: props.t("sizeThick") },
+        ];
+      default:
+        return [
+          { val: 2, dotSize: 3, label: props.t("sizeThin") },
+          { val: 6, dotSize: 9, label: props.t("sizeMedium") },
+          { val: 12, dotSize: 14, label: props.t("sizeThick") },
+        ];
+    }
+  } else if (props.activeTool === "highlighter") {
     return [
       { val: 8, dotSize: 4, label: props.t("sizeThin") },
       { val: 18, dotSize: 9, label: props.t("sizeMedium") },
@@ -591,8 +628,8 @@ const widthPresets = computed(() => {
   } else {
     return [
       { val: 2, dotSize: 3, label: props.t("sizeThin") },
-      { val: 6, dotSize: 7, label: props.t("sizeMedium") },
-      { val: 12, dotSize: 12, label: props.t("sizeThick") },
+      { val: 6, dotSize: 9, label: props.t("sizeMedium") },
+      { val: 12, dotSize: 14, label: props.t("sizeThick") },
     ];
   }
 });
