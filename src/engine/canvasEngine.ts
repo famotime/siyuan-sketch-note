@@ -1,4 +1,4 @@
-import type { SketchData, SketchPage, SketchTool, Stroke, StrokePoint, ToolPresetCollection } from "@/types/sketch";
+import type { PenSubtype, SketchData, SketchPage, SketchTool, Stroke, StrokePoint, ToolPresetCollection } from "@/types/sketch";
 import {
   CANVAS_LOGICAL_WIDTH,
   CANVAS_HEIGHT_INCREMENT,
@@ -13,6 +13,8 @@ import { getCustomBackgroundDrawRect, getCustomBackgroundTemplate } from "@/temp
 import type { CustomBackgroundTemplate } from "@/template/customBackground";
 import {
   filterStrokePointsByDistance,
+  getPenSubtypeOpacityMultiplier,
+  getPenSubtypePressureWidth,
   getPressureWidth,
   getSmoothedSegments,
 } from "./strokeSmoothing";
@@ -257,7 +259,7 @@ export function handlePointerMove(
   if (shouldRenderLiveSegment && pts.length >= 2) {
     const prev = pts[pts.length - 2];
     const curr = pts[pts.length - 1];
-    renderStrokeSegment(ctx, state.currentStroke, prev, curr);
+    renderStrokeSegment(ctx, state.currentStroke, prev, curr, state.toolPresets[state.tool].penSubtype);
   }
   return heightChanged;
 }
@@ -477,6 +479,7 @@ function renderStrokeSegment(
   stroke: Stroke,
   prev: StrokePoint,
   curr: StrokePoint,
+  penSubtype?: PenSubtype,
 ): void {
   ctx.save();
   if (stroke.tool === "eraser") {
@@ -487,7 +490,13 @@ function renderStrokeSegment(
     ctx.globalCompositeOperation = "source-over";
     ctx.strokeStyle = stroke.color;
   }
-  ctx.lineWidth = getPressureWidth(stroke.width, curr.pressure);
+  const segWidth = stroke.tool === "pen"
+    ? getPenSubtypePressureWidth(stroke.width, curr.pressure, penSubtype)
+    : getPressureWidth(stroke.width, curr.pressure);
+  ctx.lineWidth = segWidth;
+  if (stroke.tool === "pen" && penSubtype) {
+    ctx.globalAlpha = (stroke.opacity ?? 1) * getPenSubtypeOpacityMultiplier(curr.pressure, penSubtype);
+  }
   ctx.lineJoin = "round";
   ctx.lineCap = "round";
   ctx.beginPath();
