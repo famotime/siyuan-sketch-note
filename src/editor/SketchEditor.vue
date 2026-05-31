@@ -59,9 +59,13 @@
         ref="toolbarRef"
         :activeTool="displayTool"
         :lastShapeTool="lastShapeTool"
+        :penSubtype="activePenSubtype"
+        :highlighterSubtype="activeHighlighterSubtype"
         :t="t"
         :replayActive="isReplayMode"
         @selectTool="selectTool"
+        @selectPenSubtype="selectPenSubtype"
+        @selectHighlighterSubtype="selectHighlighterSubtype"
       />
       <input
         ref="imageInputRef"
@@ -184,7 +188,8 @@ import { ref, computed, onMounted, onUnmounted, watch, watchEffect, nextTick } f
 import type { SketchData, ToolPreset } from "@/types/sketch";
 import { getAllTemplates, getTemplate } from "@/template";
 import { showMessage } from "siyuan";
-import { normalizeToolPresets, updateToolPreset } from "@/tools/presets";
+import { normalizeToolPresets, updateToolPreset, applyPenSubtypeDefaults, applyHighlighterSubtypeDefaults } from "@/tools/presets";
+import type { PenSubtype, HighlighterSubtype } from "@/types/sketch";
 import { importSketchJson } from "@/export/json";
 import { normalizeInputSettings } from "./inputMode";
 import { createCustomBackgroundTemplate, getCustomBackgroundDrawRect, getCustomBackgroundTemplate, updateCustomBackgroundFit } from "@/template/customBackground";
@@ -297,6 +302,12 @@ const activePreset = computed(() => {
   }
   return toolPresets.value[getDrawingToolForEditorTool(activeTool.value)];
 });
+const activePenSubtype = computed<PenSubtype>(
+  () => toolPresets.value.pen.penSubtype ?? "ballpoint",
+);
+const activeHighlighterSubtype = computed<HighlighterSubtype>(
+  () => toolPresets.value.highlighter.highlighterSubtype ?? "round",
+);
 const displayTool = computed(() => isReplayMode.value ? replayDisplayTool.value : activeTool.value);
 const displayPreset = computed(() => isReplayMode.value && replayDisplayPreset.value ? replayDisplayPreset.value : activePreset.value);
 const displayFavoriteColors = computed(() => {
@@ -445,6 +456,20 @@ function selectTool(tool: EditorTool, source: ReplayToolSource = "mainToolbar") 
   }
   nextToolSwitchSource.value = source;
   activeTool.value = tool;
+}
+
+function selectPenSubtype(subtype: PenSubtype) {
+  toolPresets.value = applyPenSubtypeDefaults(toolPresets.value, subtype);
+  if (activeTool.value !== "pen") {
+    selectTool("pen", "floatingToolbar");
+  }
+}
+
+function selectHighlighterSubtype(subtype: HighlighterSubtype) {
+  toolPresets.value = applyHighlighterSubtypeDefaults(toolPresets.value, subtype);
+  if (activeTool.value !== "highlighter") {
+    selectTool("highlighter", "floatingToolbar");
+  }
 }
 
 function updateActivePreset(patch: Partial<Omit<ToolPreset, "tool">>) {
