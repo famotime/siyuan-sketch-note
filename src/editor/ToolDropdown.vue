@@ -9,7 +9,11 @@
       @click="toggle"
     >
       <slot name="trigger" />
-      <span class="sketch-tool-dropdown__arrow" />
+      <span class="sketch-tool-dropdown__arrow">
+        <svg viewBox="0 0 6 6" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M1.5 1.5L4.5 4.5" />
+        </svg>
+      </span>
     </div>
 
     <!-- 下拉面板 -->
@@ -75,15 +79,20 @@ onUnmounted(() => {
 
 .sketch-tool-dropdown__arrow {
   position: absolute;
-  right: 2px;
-  bottom: 2px;
-  width: 0;
-  height: 0;
-  border-left: 4px solid transparent;
-  border-right: 4px solid transparent;
-  border-top: 4px solid currentColor;
-  opacity: 0.7;
+  right: 1px;
+  bottom: 1px;
+  width: 7px;
+  height: 7px;
+  opacity: 0.6;
   pointer-events: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.sketch-tool-dropdown__arrow svg {
+  width: 100%;
+  height: 100%;
 }
 
 .sketch-tool-dropdown__panel {
