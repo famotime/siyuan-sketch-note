@@ -27,7 +27,7 @@
 <script setup lang="ts">
 import { onMounted, onUnmounted, ref } from 'vue'
 
-defineProps<{
+const props = defineProps<{
   modelValue: boolean
 }>()
 
@@ -38,7 +38,7 @@ const emit = defineEmits<{
 const rootRef = ref<HTMLDivElement>()
 
 function toggle() {
-  emit('update:modelValue', true)
+  emit('update:modelValue', !props.modelValue)
 }
 
 function close() {
