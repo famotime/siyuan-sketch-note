@@ -37,6 +37,8 @@ export interface SketchData {
   customBackgrounds?: CustomBackgroundTemplate[];
   recentColors?: string[];
   highlighterRecentColors?: string[];
+  favoriteColors?: (string | null)[];
+  highlighterFavoriteColors?: (string | null)[];
   elements?: SketchElement[];
   strokes: Stroke[];
   replayEvents?: ReplayEvent[];

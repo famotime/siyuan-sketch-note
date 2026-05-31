@@ -17,6 +17,7 @@ export function useSaveManager(ctx: {
   inputSettings: Ref<any>;
   customBackgrounds: Ref<any[]>;
   colorPalettes: Ref<{ pen: string[]; highlighter: string[] }>;
+  favoriteColors: Ref<{ pen: (string | null)[]; highlighter: (string | null)[] }>;
   ocrIndex: Ref<any>;
   t: (key: string) => string;
   onSaved?: () => void;
@@ -59,6 +60,8 @@ export function useSaveManager(ctx: {
     data.customBackgrounds = ctx.customBackgrounds.value;
     data.recentColors = ctx.colorPalettes.value.pen;
     data.highlighterRecentColors = ctx.colorPalettes.value.highlighter;
+    data.favoriteColors = ctx.favoriteColors.value.pen;
+    data.highlighterFavoriteColors = ctx.favoriteColors.value.highlighter;
     if (ctx.ocrIndex.value) {
       data.ocrIndex = ctx.ocrIndex.value;
     }

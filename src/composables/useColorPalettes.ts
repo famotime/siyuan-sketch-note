@@ -1,12 +1,13 @@
 import { ref, computed } from "vue";
 import type { Ref } from "vue";
 import { PRESET_COLORS } from "@/types/sketch";
-import { addRecentColor, appendRecentColor, normalizeToolColorPalettes } from "@/tools/palette";
+import { addRecentColor, appendRecentColor, deleteFavoriteColorAt, setFavoriteColorAt } from "@/tools/palette";
 import type { EditorTool } from "@/editor/tools";
 
 export function useColorPalettes(ctx: {
   activeTool: Ref<EditorTool>;
   colorPalettes: Ref<{ pen: string[]; highlighter: string[] }>;
+  favoriteColors: Ref<{ pen: (string | null)[]; highlighter: (string | null)[] }>;
   activePreset: Ref<any>;
   canvasRef: Ref<{ recolorLasso: (c: string) => void } | undefined>;
   t: (key: string) => string;
@@ -76,6 +77,42 @@ export function useColorPalettes(ctx: {
     ctx.markAndSchedule();
   }
 
+  function setFavoriteColor(index: number, color: string) {
+    if (ctx.activeTool.value === "highlighter") {
+      ctx.favoriteColors.value = {
+        ...ctx.favoriteColors.value,
+        highlighter: setFavoriteColorAt(ctx.favoriteColors.value.highlighter, index, color),
+      };
+    } else {
+      ctx.favoriteColors.value = {
+        ...ctx.favoriteColors.value,
+        pen: setFavoriteColorAt(ctx.favoriteColors.value.pen, index, color),
+      };
+    }
+    ctx.markAndSchedule();
+  }
+
+  function deleteFavoriteColor(index: number) {
+    const activeFavorites = ctx.activeTool.value === "highlighter" ? ctx.favoriteColors.value.highlighter : ctx.favoriteColors.value.pen;
+    const deletedColor = activeFavorites[index];
+    if (ctx.activeTool.value === "highlighter") {
+      ctx.favoriteColors.value = {
+        ...ctx.favoriteColors.value,
+        highlighter: deleteFavoriteColorAt(ctx.favoriteColors.value.highlighter, index),
+      };
+    } else {
+      ctx.favoriteColors.value = {
+        ...ctx.favoriteColors.value,
+        pen: deleteFavoriteColorAt(ctx.favoriteColors.value.pen, index),
+      };
+    }
+    if (deletedColor && ctx.activePreset.value.color === deletedColor) {
+      const fallback = colors.value[0] ?? PRESET_COLORS[0];
+      selectColor(fallback);
+    }
+    ctx.markAndSchedule();
+  }
+
   function resetDefaultColors() {
     if (ctx.activeTool.value === "highlighter") {
       ctx.colorPalettes.value = {
@@ -92,5 +129,5 @@ export function useColorPalettes(ctx: {
     ctx.markAndSchedule();
   }
 
-  return { activeColor, colors, selectColor, selectCustomColor, recolorSelection, deleteColor, resetDefaultColors };
+  return { activeColor, colors, selectColor, selectCustomColor, recolorSelection, deleteColor, setFavoriteColor, deleteFavoriteColor, resetDefaultColors };
 }

@@ -78,18 +78,25 @@
           v-if="showRecolorPopup"
           :modelValue="pendingRecolor ?? preset.color"
           :t="t"
+          :themeMode="themeMode"
           :isPresetsOpen="showRecolorPresets"
           @update:modelValue="onRecolorPicked"
           @togglePresets="showRecolorPresets = !showRecolorPresets"
         />
-        <div v-if="showRecolorPopup && showRecolorPresets" class="sketch-float-presets-below">
+        <div
+          v-if="showRecolorPopup && showRecolorPresets"
+          class="sketch-float-presets-below"
+          :class="{ 'sketch-float-presets-below--theme-light': themeMode === 'light' }"
+        >
           <PresetColorPalette
             :rainbowColors="rainbowPresetColors"
-            :recentColors="recentPaletteColors"
+            :favoriteColors="favoriteColors"
             :activeColor="pendingRecolor ?? preset.color"
+            :currentColor="pendingRecolor ?? preset.color"
             :t="t"
             @select="onRecolorPicked"
-            @deleteRecent="$emit('deleteColor', $event)"
+            @setFavorite="setFavoriteColor"
+            @deleteFavorite="deleteFavoriteColor"
           />
         </div>
       </div>
@@ -186,18 +193,25 @@
           v-if="showAddColorPopup"
           :modelValue="pendingAddColor ?? preset.color"
           :t="t"
+          :themeMode="themeMode"
           :isPresetsOpen="showAddPresets"
           @update:modelValue="onCustomColorPicked"
           @togglePresets="showAddPresets = !showAddPresets"
         />
-        <div v-if="showAddColorPopup && showAddPresets" class="sketch-float-presets-below">
+        <div
+          v-if="showAddColorPopup && showAddPresets"
+          class="sketch-float-presets-below"
+          :class="{ 'sketch-float-presets-below--theme-light': themeMode === 'light' }"
+        >
           <PresetColorPalette
             :rainbowColors="rainbowPresetColors"
-            :recentColors="recentPaletteColors"
+            :favoriteColors="favoriteColors"
             :activeColor="pendingAddColor ?? preset.color"
+            :currentColor="pendingAddColor ?? preset.color"
             :t="t"
             @select="onCustomColorPicked"
-            @deleteRecent="$emit('deleteColor', $event)"
+            @setFavorite="setFavoriteColor"
+            @deleteFavorite="deleteFavoriteColor"
           />
         </div>
         <button
@@ -312,9 +326,11 @@ import { isShapeEditorTool } from "./tools";
 const props = defineProps<{
   activeTool: EditorTool;
   colors: readonly string[];
+  favoriteColors: readonly (string | null)[];
   lassoMode: "freehand" | "box";
   preset: ToolPreset;
   t: (key: string) => string;
+  themeMode: 'light' | 'dark';
   replayActive?: boolean;
 }>();
 
@@ -328,6 +344,8 @@ const emit = defineEmits<{
   (e: "update:lassoMode", value: "freehand" | "box"): void;
   (e: "updatePreset", patch: Partial<Omit<ToolPreset, "tool">>): void;
   (e: "deleteColor", color: string): void;
+  (e: "setFavoriteColor", index: number, color: string): void;
+  (e: "deleteFavoriteColor", index: number): void;
   (e: "resetDefaultColors"): void;
 }>();
 
@@ -543,6 +561,14 @@ function onRecolorPicked(color: string) {
   pendingRecolor.value = color;
 }
 
+function setFavoriteColor(index: number, color: string) {
+  emit("setFavoriteColor", index, color);
+}
+
+function deleteFavoriteColor(index: number) {
+  emit("deleteFavoriteColor", index);
+}
+
 const widthPresets = computed(() => {
   if (props.activeTool === "highlighter") {
     return [
@@ -599,6 +625,8 @@ const hasOpacityControl = computed(() => {
 });
 
 const rainbowPresetColors = [
+  "#000000",
+  "#ffffff",
   "#ff3b30",
   "#ff9500",
   "#ffcc00",
@@ -609,18 +637,13 @@ const rainbowPresetColors = [
   "#af52de",
   "#ff2d55",
   "#a0522d",
+  "#8e8e93",
+  "#5ac8fa",
+  "#30d158",
+  "#bf5af2",
+  "#ff9f0a",
+  "#ff453a",
 ] as const;
-
-const recentPaletteColors = computed(() => {
-  const seen = new Set<string>(rainbowPresetColors);
-  return props.colors
-    .filter((color) => {
-      if (seen.has(color)) return false;
-      seen.add(color);
-      return true;
-    })
-    .slice(-5);
-});
 
 const shapeOptions = [
   { tool: "line", labelKey: "line", icon: "Minus" },
@@ -1078,6 +1101,7 @@ onUnmounted(() => {
   position: absolute;
   left: calc(100% + 8px);
   top: 100%;
+  width: 216px;
   z-index: 1000;
   background: rgba(28, 28, 30, 0.94);
   backdrop-filter: blur(16px) saturate(150%);
@@ -1085,6 +1109,13 @@ onUnmounted(() => {
   border: 1px solid rgba(255, 255, 255, 0.14);
   border-radius: 12px;
   padding: 10px;
+  box-sizing: border-box;
   box-shadow: 0 14px 34px rgba(0, 0, 0, 0.34), 0 2px 8px rgba(0, 0, 0, 0.18);
+}
+
+.sketch-float-presets-below--theme-light {
+  background: rgba(255, 255, 255, 0.96);
+  border-color: rgba(15, 23, 42, 0.1);
+  box-shadow: 0 14px 34px rgba(15, 23, 42, 0.14), 0 2px 8px rgba(15, 23, 42, 0.08);
 }
 </style>

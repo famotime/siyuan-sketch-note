@@ -90,6 +90,21 @@ describe("sketch data migrations", () => {
     expect(data.recentColors).not.toContain("#abcdef");
   });
 
+  it("normalizes persisted favorite color slots and keeps empty positions", () => {
+    const data = migrateSketchData({
+      version: 1,
+      template: "grid",
+      canvasWidth: 800,
+      canvasHeight: 1200,
+      favoriteColors: ["#ABCDEF", "bad", null, "#123456"],
+      highlighterFavoriteColors: [null, "#FFF176"],
+      strokes: [],
+    });
+
+    expect(data.favoriteColors).toEqual(["#abcdef", null, null, "#123456", null]);
+    expect(data.highlighterFavoriteColors).toEqual([null, "#fff176", null, null, null]);
+  });
+
   it("reconstructs missing page metadata for paged sketches", () => {
     const data = migrateSketchData({
       version: 1,

@@ -1,10 +1,16 @@
 import { HIGHLIGHTER_PRESET_COLORS, PRESET_COLORS } from "@/types/sketch";
 
 export const MAX_RECENT_COLORS = 10;
+export const FAVORITE_COLOR_SLOTS = 5;
 
 export interface ToolColorPalettes {
   pen: string[];
   highlighter: string[];
+}
+
+export interface ToolFavoriteColors {
+  pen: (string | null)[];
+  highlighter: (string | null)[];
 }
 
 function normalizeHexColor(color: string): string | null {
@@ -41,6 +47,20 @@ export function normalizeToolColorPalettes(input?: Partial<ToolColorPalettes>): 
   };
 }
 
+export function normalizeFavoriteColors(input?: readonly (string | null | undefined)[]): (string | null)[] {
+  return Array.from({ length: FAVORITE_COLOR_SLOTS }, (_, index) => {
+    const color = input?.[index];
+    return typeof color === "string" ? normalizeHexColor(color) : null;
+  });
+}
+
+export function normalizeToolFavoriteColors(input?: Partial<ToolFavoriteColors>): ToolFavoriteColors {
+  return {
+    pen: normalizeFavoriteColors(input?.pen),
+    highlighter: normalizeFavoriteColors(input?.highlighter),
+  };
+}
+
 export function addRecentColor(input: readonly string[], color: string): string[] {
   const normalized = normalizeHexColor(color);
   if (!normalized) return normalizeRecentColors(input);
@@ -62,6 +82,22 @@ export function appendRecentColor(input: readonly string[], color: string): stri
     return result.slice(result.length - MAX_RECENT_COLORS);
   }
   return result;
+}
+
+export function setFavoriteColorAt(input: readonly (string | null)[], index: number, color: string): (string | null)[] {
+  const normalized = normalizeHexColor(color);
+  const next = normalizeFavoriteColors(input);
+  if (!normalized || index < 0 || index >= FAVORITE_COLOR_SLOTS) return next;
+
+  next[index] = normalized;
+  return next;
+}
+
+export function deleteFavoriteColorAt(input: readonly (string | null)[], index: number): (string | null)[] {
+  const next = normalizeFavoriteColors(input);
+  if (index < 0 || index >= FAVORITE_COLOR_SLOTS) return next;
+  next[index] = null;
+  return next;
 }
 
 export function appendToolColor(

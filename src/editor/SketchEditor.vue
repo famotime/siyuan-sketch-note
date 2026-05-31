@@ -146,9 +146,11 @@
       v-model:lassoMode="lassoMode"
       :activeTool="displayTool"
       :colors="colors"
+      :favoriteColors="displayFavoriteColors"
       :preset="displayPreset"
       :t="t"
       :replayActive="isReplayMode"
+      :themeMode="effectiveThemeMode"
       @selectColor="onFloatingSelectColor"
       @selectCustomColor="onFloatingSelectCustomColor"
       @selectTool="selectTool($event, 'floatingToolbar')"
@@ -157,6 +159,8 @@
       @duplicateSelection="canvasRef?.duplicateLassoSelection()"
       @recolorSelection="recolorSelection"
       @deleteColor="deleteColor"
+      @setFavoriteColor="setFavoriteColor"
+      @deleteFavoriteColor="deleteFavoriteColor"
       @resetDefaultColors="resetDefaultColors"
     />
     <button
@@ -186,7 +190,7 @@ import { normalizeInputSettings } from "./inputMode";
 import { createCustomBackgroundTemplate, getCustomBackgroundDrawRect, getCustomBackgroundTemplate, updateCustomBackgroundFit } from "@/template/customBackground";
 import type { CustomBackgroundTemplate } from "@/template/customBackground";
 import type { PageOverviewItem } from "@/pages/model";
-import { normalizeToolColorPalettes } from "@/tools/palette";
+import { normalizeToolColorPalettes, normalizeToolFavoriteColors } from "@/tools/palette";
 import { getFirstImageFileFromClipboard } from "./clipboard";
 import { resolveEditorShortcut } from "./shortcuts";
 import { getDrawingToolForEditorTool, isShapeEditorTool } from "./tools";
@@ -256,6 +260,10 @@ const colorPalettes = ref(normalizeToolColorPalettes({
   pen: props.initialData?.recentColors,
   highlighter: props.initialData?.highlighterRecentColors,
 }));
+const favoriteColors = ref(normalizeToolFavoriteColors({
+  pen: props.initialData?.favoriteColors,
+  highlighter: props.initialData?.highlighterFavoriteColors,
+}));
 const canUndo = ref(false);
 const canRedo = ref(false);
 const pageState = ref({ current: 1, total: 1 });
@@ -291,6 +299,9 @@ const activePreset = computed(() => {
 });
 const displayTool = computed(() => isReplayMode.value ? replayDisplayTool.value : activeTool.value);
 const displayPreset = computed(() => isReplayMode.value && replayDisplayPreset.value ? replayDisplayPreset.value : activePreset.value);
+const displayFavoriteColors = computed(() => {
+  return displayTool.value === "highlighter" ? favoriteColors.value.highlighter : favoriteColors.value.pen;
+});
 
 // Record toolSwitch events
 watch(activeTool, () => {
@@ -332,14 +343,16 @@ const {
   inputSettings,
   customBackgrounds,
   colorPalettes,
+  favoriteColors,
   ocrIndex,
   t,
   onSaved: () => syncPageOverview(),
 });
 
-const { colors, selectColor, selectCustomColor, recolorSelection, deleteColor, resetDefaultColors } = useColorPalettes({
+const { colors, selectColor, selectCustomColor, recolorSelection, deleteColor, setFavoriteColor, deleteFavoriteColor, resetDefaultColors } = useColorPalettes({
   activeTool,
   colorPalettes,
+  favoriteColors,
   activePreset: computed(() => activePreset.value),
   canvasRef: canvasRef as any,
   t,
@@ -362,6 +375,7 @@ const { exportIncludeBackground, exportPng, exportPdf, exportJson } = useExportM
   canvasRef: canvasRef as any,
   currentTemplate,
   colorPalettes,
+  favoriteColors,
   toolPresets,
   inputSettings,
   customBackgrounds,
@@ -537,6 +551,10 @@ async function onJsonSelected(event: Event) {
     colorPalettes.value = normalizeToolColorPalettes({
       pen: imported.recentColors,
       highlighter: imported.highlighterRecentColors,
+    });
+    favoriteColors.value = normalizeToolFavoriteColors({
+      pen: imported.favoriteColors,
+      highlighter: imported.highlighterFavoriteColors,
     });
     loadedData.value = imported;
     await canvasRef.value.restoreData(imported);

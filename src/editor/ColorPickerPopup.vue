@@ -1,5 +1,11 @@
 <template>
-  <div class="sketch-color-popup">
+  <div
+    class="sketch-color-popup"
+    :class="{
+      'sketch-color-popup--theme-light': themeMode === 'light',
+      'sketch-color-popup--theme-dark': themeMode === 'dark',
+    }"
+  >
     <div class="sketch-color-popup__spectrum-wrap">
       <div
         ref="spectrumRef"
@@ -72,6 +78,7 @@ import { clampSpectrumPoint, hexToHsv, hsvToHex } from "./colorPickerModel";
 const props = defineProps<{
   modelValue: string;
   t: (key: string) => string;
+  themeMode: 'light' | 'dark';
   isPresetsOpen?: boolean;
 }>();
 
@@ -208,22 +215,55 @@ onUnmounted(removeSpectrumListeners);
 
 <style scoped>
 .sketch-color-popup {
+  --sketch-color-popup-bg: rgba(28, 28, 30, 0.94);
+  --sketch-color-popup-border: rgba(255, 255, 255, 0.14);
+  --sketch-color-popup-shadow: 0 14px 34px rgba(0, 0, 0, 0.34), 0 2px 8px rgba(0, 0, 0, 0.18);
+  --sketch-color-popup-text: rgba(255, 255, 255, 0.78);
+  --sketch-color-popup-strong-text: #fff;
+  --sketch-color-popup-control-bg: rgba(255, 255, 255, 0.1);
+  --sketch-color-popup-control-hover-bg: rgba(255, 255, 255, 0.2);
+  --sketch-color-popup-toggle-bg: rgba(255, 255, 255, 0.08);
+  --sketch-color-popup-toggle-hover-bg: rgba(255, 255, 255, 0.16);
   position: absolute;
   left: calc(100% + 8px);
   bottom: 0;
   width: 216px;
-  background: rgba(28, 28, 30, 0.94);
+  background: var(--sketch-color-popup-bg);
   backdrop-filter: blur(16px) saturate(150%);
   -webkit-backdrop-filter: blur(16px) saturate(150%);
-  border: 1px solid rgba(255, 255, 255, 0.14);
+  border: 1px solid var(--sketch-color-popup-border);
   border-radius: 16px;
   padding: 12px;
-  box-shadow: 0 14px 34px rgba(0, 0, 0, 0.34), 0 2px 8px rgba(0, 0, 0, 0.18);
+  box-shadow: var(--sketch-color-popup-shadow);
   z-index: 1001;
   display: flex;
   flex-direction: column;
   align-items: stretch;
   gap: 10px;
+}
+
+.sketch-color-popup--theme-light {
+  --sketch-color-popup-bg: rgba(255, 255, 255, 0.96);
+  --sketch-color-popup-border: rgba(15, 23, 42, 0.1);
+  --sketch-color-popup-shadow: 0 14px 34px rgba(15, 23, 42, 0.14), 0 2px 8px rgba(15, 23, 42, 0.08);
+  --sketch-color-popup-text: rgba(15, 23, 42, 0.78);
+  --sketch-color-popup-strong-text: rgba(15, 23, 42, 0.94);
+  --sketch-color-popup-control-bg: rgba(15, 23, 42, 0.08);
+  --sketch-color-popup-control-hover-bg: rgba(15, 23, 42, 0.14);
+  --sketch-color-popup-toggle-bg: rgba(15, 23, 42, 0.06);
+  --sketch-color-popup-toggle-hover-bg: rgba(15, 23, 42, 0.12);
+}
+
+.sketch-color-popup--theme-dark {
+  --sketch-color-popup-bg: rgba(28, 28, 30, 0.94);
+  --sketch-color-popup-border: rgba(255, 255, 255, 0.14);
+  --sketch-color-popup-shadow: 0 14px 34px rgba(0, 0, 0, 0.34), 0 2px 8px rgba(0, 0, 0, 0.18);
+  --sketch-color-popup-text: rgba(255, 255, 255, 0.78);
+  --sketch-color-popup-strong-text: #fff;
+  --sketch-color-popup-control-bg: rgba(255, 255, 255, 0.1);
+  --sketch-color-popup-control-hover-bg: rgba(255, 255, 255, 0.2);
+  --sketch-color-popup-toggle-bg: rgba(255, 255, 255, 0.08);
+  --sketch-color-popup-toggle-hover-bg: rgba(255, 255, 255, 0.16);
 }
 
 .sketch-color-popup__spectrum-wrap {
@@ -330,7 +370,7 @@ onUnmounted(removeSpectrumListeners);
 }
 
 .sketch-color-popup__value {
-  color: rgba(255, 255, 255, 0.78);
+  color: var(--sketch-color-popup-text);
   font-size: 11px;
   letter-spacing: 0.08em;
   font-variant-numeric: tabular-nums;
@@ -342,8 +382,8 @@ onUnmounted(removeSpectrumListeners);
   height: 24px;
   border: none;
   border-radius: 6px;
-  background: rgba(255, 255, 255, 0.1);
-  color: rgba(255, 255, 255, 0.78);
+  background: var(--sketch-color-popup-control-bg);
+  color: var(--sketch-color-popup-text);
   cursor: pointer;
   display: inline-flex;
   align-items: center;
@@ -354,8 +394,8 @@ onUnmounted(removeSpectrumListeners);
 }
 
 .sketch-color-popup__eyedropper:hover {
-  background: rgba(255, 255, 255, 0.2);
-  color: #fff;
+  background: var(--sketch-color-popup-control-hover-bg);
+  color: var(--sketch-color-popup-strong-text);
 }
 
 .sketch-color-popup__eyedropper--disabled {
@@ -364,8 +404,8 @@ onUnmounted(removeSpectrumListeners);
 }
 
 .sketch-color-popup__eyedropper--disabled:hover {
-  background: rgba(255, 255, 255, 0.1);
-  color: rgba(255, 255, 255, 0.78);
+  background: var(--sketch-color-popup-control-bg);
+  color: var(--sketch-color-popup-text);
 }
 
 .sketch-color-popup__eyedropper-icon {
@@ -380,8 +420,8 @@ onUnmounted(removeSpectrumListeners);
   height: 18px;
   border: none;
   border-radius: 999px;
-  background: rgba(255, 255, 255, 0.08);
-  color: rgba(255, 255, 255, 0.7);
+  background: var(--sketch-color-popup-toggle-bg);
+  color: var(--sketch-color-popup-text);
   cursor: pointer;
   display: inline-flex;
   align-items: center;
@@ -391,8 +431,8 @@ onUnmounted(removeSpectrumListeners);
 
 .sketch-color-popup__preset-toggle:hover,
 .sketch-color-popup__preset-toggle--open {
-  background: rgba(255, 255, 255, 0.16);
-  color: #fff;
+  background: var(--sketch-color-popup-toggle-hover-bg);
+  color: var(--sketch-color-popup-strong-text);
 }
 
 .sketch-color-popup__preset-toggle:active {

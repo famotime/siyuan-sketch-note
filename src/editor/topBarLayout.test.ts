@@ -313,6 +313,47 @@ it("renders a visible hue spectrum and the custom eyedropper icon in the color p
   expect(colorPicker).toContain("M13.432 2.569");
 });
 
+it("uses light themed color picker popups when the editor is in light mode", () => {
+  const editor = readFileSync(resolve(process.cwd(), "src/editor/SketchEditor.vue"), "utf8");
+  const floatingToolbar = readFileSync(resolve(process.cwd(), "src/editor/FloatingToolbar.vue"), "utf8");
+  const colorPicker = readFileSync(resolve(process.cwd(), "src/editor/ColorPickerPopup.vue"), "utf8");
+
+  expect(editor).toContain(':themeMode="effectiveThemeMode"');
+  expect(floatingToolbar).toContain("themeMode: 'light' | 'dark'");
+  expect(floatingToolbar).toContain(':themeMode="themeMode"');
+  expect(floatingToolbar).toContain("'sketch-float-presets-below--theme-light': themeMode === 'light'");
+  expect(colorPicker).toContain("themeMode: 'light' | 'dark'");
+  expect(colorPicker).toContain("'sketch-color-popup--theme-light': themeMode === 'light'");
+  expect(colorPicker).toMatch(/\.sketch-color-popup--theme-light\s*\{[^}]*--sketch-color-popup-bg:\s*rgba\(255,\s*255,\s*255,\s*0\.96\)/s);
+  expect(colorPicker).toMatch(/\.sketch-color-popup\s*\{[^}]*background:\s*var\(--sketch-color-popup-bg\)/s);
+});
+
+it("aligns preset color panel width with the color picker", () => {
+  const floatingToolbar = readFileSync(resolve(process.cwd(), "src/editor/FloatingToolbar.vue"), "utf8");
+
+  expect(floatingToolbar).toMatch(/\.sketch-float-presets-below\s*\{[^}]*width:\s*216px;[^}]*box-sizing:\s*border-box/s);
+});
+
+it("renders preset colors above a fixed favorite color slot row", () => {
+  const palette = readFileSync(resolve(process.cwd(), "src/editor/PresetColorPalette.vue"), "utf8");
+  const floatingToolbar = readFileSync(resolve(process.cwd(), "src/editor/FloatingToolbar.vue"), "utf8");
+
+  expect(palette).toContain("favoriteSlots");
+  expect(palette).toContain("sketch-preset-favorites");
+  expect(palette).toContain("sketch-preset-favorite-slot--empty");
+  expect(palette).toContain("{{ slot.color ? \"\" : \"+\" }}");
+  expect(palette).toContain("@contextmenu.prevent=\"deleteFavorite(slot.index)\"");
+  expect(palette).toContain("onFavoritePointerDown(slot, $event)");
+  expect(palette).toContain("(e: \"setFavorite\", index: number, color: string): void");
+  expect(palette).toContain("(e: \"deleteFavorite\", index: number): void");
+  expect(floatingToolbar).toContain(":favoriteColors=\"favoriteColors\"");
+  expect(floatingToolbar).toContain("favoriteColors: readonly (string | null)[]");
+  expect(floatingToolbar).toContain(":currentColor=\"pendingAddColor ?? preset.color\"");
+  expect(floatingToolbar).toContain("@setFavorite=\"setFavoriteColor\"");
+  expect(floatingToolbar).toContain("@deleteFavorite=\"deleteFavoriteColor\"");
+  expect(floatingToolbar).not.toContain("recentPaletteColors");
+});
+
 it("closes floating color popups from captured pointer events outside the picker", () => {
   const floatingToolbar = readFileSync(resolve(process.cwd(), "src/editor/FloatingToolbar.vue"), "utf8");
 

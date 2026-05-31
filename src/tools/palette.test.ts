@@ -5,6 +5,9 @@ import {
   appendRecentColor,
   appendToolColor,
   normalizeToolColorPalettes,
+  setFavoriteColorAt,
+  deleteFavoriteColorAt,
+  normalizeFavoriteColors,
 } from "./palette";
 
 describe("tool color palette", () => {
@@ -52,5 +55,27 @@ describe("tool color palette", () => {
     expect(next.pen).toEqual(palettes.pen);
     expect(next.highlighter).toContain("#abcdef");
     expect(next.pen).not.toContain("#abcdef");
+  });
+
+  it("sets a favorite color at the requested slot and keeps other slots in order", () => {
+    const next = setFavoriteColorAt(["#111111", "#222222"], 3, "#ABCDEF");
+
+    expect(next).toEqual(["#111111", "#222222", null, "#abcdef", null]);
+  });
+
+  it("deletes a favorite color at the requested slot without shifting other slots", () => {
+    const next = deleteFavoriteColorAt(["#111111", "#222222", "#111111"], 0);
+
+    expect(next).toEqual([null, "#222222", "#111111", null, null]);
+  });
+
+  it("normalizes favorite color slots as a fixed row with empty positions", () => {
+    expect(normalizeFavoriteColors(["#ABCDEF", "bad", null, "#123456"])).toEqual([
+      "#abcdef",
+      null,
+      null,
+      "#123456",
+      null,
+    ]);
   });
 });
