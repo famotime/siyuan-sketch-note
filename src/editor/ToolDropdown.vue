@@ -2,6 +2,7 @@
   <div
     ref="rootRef"
     class="sketch-tool-dropdown"
+    @mousedown.stop
   >
     <!-- 触发器按钮 -->
     <div
@@ -10,8 +11,8 @@
     >
       <slot name="trigger" />
       <span class="sketch-tool-dropdown__arrow">
-        <svg viewBox="0 0 8 8" fill="currentColor">
-          <path d="M2 8L8 8L8 2Z" />
+        <svg viewBox="0 0 10 10" fill="currentColor">
+          <path d="M2 10L10 10L10 2Z" />
         </svg>
       </span>
     </div>
@@ -69,11 +70,11 @@ function onClickOutside(e: MouseEvent) {
 }
 
 onMounted(() => {
-  document.addEventListener('mousedown', onClickOutside)
+  document.addEventListener('click', onClickOutside, true)
 })
 
 onUnmounted(() => {
-  document.removeEventListener('mousedown', onClickOutside)
+  document.removeEventListener('click', onClickOutside, true)
 })
 </script>
 
@@ -94,9 +95,9 @@ onUnmounted(() => {
   position: absolute;
   right: 0;
   bottom: 0;
-  width: 8px;
-  height: 8px;
-  opacity: 0.55;
+  width: 10px;
+  height: 10px;
+  opacity: 0.5;
   pointer-events: none;
   display: flex;
   align-items: center;
