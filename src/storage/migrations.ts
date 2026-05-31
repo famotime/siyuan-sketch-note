@@ -1,6 +1,7 @@
 import { migrateStrokesToElements, withStrokeBounds } from "@/elements/model";
 import { getSketchPages } from "@/pages/model";
 import { normalizeFavoriteColors, normalizeHighlighterRecentColors, normalizeRecentColors } from "@/tools/palette";
+import { normalizeToolPresets } from "@/tools/presets";
 import type { SketchData } from "@/types/sketch";
 import {
   CANVAS_INITIAL_HEIGHT,
@@ -45,6 +46,7 @@ export function migrateSketchData(raw: unknown): SketchData {
     recentColors: normalizeRecentColors(data.recentColors),
     strokes,
     template: data.template || DEFAULT_SKETCH_DATA.template,
+    toolPresets: normalizeToolPresets(data.toolPresets),
     version: 1,
   };
 }
