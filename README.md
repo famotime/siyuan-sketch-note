@@ -2,6 +2,8 @@
 
 思源笔记手写插件。在文档中嵌入一块手写画布，用触控笔或鼠标自由书写、绘图、标注，内容以矢量形式保存，随时可以再次编辑。
 
+![image](https://raw.githubusercontent.com/famotime/siyuan-sketch-note/master/assets/intro.webp)
+
 ## 典型场景
 
 **课堂 / 会议速记** — 手写比打字更快捕捉灵感。插入一个手写块，用画笔或荧光笔记录要点，支持多页分隔，结束后导出 PDF 存档。

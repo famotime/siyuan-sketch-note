@@ -49,8 +49,8 @@ export interface AlphaFeatureHideConfig {
 // ── 编辑此对象来控制功能可见性 ──
 
 const ALPHA_FEATURE_HIDE_CONFIG: AlphaFeatureHideConfig = {
-  hiddenSettingKeys: ['replay'],
-  hiddenTopbarKeys: ['replay', 'insertImage'],
+  hiddenSettingKeys: [],
+  hiddenTopbarKeys: [],
 };
 
 // ── 工具函数 ──
