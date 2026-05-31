@@ -4,39 +4,75 @@
       class="sketch-toolbar-group"
       :class="{ 'sketch-toolbar-group--replay': replayActive }"
     >
-      <!-- 画笔 -->
-      <button
-        class="sketch-btn sketch-btn--tool sketch-btn--icon-tool"
-        :class="{ 'sketch-btn--tool-active': getToolButtonActiveState(activeTool, 'pen') }"
-        :title="t('pen')"
-        :aria-label="t('pen')"
-        data-tool="pen"
-        @click="$emit('selectTool', 'pen')"
-      >
-        <span
-          class="sketch-btn__icon"
-          aria-hidden="true"
-        >
-          <IconParkIcon name="Write" />
-        </span>
-      </button>
+      <!-- 画笔（下拉） -->
+      <ToolDropdown v-model="showPenDropdown">
+        <template #trigger>
+          <button
+            class="sketch-btn sketch-btn--tool sketch-btn--icon-tool sketch-btn--dropdown-trigger"
+            :class="{ 'sketch-btn--tool-active': getToolButtonActiveState(activeTool, 'pen') }"
+            :title="t(props.penSubtype === 'ballpoint' ? 'pen' : PEN_SUBTYPE_LABEL_KEYS[props.penSubtype])"
+            :aria-label="t('pen')"
+            data-tool="pen"
+            @click="emit('selectTool', 'pen')"
+          >
+            <span
+              class="sketch-btn__icon"
+              aria-hidden="true"
+              v-html="PEN_SUBTYPE_ICONS[props.penSubtype]"
+            />
+          </button>
+        </template>
+        <template #dropdown>
+          <button
+            v-for="subtype in penSubtypes"
+            :key="subtype"
+            class="sketch-dropdown-item"
+            :class="{ 'sketch-dropdown-item--active': props.penSubtype === subtype }"
+            @click="onSelectPenSubtype(subtype)"
+          >
+            <span
+              class="sketch-dropdown-item__icon"
+              v-html="PEN_SUBTYPE_ICONS[subtype]"
+            />
+            <span class="sketch-dropdown-item__label">{{ t(PEN_SUBTYPE_LABEL_KEYS[subtype]) }}</span>
+          </button>
+        </template>
+      </ToolDropdown>
 
-      <!-- 荧光笔 -->
-      <button
-        class="sketch-btn sketch-btn--tool sketch-btn--icon-tool"
-        :class="{ 'sketch-btn--tool-active': getToolButtonActiveState(activeTool, 'highlighter') }"
-        :title="t('highlighter')"
-        :aria-label="t('highlighter')"
-        data-tool="highlighter"
-        @click="$emit('selectTool', 'highlighter')"
-      >
-        <span
-          class="sketch-btn__icon"
-          aria-hidden="true"
-        >
-          <IconParkIcon name="FormatBrush" />
-        </span>
-      </button>
+      <!-- 荧光笔（下拉） -->
+      <ToolDropdown v-model="showHighlighterDropdown">
+        <template #trigger>
+          <button
+            class="sketch-btn sketch-btn--tool sketch-btn--icon-tool sketch-btn--dropdown-trigger"
+            :class="{ 'sketch-btn--tool-active': getToolButtonActiveState(activeTool, 'highlighter') }"
+            :title="t(HIGHLIGHTER_SUBTYPE_LABEL_KEYS[props.highlighterSubtype])"
+            :aria-label="t('highlighter')"
+            data-tool="highlighter"
+            @click="emit('selectTool', 'highlighter')"
+          >
+            <span
+              class="sketch-btn__icon"
+              aria-hidden="true"
+              v-html="HIGHLIGHTER_SUBTYPE_ICONS[props.highlighterSubtype]"
+            />
+          </button>
+        </template>
+        <template #dropdown>
+          <button
+            v-for="subtype in highlighterSubtypes"
+            :key="subtype"
+            class="sketch-dropdown-item"
+            :class="{ 'sketch-dropdown-item--active': props.highlighterSubtype === subtype }"
+            @click="onSelectHighlighterSubtype(subtype)"
+          >
+            <span
+              class="sketch-dropdown-item__icon"
+              v-html="HIGHLIGHTER_SUBTYPE_ICONS[subtype]"
+            />
+            <span class="sketch-dropdown-item__label">{{ t(HIGHLIGHTER_SUBTYPE_LABEL_KEYS[subtype]) }}</span>
+          </button>
+        </template>
+      </ToolDropdown>
 
       <!-- 橡皮擦 -->
       <button
@@ -160,21 +196,28 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from "vue";
+import { ref, computed } from "vue";
 import type { EditorTool, ShapeEditorTool } from "./tools";
+import type { PenSubtype, HighlighterSubtype } from "@/types/sketch";
 import IconParkIcon from "./IconParkIcon.vue";
+import ToolDropdown from "./ToolDropdown.vue";
 import type { IconParkName } from "./iconParkIcons";
+import { PEN_SUBTYPE_ICONS, HIGHLIGHTER_SUBTYPE_ICONS, PEN_SUBTYPE_LABEL_KEYS, HIGHLIGHTER_SUBTYPE_LABEL_KEYS } from "./penSubtypeIcons";
 import { getToolButtonActiveState } from "./toolbarModel";
 
 const props = defineProps<{
   activeTool: EditorTool;
   lastShapeTool: ShapeEditorTool;
+  penSubtype: PenSubtype;
+  highlighterSubtype: HighlighterSubtype;
   t: (key: string) => string;
   replayActive?: boolean;
 }>();
 
-defineEmits<{
+const emit = defineEmits<{
   (e: "selectTool", tool: EditorTool): void;
+  (e: "selectPenSubtype", subtype: PenSubtype): void;
+  (e: "selectHighlighterSubtype", subtype: HighlighterSubtype): void;
 }>();
 
 // ── 根据上次选择的图形映射图形图标 ──
@@ -188,6 +231,23 @@ const currentShapeIcon = computed<IconParkName>(() => {
   };
   return icons[props.lastShapeTool] ?? "Minus";
 });
+
+// ── 画笔 / 荧光笔下拉 ──
+const showPenDropdown = ref(false);
+const showHighlighterDropdown = ref(false);
+
+const penSubtypes: PenSubtype[] = ["ballpoint", "pencil", "fountain", "brush"];
+const highlighterSubtypes: HighlighterSubtype[] = ["round", "square", "watercolor"];
+
+function onSelectPenSubtype(subtype: PenSubtype) {
+  emit("selectPenSubtype", subtype);
+  showPenDropdown.value = false;
+}
+
+function onSelectHighlighterSubtype(subtype: HighlighterSubtype) {
+  emit("selectHighlighterSubtype", subtype);
+  showHighlighterDropdown.value = false;
+}
 </script>
 
 <style scoped>
@@ -269,6 +329,53 @@ const currentShapeIcon = computed<IconParkName>(() => {
 /* 回放时禁止交互 */
 .sketch-toolbar-group--replay {
   pointer-events: none;
+}
+
+/* 下拉项 */
+.sketch-btn--dropdown-trigger {
+  position: relative;
+  padding-right: 14px;
+}
+
+.sketch-dropdown-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 6px 10px;
+  border: none;
+  background: transparent;
+  color: var(--sketch-toolbar-text);
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 13px;
+  transition: background 0.15s ease;
+}
+
+.sketch-dropdown-item:hover {
+  background: var(--sketch-toolbar-border);
+}
+
+.sketch-dropdown-item--active {
+  background: var(--b3-theme-primary);
+  color: var(--sketch-toolbar-active-text);
+}
+
+.sketch-dropdown-item__icon {
+  display: inline-flex;
+  align-items: center;
+  font-size: 14px;
+  width: 1em;
+  height: 1em;
+}
+
+.sketch-dropdown-item__icon > svg {
+  width: 1em;
+  height: 1em;
+}
+
+.sketch-dropdown-item__label {
+  white-space: nowrap;
 }
 
 </style>
