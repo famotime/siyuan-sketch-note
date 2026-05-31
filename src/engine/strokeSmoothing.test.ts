@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import type { StrokePoint } from "@/types/sketch";
 import {
+  getBrushOpacity,
+  getBrushPressureWidth,
   filterStrokePointsByDistance,
   getPressureWidth,
   getSmoothedSegments,
@@ -62,5 +64,26 @@ describe("stroke smoothing", () => {
     expect(getPressureWidth(10, 0.5)).toBe(10);
     expect(getPressureWidth(10, 1)).toBe(15);
     expect(getPressureWidth(10, 3)).toBe(15);
+  });
+
+  it("maps brush profile pressure to width and opacity independently", () => {
+    const pencil = {
+      id: "pen.pencil",
+      tool: "pen" as const,
+      sizePressure: { min: 0.85, max: 1.15, curve: "linear" as const },
+      opacityPressure: { min: 0.6, max: 1, curve: "linear" as const },
+      flow: 0.82,
+      taper: { start: 0.12, end: 0.18 },
+      lineCap: "round" as const,
+      lineJoin: "round" as const,
+      texture: { kind: "grain" as const, amount: 0.18 },
+      smoothing: 0.55,
+      blendMode: "source-over" as const,
+    };
+
+    expect(getBrushPressureWidth(10, 0, pencil)).toBe(8.5);
+    expect(getBrushPressureWidth(10, 1, pencil)).toBe(11.5);
+    expect(getBrushOpacity(0.65, 0, pencil)).toBeCloseTo(0.3198, 4);
+    expect(getBrushOpacity(0.65, 1, pencil)).toBeCloseTo(0.533, 4);
   });
 });

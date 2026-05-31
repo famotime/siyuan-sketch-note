@@ -18,6 +18,9 @@ export interface Stroke {
   width: number; // base line width in px
   opacity?: number; // 0~1, default 1 for old data
   tool: SketchTool;
+  brushProfileId?: string;
+  penSubtype?: PenSubtype;
+  highlighterSubtype?: HighlighterSubtype;
   bounds?: Bounds; // precomputed bounds for large documents
   isShape?: boolean; // 是否为几何形状（跳过贝塞尔平滑）
 }
@@ -73,6 +76,39 @@ export type SketchTool = "pen" | "highlighter" | "eraser";
 export type PenSubtype = "pencil" | "ballpoint" | "fountain" | "brush";
 export type HighlighterSubtype = "round" | "square" | "watercolor";
 
+export type BrushCurve = "linear" | "sigmoid";
+export type BrushTextureKind = "none" | "grain" | "wash";
+
+export interface BrushPressureRange {
+  min: number;
+  max: number;
+  curve: BrushCurve;
+}
+
+export interface BrushTaperSettings {
+  start: number;
+  end: number;
+}
+
+export interface BrushTextureSettings {
+  kind: BrushTextureKind;
+  amount: number;
+}
+
+export interface BrushProfile {
+  id: string;
+  tool: SketchTool;
+  sizePressure: BrushPressureRange;
+  opacityPressure: BrushPressureRange;
+  flow: number;
+  taper: BrushTaperSettings;
+  lineCap: CanvasLineCap;
+  lineJoin: CanvasLineJoin;
+  texture: BrushTextureSettings;
+  smoothing: number;
+  blendMode: GlobalCompositeOperation;
+}
+
 export const DEFAULT_PEN_SUBTYPE: PenSubtype = "ballpoint";
 export const DEFAULT_HIGHLIGHTER_SUBTYPE: HighlighterSubtype = "round";
 
@@ -82,6 +118,7 @@ export interface ToolPreset {
   width: number;
   opacity: number;
   mode: "ink" | "marker" | "pixel" | "stroke";
+  brushProfileId?: string;
   penSubtype?: PenSubtype;
   highlighterSubtype?: HighlighterSubtype;
 }
@@ -106,20 +143,20 @@ export const HIGHLIGHTER_PRESET_COLORS = [
 
 export const DEFAULT_PEN_WIDTH = 3;
 export const DEFAULT_HIGHLIGHTER_WIDTH = 18;
-export const DEFAULT_ERASER_WIDTH = 20;
+export const DEFAULT_ERASER_WIDTH = 24;
 export const CANVAS_LOGICAL_WIDTH = 800;
 export const CANVAS_INITIAL_HEIGHT = 1200;
 export const CANVAS_HEIGHT_INCREMENT = 600;
 
 export const PEN_SUBTYPE_DEFAULTS: Record<PenSubtype, { color: string; width: number; opacity: number }> = {
-  pencil:    { color: "#4a4a4a", width: 2,   opacity: 0.85 },
-  ballpoint: { color: "#1a237e", width: 1.5, opacity: 1.0 },
-  fountain:  { color: "#1a1a2e", width: 2,   opacity: 0.95 },
-  brush:     { color: "#1a1a2e", width: 3,   opacity: 0.9 },
+  pencil:    { color: "#565656", width: 2.2, opacity: 0.65 },
+  ballpoint: { color: "#1f2a7a", width: 1.8, opacity: 1.0 },
+  fountain:  { color: "#111827", width: 2.4, opacity: 0.96 },
+  brush:     { color: "#111111", width: 5.5, opacity: 0.9 },
 };
 
 export const HIGHLIGHTER_SUBTYPE_DEFAULTS: Record<HighlighterSubtype, { color: string; width: number; opacity: number }> = {
-  round:      { color: "#fff176", width: 18, opacity: 0.45 },
-  square:     { color: "#fff176", width: 18, opacity: 0.45 },
-  watercolor: { color: "#64b5f6", width: 24, opacity: 0.3 },
+  round:      { color: "#fff176", width: 21, opacity: 0.36 },
+  square:     { color: "#fff176", width: 24, opacity: 0.34 },
+  watercolor: { color: "#64b5f6", width: 30, opacity: 0.22 },
 };

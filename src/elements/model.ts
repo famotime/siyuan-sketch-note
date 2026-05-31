@@ -1,4 +1,5 @@
 import type { Stroke } from "@/types/sketch";
+import { resolveBrushProfile } from "@/tools/brushProfiles";
 import type { ImageElement } from "./image";
 import type { ShapeElement } from "./shapes";
 import type { TextElement } from "./text";
@@ -65,9 +66,18 @@ export function calculateStrokeBounds(stroke: Stroke): Bounds {
 }
 
 export function withStrokeBounds(stroke: Stroke): Stroke {
-  return {
+  const profile = resolveBrushProfile(stroke.brushProfileId, stroke.tool, {
+    tool: stroke.tool,
+    penSubtype: stroke.penSubtype,
+    highlighterSubtype: stroke.highlighterSubtype,
+  });
+  const normalizedStroke = {
     ...stroke,
-    bounds: stroke.bounds ?? calculateStrokeBounds(stroke),
+    brushProfileId: profile.id,
+  };
+  return {
+    ...normalizedStroke,
+    bounds: normalizedStroke.bounds ?? calculateStrokeBounds(normalizedStroke),
   };
 }
 

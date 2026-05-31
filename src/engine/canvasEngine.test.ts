@@ -171,10 +171,64 @@ describe("canvas engine history", () => {
     handlePointerUp(state);
 
     expect(state.strokes[0].bounds).toEqual({
-      x: 9.25,
-      y: 19.25,
-      width: 31.5,
-      height: 31.5,
+      x: 9.1,
+      y: 19.1,
+      width: 31.799999999999997,
+      height: 31.799999999999997,
+    });
+  });
+
+  it("persists the active brush profile identity on completed strokes", () => {
+    const state = createEngineState("blank");
+    state.tool = "pen";
+    state.toolPresets.pen.penSubtype = "brush";
+    state.toolPresets.pen.brushProfileId = "pen.brush";
+    state.toolPresets.pen.color = "#111111";
+    state.toolPresets.pen.width = 5.5;
+    state.toolPresets.pen.opacity = 0.9;
+
+    const canvas = {
+      getBoundingClientRect: () => ({ left: 0, top: 0 }),
+      getContext: () => ({
+        save() {},
+        restore() {},
+        beginPath() {},
+        moveTo() {},
+        lineTo() {},
+        stroke() {},
+        get lineWidth() { return 1; },
+        set lineWidth(_value: number) {},
+        get lineJoin() { return ""; },
+        set lineJoin(_value: string) {},
+        get lineCap() { return ""; },
+        set lineCap(_value: string) {},
+        get globalAlpha() { return 1; },
+        set globalAlpha(_value: number) {},
+        get globalCompositeOperation() { return ""; },
+        set globalCompositeOperation(_value: string) {},
+        get strokeStyle() { return ""; },
+        set strokeStyle(_value: string) {},
+      }),
+    } as unknown as HTMLCanvasElement;
+
+    handlePointerDown(state, {
+      clientX: 10,
+      clientY: 20,
+      pressure: 0.5,
+      timeStamp: 1,
+    } as PointerEvent, canvas);
+    handlePointerMove(state, {
+      clientX: 40,
+      clientY: 50,
+      pressure: 0.5,
+      timeStamp: 2,
+    } as PointerEvent, canvas);
+    handlePointerUp(state);
+
+    expect(state.strokes[0]).toMatchObject({
+      tool: "pen",
+      penSubtype: "brush",
+      brushProfileId: "pen.brush",
     });
   });
 

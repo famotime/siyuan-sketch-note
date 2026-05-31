@@ -1,10 +1,11 @@
-import type { PenSubtype, SketchData, SketchPage, SketchTool, Stroke, StrokePoint, ToolPresetCollection } from "@/types/sketch";
+import type { SketchData, SketchPage, SketchTool, Stroke, StrokePoint, ToolPresetCollection } from "@/types/sketch";
 import {
   CANVAS_LOGICAL_WIDTH,
   CANVAS_HEIGHT_INCREMENT,
 } from "@/types/sketch";
 import { getTemplate } from "@/template";
 import { normalizeToolPresets } from "@/tools/presets";
+import { resolveBrushProfile } from "@/tools/brushProfiles";
 import { migrateStrokesToElements, withStrokeBounds } from "@/elements/model";
 import type { SketchElement } from "@/elements/model";
 import { splitElementsForRender } from "@/elements/renderOrder";
@@ -13,9 +14,8 @@ import { getCustomBackgroundDrawRect, getCustomBackgroundTemplate } from "@/temp
 import type { CustomBackgroundTemplate } from "@/template/customBackground";
 import {
   filterStrokePointsByDistance,
-  getPenSubtypeOpacityMultiplier,
-  getPenSubtypePressureWidth,
-  getPressureWidth,
+  getBrushOpacity,
+  getBrushPressureWidth,
   getSmoothedSegments,
 } from "./strokeSmoothing";
 
@@ -219,6 +219,7 @@ export function handlePointerDown(
   const x = e.canvasX ?? ((e.clientX ?? 0) - rect.left);
   const y = e.canvasY ?? ((e.clientY ?? 0) - rect.top);
   const preset = state.toolPresets[state.tool];
+  const profile = resolveBrushProfile(preset.brushProfileId, preset.tool, preset);
   const rawPressure = state.enablePressure ? (e.pressure || 0.5) : 0.5;
   state.currentStroke = {
     id: newId(),
@@ -227,6 +228,9 @@ export function handlePointerDown(
     width: preset.width,
     opacity: preset.opacity,
     tool: state.tool,
+    brushProfileId: profile.id,
+    penSubtype: state.tool === "pen" ? preset.penSubtype : undefined,
+    highlighterSubtype: state.tool === "highlighter" ? preset.highlighterSubtype : undefined,
   };
 }
 
@@ -259,7 +263,7 @@ export function handlePointerMove(
   if (shouldRenderLiveSegment && pts.length >= 2) {
     const prev = pts[pts.length - 2];
     const curr = pts[pts.length - 1];
-    renderStrokeSegment(ctx, state.currentStroke, prev, curr, state.toolPresets[state.tool].penSubtype);
+    renderStrokeSegment(ctx, state.currentStroke, prev, curr);
   }
   return heightChanged;
 }
@@ -414,23 +418,28 @@ function renderImageElement(ctx: CanvasRenderingContext2D, element: Extract<Sket
 function renderStroke(ctx: CanvasRenderingContext2D, stroke: Stroke): void {
   const { points, color, width, tool, isShape } = stroke;
   if (points.length < 2) return;
+  const profile = resolveBrushProfile(stroke.brushProfileId, stroke.tool, {
+    tool: stroke.tool,
+    penSubtype: stroke.penSubtype,
+    highlighterSubtype: stroke.highlighterSubtype,
+  });
   ctx.save();
   if (tool === "eraser") {
-    ctx.globalCompositeOperation = "destination-out";
+    ctx.globalCompositeOperation = profile.blendMode;
     ctx.strokeStyle = "rgba(0,0,0,1)";
   } else {
-    ctx.globalAlpha = stroke.opacity ?? 1;
-    ctx.globalCompositeOperation = "source-over";
+    ctx.globalAlpha = getBrushOpacity(stroke.opacity ?? 1, points[0].pressure, profile);
+    ctx.globalCompositeOperation = profile.blendMode;
     ctx.strokeStyle = color;
   }
-  ctx.lineJoin = "round";
-  ctx.lineCap = "round";
+  ctx.lineJoin = profile.lineJoin;
+  ctx.lineCap = profile.lineCap;
 
   const firstPressure = points[0].pressure;
   const allSame = points.every((p) => p.pressure === firstPressure);
 
   if (isShape) {
-    ctx.lineWidth = getPressureWidth(width, firstPressure);
+    ctx.lineWidth = getBrushPressureWidth(width, firstPressure, profile);
     ctx.beginPath();
     ctx.moveTo(points[0].x, points[0].y);
     for (let i = 1; i < points.length; i++) {
@@ -439,7 +448,10 @@ function renderStroke(ctx: CanvasRenderingContext2D, stroke: Stroke): void {
     ctx.stroke();
   } else if (allSame) {
     // 整体一次性流畅渲染，可有效消除半透明荧光笔重叠导致的斑点痕迹，性能极佳
-    ctx.lineWidth = getPressureWidth(width, firstPressure);
+    ctx.lineWidth = getBrushPressureWidth(width, firstPressure, profile);
+    if (tool !== "eraser") {
+      ctx.globalAlpha = getBrushOpacity(stroke.opacity ?? 1, firstPressure, profile);
+    }
     ctx.beginPath();
     ctx.moveTo(points[0].x, points[0].y);
     for (const segment of getSmoothedSegments(points)) {
@@ -457,7 +469,10 @@ function renderStroke(ctx: CanvasRenderingContext2D, stroke: Stroke): void {
     let currentX = points[0].x;
     let currentY = points[0].y;
     for (const segment of segments) {
-      ctx.lineWidth = getPressureWidth(width, segment.control.pressure);
+      ctx.lineWidth = getBrushPressureWidth(width, segment.control.pressure, profile);
+      if (tool !== "eraser") {
+        ctx.globalAlpha = getBrushOpacity(stroke.opacity ?? 1, segment.control.pressure, profile);
+      }
       ctx.beginPath();
       ctx.moveTo(currentX, currentY);
       ctx.quadraticCurveTo(
@@ -479,26 +494,24 @@ function renderStrokeSegment(
   stroke: Stroke,
   prev: StrokePoint,
   curr: StrokePoint,
-  penSubtype?: PenSubtype,
 ): void {
+  const profile = resolveBrushProfile(stroke.brushProfileId, stroke.tool, {
+    tool: stroke.tool,
+    penSubtype: stroke.penSubtype,
+    highlighterSubtype: stroke.highlighterSubtype,
+  });
   ctx.save();
   if (stroke.tool === "eraser") {
-    ctx.globalCompositeOperation = "destination-out";
+    ctx.globalCompositeOperation = profile.blendMode;
     ctx.strokeStyle = "rgba(0,0,0,1)";
   } else {
-    ctx.globalAlpha = stroke.opacity ?? 1;
-    ctx.globalCompositeOperation = "source-over";
+    ctx.globalAlpha = getBrushOpacity(stroke.opacity ?? 1, curr.pressure, profile);
+    ctx.globalCompositeOperation = profile.blendMode;
     ctx.strokeStyle = stroke.color;
   }
-  const segWidth = stroke.tool === "pen"
-    ? getPenSubtypePressureWidth(stroke.width, curr.pressure, penSubtype)
-    : getPressureWidth(stroke.width, curr.pressure);
-  ctx.lineWidth = segWidth;
-  if (stroke.tool === "pen" && penSubtype) {
-    ctx.globalAlpha = (stroke.opacity ?? 1) * getPenSubtypeOpacityMultiplier(curr.pressure, penSubtype);
-  }
-  ctx.lineJoin = "round";
-  ctx.lineCap = "round";
+  ctx.lineWidth = getBrushPressureWidth(stroke.width, curr.pressure, profile);
+  ctx.lineJoin = profile.lineJoin;
+  ctx.lineCap = profile.lineCap;
   ctx.beginPath();
   ctx.moveTo(prev.x, prev.y);
   ctx.lineTo(curr.x, curr.y);

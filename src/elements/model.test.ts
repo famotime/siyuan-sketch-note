@@ -35,6 +35,7 @@ describe("element model", () => {
       type: "stroke",
       stroke: {
         ...stroke,
+        brushProfileId: "pen.ballpoint",
         bounds: {
           x: 5,
           y: 15,
@@ -57,5 +58,6 @@ describe("element model", () => {
       },
       zIndex: 0,
     }]);
+    expect(stroke).not.toHaveProperty("brushProfileId");
   });
 });

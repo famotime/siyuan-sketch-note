@@ -1,4 +1,4 @@
-import type { StrokePoint } from "@/types/sketch";
+import type { BrushPressureRange, BrushProfile, StrokePoint } from "@/types/sketch";
 import type { PenSubtype, HighlighterSubtype } from "@/types/sketch";
 
 export interface SmoothedSegment {
@@ -72,6 +72,36 @@ export function getPressureWidth(baseWidth: number, pressure: number): number {
 
 function sigmoid(t: number): number {
   return 1 / (1 + Math.exp(-10 * (t - 0.5)));
+}
+
+function normalizePressure(pressure: number): number {
+  return Math.min(1, Math.max(0, Number.isFinite(pressure) ? pressure : 0.5));
+}
+
+function applyBrushCurve(pressure: number, curve: BrushPressureRange["curve"]): number {
+  return curve === "sigmoid" ? sigmoid(pressure) : pressure;
+}
+
+function getBrushPressureMultiplier(pressure: number, range: BrushPressureRange): number {
+  const p = applyBrushCurve(normalizePressure(pressure), range.curve);
+  return range.min + (range.max - range.min) * p;
+}
+
+export function getBrushPressureWidth(
+  baseWidth: number,
+  pressure: number,
+  profile: BrushProfile,
+): number {
+  return baseWidth * getBrushPressureMultiplier(pressure, profile.sizePressure);
+}
+
+export function getBrushOpacity(
+  baseOpacity: number,
+  pressure: number,
+  profile: BrushProfile,
+): number {
+  const opacity = baseOpacity * profile.flow * getBrushPressureMultiplier(pressure, profile.opacityPressure);
+  return Math.min(1, Math.max(0, opacity));
 }
 
 export function getPenSubtypePressureWidth(

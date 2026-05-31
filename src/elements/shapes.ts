@@ -129,6 +129,8 @@ function createShapeStroke(
     width: preset.width,
     opacity: preset.opacity,
     tool: "pen",
+    brushProfileId: preset.brushProfileId,
+    penSubtype: preset.penSubtype,
     isShape: true,
   });
 }

@@ -4,7 +4,8 @@ import type { PngExportPlan } from "@/export/png";
 import type { SketchData, Stroke } from "@/types/sketch";
 import type { SketchElement } from "@/elements/model";
 import { splitElementsForRender } from "@/elements/renderOrder";
-import { getPressureWidth, getSmoothedSegments } from "@/engine/strokeSmoothing";
+import { getBrushOpacity, getBrushPressureWidth, getSmoothedSegments } from "@/engine/strokeSmoothing";
+import { resolveBrushProfile } from "@/tools/brushProfiles";
 import { getCustomBackgroundDrawRect, getCustomBackgroundSource, getCustomBackgroundTemplate } from "@/template/customBackground";
 import { translateElementsForRender } from "./renderElements";
 
@@ -563,20 +564,25 @@ function loadImage(src: string): Promise<HTMLImageElement> {
 function renderStrokeToCtx(ctx: CanvasRenderingContext2D, stroke: Stroke): void {
   const { points, color, width, tool } = stroke;
   if (points.length < 2) return;
+  const profile = resolveBrushProfile(stroke.brushProfileId, stroke.tool, {
+    tool: stroke.tool,
+    penSubtype: stroke.penSubtype,
+    highlighterSubtype: stroke.highlighterSubtype,
+  });
 
   ctx.save();
   if (tool === "eraser") {
-    ctx.globalCompositeOperation = "destination-out";
+    ctx.globalCompositeOperation = profile.blendMode;
     ctx.strokeStyle = "rgba(0,0,0,1)";
   } else {
-    ctx.globalAlpha = stroke.opacity ?? 1;
-    ctx.globalCompositeOperation = "source-over";
+    ctx.globalAlpha = getBrushOpacity(stroke.opacity ?? 1, points[0].pressure, profile);
+    ctx.globalCompositeOperation = profile.blendMode;
     ctx.strokeStyle = color;
   }
 
-  ctx.lineWidth = getPressureWidth(width, points[0].pressure);
-  ctx.lineJoin = "round";
-  ctx.lineCap = "round";
+  ctx.lineWidth = getBrushPressureWidth(width, points[0].pressure, profile);
+  ctx.lineJoin = profile.lineJoin;
+  ctx.lineCap = profile.lineCap;
 
   ctx.beginPath();
   ctx.moveTo(points[0].x, points[0].y);

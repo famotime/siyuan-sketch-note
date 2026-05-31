@@ -2,7 +2,8 @@ import type { ReplayEvent, StrokeReplayEvent, ShapeReplayEvent, ToolSwitchReplay
 import type { Stroke, StrokePoint } from "@/types/sketch";
 import type { ImageElement } from "@/elements/image";
 import type { TextElement } from "@/elements/text";
-import { getPressureWidth, getSmoothedSegments } from "@/engine/strokeSmoothing";
+import { getBrushOpacity, getBrushPressureWidth, getSmoothedSegments } from "@/engine/strokeSmoothing";
+import { resolveBrushProfile } from "@/tools/brushProfiles";
 
 export type PlaybackState = "idle" | "playing" | "paused";
 export type PlaybackSpeed = 1 | 2 | 4;
@@ -579,31 +580,39 @@ export class ReplayPlayer {
     const { points, color, width, tool, isShape } = stroke;
     if (points.length < 2) return;
     if (tool === "eraser" && !this.layerCtx) return;
+    const profile = resolveBrushProfile(stroke.brushProfileId, stroke.tool, {
+      tool: stroke.tool,
+      penSubtype: stroke.penSubtype,
+      highlighterSubtype: stroke.highlighterSubtype,
+    });
 
     const ctx = this.getDrawingContext();
     ctx.save();
     if (tool === "eraser") {
-      ctx.globalCompositeOperation = "destination-out";
+      ctx.globalCompositeOperation = profile.blendMode;
       ctx.strokeStyle = "rgba(0,0,0,1)";
     } else {
-      ctx.globalAlpha = stroke.opacity ?? 1;
-      ctx.globalCompositeOperation = "source-over";
+      ctx.globalAlpha = getBrushOpacity(stroke.opacity ?? 1, points[0].pressure, profile);
+      ctx.globalCompositeOperation = profile.blendMode;
       ctx.strokeStyle = color;
     }
-    ctx.lineJoin = "round";
-    ctx.lineCap = "round";
+    ctx.lineJoin = profile.lineJoin;
+    ctx.lineCap = profile.lineCap;
 
     const firstPressure = points[0].pressure;
     const allSame = points.every((p) => p.pressure === firstPressure);
 
     if (isShape) {
-      ctx.lineWidth = getPressureWidth(width, firstPressure);
+      ctx.lineWidth = getBrushPressureWidth(width, firstPressure, profile);
       ctx.beginPath();
       ctx.moveTo(points[0].x, points[0].y);
       for (let i = 1; i < points.length; i++) ctx.lineTo(points[i].x, points[i].y);
       ctx.stroke();
     } else if (allSame) {
-      ctx.lineWidth = getPressureWidth(width, firstPressure);
+      ctx.lineWidth = getBrushPressureWidth(width, firstPressure, profile);
+      if (tool !== "eraser") {
+        ctx.globalAlpha = getBrushOpacity(stroke.opacity ?? 1, firstPressure, profile);
+      }
       ctx.beginPath();
       ctx.moveTo(points[0].x, points[0].y);
       for (const segment of getSmoothedSegments(points)) {
@@ -615,7 +624,10 @@ export class ReplayPlayer {
       let currentX = points[0].x;
       let currentY = points[0].y;
       for (const segment of segments) {
-        ctx.lineWidth = getPressureWidth(width, segment.control.pressure);
+        ctx.lineWidth = getBrushPressureWidth(width, segment.control.pressure, profile);
+        if (tool !== "eraser") {
+          ctx.globalAlpha = getBrushOpacity(stroke.opacity ?? 1, segment.control.pressure, profile);
+        }
         ctx.beginPath();
         ctx.moveTo(currentX, currentY);
         ctx.quadraticCurveTo(segment.control.x, segment.control.y, segment.end.x, segment.end.y);
@@ -629,20 +641,25 @@ export class ReplayPlayer {
 
   private renderStrokeSegment(stroke: Stroke, prev: StrokePoint, curr: StrokePoint): void {
     if (stroke.tool === "eraser" && !this.layerCtx) return;
+    const profile = resolveBrushProfile(stroke.brushProfileId, stroke.tool, {
+      tool: stroke.tool,
+      penSubtype: stroke.penSubtype,
+      highlighterSubtype: stroke.highlighterSubtype,
+    });
 
     const ctx = this.getDrawingContext();
     ctx.save();
     if (stroke.tool === "eraser") {
-      ctx.globalCompositeOperation = "destination-out";
+      ctx.globalCompositeOperation = profile.blendMode;
       ctx.strokeStyle = "rgba(0,0,0,1)";
     } else {
-      ctx.globalAlpha = stroke.opacity ?? 1;
-      ctx.globalCompositeOperation = "source-over";
+      ctx.globalAlpha = getBrushOpacity(stroke.opacity ?? 1, curr.pressure, profile);
+      ctx.globalCompositeOperation = profile.blendMode;
       ctx.strokeStyle = stroke.color;
     }
-    ctx.lineWidth = getPressureWidth(stroke.width, curr.pressure);
-    ctx.lineJoin = "round";
-    ctx.lineCap = "round";
+    ctx.lineWidth = getBrushPressureWidth(stroke.width, curr.pressure, profile);
+    ctx.lineJoin = profile.lineJoin;
+    ctx.lineCap = profile.lineCap;
     ctx.beginPath();
     ctx.moveTo(prev.x, prev.y);
     ctx.lineTo(curr.x, curr.y);
