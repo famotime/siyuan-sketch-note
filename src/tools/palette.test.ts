@@ -60,13 +60,13 @@ describe("tool color palette", () => {
   it("sets a favorite color at the requested slot and keeps other slots in order", () => {
     const next = setFavoriteColorAt(["#111111", "#222222"], 3, "#ABCDEF");
 
-    expect(next).toEqual(["#111111", "#222222", null, "#abcdef", null]);
+    expect(next).toEqual(["#111111", "#222222", null, "#abcdef", null, null, null]);
   });
 
   it("deletes a favorite color at the requested slot without shifting other slots", () => {
     const next = deleteFavoriteColorAt(["#111111", "#222222", "#111111"], 0);
 
-    expect(next).toEqual([null, "#222222", "#111111", null, null]);
+    expect(next).toEqual([null, "#222222", "#111111", null, null, null, null]);
   });
 
   it("normalizes favorite color slots as a fixed row with empty positions", () => {
@@ -75,6 +75,8 @@ describe("tool color palette", () => {
       null,
       null,
       "#123456",
+      null,
+      null,
       null,
     ]);
   });

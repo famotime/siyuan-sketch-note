@@ -1,7 +1,7 @@
 import { HIGHLIGHTER_PRESET_COLORS, PRESET_COLORS } from "@/types/sketch";
 
 export const MAX_RECENT_COLORS = 10;
-export const FAVORITE_COLOR_SLOTS = 5;
+export const FAVORITE_COLOR_SLOTS = 7;
 
 export interface ToolColorPalettes {
   pen: string[];

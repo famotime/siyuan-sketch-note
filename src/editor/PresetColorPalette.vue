@@ -43,7 +43,7 @@
 import { computed, onUnmounted } from "vue";
 import { createColorLongPressState, shouldCancelColorLongPress, shouldSwallowColorClick } from "./colorLongPress";
 
-const FAVORITE_COLOR_SLOTS = 5;
+const FAVORITE_COLOR_SLOTS = 7;
 
 const props = defineProps<{
   rainbowColors: readonly string[];
@@ -131,8 +131,8 @@ onUnmounted(onFavoritePointerEnd);
 
 .sketch-preset-colors {
   display: grid;
-  grid-template-columns: repeat(6, 24px);
-  gap: 8px 6px;
+  grid-template-columns: repeat(7, 24px);
+  gap: 8px 4px;
   justify-content: center;
 }
 
@@ -167,8 +167,8 @@ onUnmounted(onFavoritePointerEnd);
 
 .sketch-preset-favorites {
   display: grid;
-  grid-template-columns: repeat(5, 24px);
-  gap: 8px;
+  grid-template-columns: repeat(7, 24px);
+  gap: 8px 4px;
   justify-content: center;
 }
 

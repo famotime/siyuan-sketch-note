@@ -228,6 +228,7 @@ onUnmounted(removeSpectrumListeners);
   left: calc(100% + 8px);
   bottom: 0;
   width: 216px;
+  box-sizing: border-box;
   background: var(--sketch-color-popup-bg);
   backdrop-filter: blur(16px) saturate(150%);
   -webkit-backdrop-filter: blur(16px) saturate(150%);

@@ -101,8 +101,8 @@ describe("sketch data migrations", () => {
       strokes: [],
     });
 
-    expect(data.favoriteColors).toEqual(["#abcdef", null, null, "#123456", null]);
-    expect(data.highlighterFavoriteColors).toEqual([null, "#fff176", null, null, null]);
+    expect(data.favoriteColors).toEqual(["#abcdef", null, null, "#123456", null, null, null]);
+    expect(data.highlighterFavoriteColors).toEqual([null, "#fff176", null, null, null, null, null]);
   });
 
   it("reconstructs missing page metadata for paged sketches", () => {

@@ -673,13 +673,9 @@ const rainbowPresetColors = [
   "#5856d6",
   "#af52de",
   "#ff2d55",
-  "#a0522d",
-  "#8e8e93",
   "#5ac8fa",
   "#30d158",
   "#bf5af2",
-  "#ff9f0a",
-  "#ff453a",
 ] as const;
 
 const shapeOptions = [
@@ -1145,7 +1141,7 @@ onUnmounted(() => {
   -webkit-backdrop-filter: blur(16px) saturate(150%);
   border: 1px solid rgba(255, 255, 255, 0.14);
   border-radius: 12px;
-  padding: 10px;
+  padding: 12px;
   box-sizing: border-box;
   box-shadow: 0 14px 34px rgba(0, 0, 0, 0.34), 0 2px 8px rgba(0, 0, 0, 0.18);
 }
