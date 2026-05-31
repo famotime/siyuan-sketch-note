@@ -1,8 +1,18 @@
-import type { SketchTool, ToolPreset, ToolPresetCollection } from "@/types/sketch";
+import type {
+  SketchTool,
+  ToolPreset,
+  ToolPresetCollection,
+  PenSubtype,
+  HighlighterSubtype,
+} from "@/types/sketch";
 import {
   DEFAULT_ERASER_WIDTH,
   DEFAULT_HIGHLIGHTER_WIDTH,
   DEFAULT_PEN_WIDTH,
+  DEFAULT_PEN_SUBTYPE,
+  DEFAULT_HIGHLIGHTER_SUBTYPE,
+  PEN_SUBTYPE_DEFAULTS,
+  HIGHLIGHTER_SUBTYPE_DEFAULTS,
 } from "@/types/sketch";
 
 const MIN_WIDTH = 1;
@@ -18,17 +28,15 @@ export function createDefaultToolPresets(): ToolPresetCollection {
   return {
     pen: {
       tool: "pen",
-      color: "#000000",
-      width: DEFAULT_PEN_WIDTH,
-      opacity: 1,
+      ...PEN_SUBTYPE_DEFAULTS[DEFAULT_PEN_SUBTYPE],
       mode: "ink",
+      penSubtype: DEFAULT_PEN_SUBTYPE,
     },
     highlighter: {
       tool: "highlighter",
-      color: "#fff176",
-      width: DEFAULT_HIGHLIGHTER_WIDTH,
-      opacity: 0.45,
+      ...HIGHLIGHTER_SUBTYPE_DEFAULTS[DEFAULT_HIGHLIGHTER_SUBTYPE],
       mode: "marker",
+      highlighterSubtype: DEFAULT_HIGHLIGHTER_SUBTYPE,
     },
     eraser: {
       tool: "eraser",
@@ -41,11 +49,18 @@ export function createDefaultToolPresets(): ToolPresetCollection {
 }
 
 export function normalizeToolPreset(preset: ToolPreset): ToolPreset {
-  return {
+  const normalized = {
     ...preset,
     width: clamp(Number.isFinite(preset.width) ? preset.width : MIN_WIDTH, MIN_WIDTH, MAX_WIDTH),
     opacity: clamp(Number.isFinite(preset.opacity) ? preset.opacity : MAX_OPACITY, MIN_OPACITY, MAX_OPACITY),
   };
+  if (normalized.tool === "pen" && !normalized.penSubtype) {
+    normalized.penSubtype = DEFAULT_PEN_SUBTYPE;
+  }
+  if (normalized.tool === "highlighter" && !normalized.highlighterSubtype) {
+    normalized.highlighterSubtype = DEFAULT_HIGHLIGHTER_SUBTYPE;
+  }
+  return normalized;
 }
 
 export function normalizeToolPresets(input?: Partial<ToolPresetCollection>): ToolPresetCollection {
@@ -80,6 +95,40 @@ export function updateToolPreset(
       ...presets[tool],
       ...patch,
       tool,
+    }),
+  };
+}
+
+export function applyPenSubtypeDefaults(
+  presets: ToolPresetCollection,
+  subtype: PenSubtype,
+): ToolPresetCollection {
+  const defaults = PEN_SUBTYPE_DEFAULTS[subtype];
+  return {
+    ...presets,
+    pen: normalizeToolPreset({
+      ...presets.pen,
+      ...defaults,
+      tool: "pen",
+      mode: "ink",
+      penSubtype: subtype,
+    }),
+  };
+}
+
+export function applyHighlighterSubtypeDefaults(
+  presets: ToolPresetCollection,
+  subtype: HighlighterSubtype,
+): ToolPresetCollection {
+  const defaults = HIGHLIGHTER_SUBTYPE_DEFAULTS[subtype];
+  return {
+    ...presets,
+    highlighter: normalizeToolPreset({
+      ...presets.highlighter,
+      ...defaults,
+      tool: "highlighter",
+      mode: "marker",
+      highlighterSubtype: subtype,
     }),
   };
 }

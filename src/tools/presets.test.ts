@@ -11,10 +11,11 @@ describe("tool presets", () => {
 
     expect(presets.pen).toMatchObject({
       tool: "pen",
-      color: "#000000",
-      width: 3,
+      color: "#1a237e",
+      width: 1.5,
       opacity: 1,
       mode: "ink",
+      penSubtype: "ballpoint",
     });
     expect(presets.highlighter).toMatchObject({
       tool: "highlighter",

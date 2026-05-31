@@ -70,12 +70,20 @@ export const DEFAULT_SKETCH_DATA: SketchData = {
 
 export type SketchTool = "pen" | "highlighter" | "eraser";
 
+export type PenSubtype = "pencil" | "ballpoint" | "fountain" | "brush";
+export type HighlighterSubtype = "round" | "square" | "watercolor";
+
+export const DEFAULT_PEN_SUBTYPE: PenSubtype = "ballpoint";
+export const DEFAULT_HIGHLIGHTER_SUBTYPE: HighlighterSubtype = "round";
+
 export interface ToolPreset {
   tool: SketchTool;
   color: string;
   width: number;
   opacity: number;
   mode: "ink" | "marker" | "pixel" | "stroke";
+  penSubtype?: PenSubtype;
+  highlighterSubtype?: HighlighterSubtype;
 }
 
 export type ToolPresetCollection = Record<SketchTool, ToolPreset>;
@@ -102,3 +110,16 @@ export const DEFAULT_ERASER_WIDTH = 20;
 export const CANVAS_LOGICAL_WIDTH = 800;
 export const CANVAS_INITIAL_HEIGHT = 1200;
 export const CANVAS_HEIGHT_INCREMENT = 600;
+
+export const PEN_SUBTYPE_DEFAULTS: Record<PenSubtype, { color: string; width: number; opacity: number }> = {
+  pencil:    { color: "#4a4a4a", width: 2,   opacity: 0.85 },
+  ballpoint: { color: "#1a237e", width: 1.5, opacity: 1.0 },
+  fountain:  { color: "#1a1a2e", width: 2,   opacity: 0.95 },
+  brush:     { color: "#1a1a2e", width: 3,   opacity: 0.9 },
+};
+
+export const HIGHLIGHTER_SUBTYPE_DEFAULTS: Record<HighlighterSubtype, { color: string; width: number; opacity: number }> = {
+  round:      { color: "#fff176", width: 18, opacity: 0.45 },
+  square:     { color: "#fff176", width: 18, opacity: 0.45 },
+  watercolor: { color: "#64b5f6", width: 24, opacity: 0.3 },
+};

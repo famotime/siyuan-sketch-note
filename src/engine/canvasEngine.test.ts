@@ -171,10 +171,10 @@ describe("canvas engine history", () => {
     handlePointerUp(state);
 
     expect(state.strokes[0].bounds).toEqual({
-      x: 8.5,
-      y: 18.5,
-      width: 33,
-      height: 33,
+      x: 9.25,
+      y: 19.25,
+      width: 31.5,
+      height: 31.5,
     });
   });
 
