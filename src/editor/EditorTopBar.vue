@@ -85,6 +85,13 @@
           <span class="sketch-more-label">{{ t("clear") }}</span>
           <IconParkIcon name="Clear" />
         </div>
+        <div
+          class="sketch-more-row sketch-more-row--action"
+          @click="openExportDialog"
+        >
+          <span class="sketch-more-label">{{ t("export") }}</span>
+          <IconParkIcon name="ArrowRight" />
+        </div>
         <div class="sketch-more-divider" />
         <label class="sketch-more-row sketch-more-row--select">
           <span class="sketch-more-label">{{ t("noteBackground") }}</span>
@@ -139,6 +146,89 @@
         </label>
       </div>
     </div>
+    <Teleport to="body">
+      <div
+        v-if="exportDialogOpen"
+        class="sketch-export-dialog"
+        :class="{
+          'sketch-export-dialog--theme-light': themeMode === 'light',
+          'sketch-export-dialog--theme-dark': themeMode === 'dark',
+        }"
+        role="dialog"
+        aria-modal="true"
+        :aria-label="t('export')"
+        @click.self="closeExportDialog"
+      >
+        <div class="sketch-export-dialog__panel">
+          <div class="sketch-export-dialog__header">
+            <strong class="sketch-export-dialog__title">{{ t("export") }}</strong>
+            <button
+              class="sketch-export-dialog__close"
+              type="button"
+              :aria-label="t('cancel')"
+              @click="closeExportDialog"
+            >
+              ×
+            </button>
+          </div>
+          <div class="sketch-export-dialog__section">
+            <span class="sketch-export-dialog__label">{{ t("exportFormat") }}</span>
+            <div class="sketch-export-format">
+              <label
+                class="sketch-export-format__option"
+                :class="{ 'sketch-export-format__option--active': exportFormat === 'png' }"
+                >
+                <IconParkIcon name="AddPic" />
+                <input
+                  v-model="exportFormat"
+                  type="radio"
+                  value="png"
+                >
+                <span>PNG</span>
+              </label>
+              <label
+                class="sketch-export-format__option"
+                :class="{ 'sketch-export-format__option--active': exportFormat === 'pdf' }"
+                >
+                <IconParkIcon name="BookOpen" />
+                <input
+                  v-model="exportFormat"
+                  type="radio"
+                  value="pdf"
+                >
+                <span>PDF</span>
+              </label>
+            </div>
+          </div>
+          <label class="sketch-export-dialog__row">
+            <span class="sketch-export-dialog__label">{{ t("exportBackground") }}</span>
+            <span
+              class="sketch-toggle"
+              :class="{ 'sketch-toggle--on': exportIncludeBackground }"
+              @click="$emit('toggleExportBackground')"
+            >
+              <span class="sketch-toggle__knob" />
+            </span>
+          </label>
+          <div class="sketch-export-dialog__actions">
+            <button
+              class="sketch-export-dialog__button sketch-export-dialog__button--ghost"
+              type="button"
+              @click="closeExportDialog"
+            >
+              {{ t("cancel") }}
+            </button>
+            <button
+              class="sketch-export-dialog__button sketch-export-dialog__button--primary"
+              type="button"
+              @click="confirmExport"
+            >
+              {{ t("confirm") }}
+            </button>
+          </div>
+        </div>
+      </div>
+    </Teleport>
   </div>
 </template>
 
@@ -164,18 +254,21 @@ defineProps<{
   stylusOnly: boolean;
   enablePressure: boolean;
   templateId: string;
+  themeMode: 'light' | 'dark';
   templates: Template[];
   t: (key: string) => string;
 }>();
 
-defineEmits<{
+const emit = defineEmits<{
   (e: "back"): void;
   (e: "backgroundFitChange", value: string): void;
   (e: "clear"): void;
+  (e: "export", format: "png" | "pdf"): void;
   (e: "replay"): void;
   (e: "insertImage"): void;
   (e: "toggleStylusOnly"): void;
   (e: "togglePressure"): void;
+  (e: "toggleExportBackground"): void;
   (e: "toggleZenMode"): void;
   (e: "undo"): void;
   (e: "redo"): void;
@@ -185,7 +278,23 @@ defineEmits<{
 const zenToggleState = computed(() => createZenToggleState(false));
 
 const moreOpen = ref(false);
+const exportDialogOpen = ref(false);
+const exportFormat = ref<"png" | "pdf">("png");
 const moreWrapRef = ref<HTMLDivElement>();
+
+function openExportDialog() {
+  moreOpen.value = false;
+  exportDialogOpen.value = true;
+}
+
+function closeExportDialog() {
+  exportDialogOpen.value = false;
+}
+
+function confirmExport() {
+  emit("export", exportFormat.value);
+  closeExportDialog();
+}
 
 function onDocClick(e: MouseEvent) {
   if (moreOpen.value && moreWrapRef.value && !moreWrapRef.value.contains(e.target as Node)) {
@@ -405,6 +514,196 @@ function onCanvasPointerDown(e: PointerEvent) {
   height: 1px;
   background: var(--sketch-toolbar-control-border);
   margin: 2px 0;
+}
+
+.sketch-export-dialog {
+  --sketch-export-dialog-panel: rgba(28, 28, 30, 0.98);
+  --sketch-export-dialog-text: rgba(255, 255, 255, 0.88);
+  --sketch-export-dialog-strong-text: #fff;
+  --sketch-more-popover-surface: var(--b3-menu-background, var(--sketch-toolbar-popover-surface, rgba(28, 28, 30, 0.95)));
+  --sketch-toolbar-active-text: #fff;
+  --sketch-toolbar-border: rgba(255, 255, 255, 0.12);
+  --sketch-toolbar-control-bg: rgba(255, 255, 255, 0.05);
+  --sketch-toolbar-control-border: rgba(255, 255, 255, 0.08);
+  --sketch-toolbar-hover-bg: rgba(255, 255, 255, 0.15);
+  --sketch-toolbar-shadow: 0 10px 30px rgba(0, 0, 0, 0.25), 0 2px 8px rgba(0, 0, 0, 0.12);
+  --sketch-toolbar-strong-text: #fff;
+  --sketch-toolbar-text: rgba(255, 255, 255, 0.8);
+  position: fixed;
+  inset: 0;
+  z-index: 1200;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  background: rgba(0, 0, 0, 0.24);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  box-sizing: border-box;
+}
+
+@media (prefers-color-scheme: light) {
+  .sketch-export-dialog {
+    --sketch-export-dialog-panel: rgba(255, 255, 255, 0.98);
+    --sketch-export-dialog-text: rgba(15, 23, 42, 0.78);
+    --sketch-export-dialog-strong-text: rgba(15, 23, 42, 0.94);
+    --sketch-toolbar-border: rgba(15, 23, 42, 0.1);
+    --sketch-toolbar-control-bg: rgba(15, 23, 42, 0.045);
+    --sketch-toolbar-control-border: rgba(15, 23, 42, 0.08);
+    --sketch-toolbar-hover-bg: rgba(15, 23, 42, 0.09);
+    --sketch-toolbar-shadow: 0 12px 32px rgba(15, 23, 42, 0.12), 0 2px 8px rgba(15, 23, 42, 0.06);
+  }
+}
+
+:global(html[data-theme="light"]) .sketch-export-dialog,
+:global(html[data-theme-mode="light"]) .sketch-export-dialog,
+:global(body[data-theme="light"]) .sketch-export-dialog,
+.sketch-export-dialog--theme-light {
+  --sketch-export-dialog-panel: rgba(255, 255, 255, 0.98);
+  --sketch-export-dialog-text: rgba(15, 23, 42, 0.78);
+  --sketch-export-dialog-strong-text: rgba(15, 23, 42, 0.94);
+  --sketch-toolbar-border: rgba(15, 23, 42, 0.1);
+  --sketch-toolbar-control-bg: rgba(15, 23, 42, 0.045);
+  --sketch-toolbar-control-border: rgba(15, 23, 42, 0.08);
+  --sketch-toolbar-hover-bg: rgba(15, 23, 42, 0.09);
+  --sketch-toolbar-shadow: 0 12px 32px rgba(15, 23, 42, 0.12), 0 2px 8px rgba(15, 23, 42, 0.06);
+}
+
+:global(html[data-theme="dark"]) .sketch-export-dialog,
+:global(html[data-theme-mode="dark"]) .sketch-export-dialog,
+:global(body[data-theme="dark"]) .sketch-export-dialog,
+.sketch-export-dialog--theme-dark {
+  --sketch-export-dialog-panel: rgba(28, 28, 30, 0.98);
+  --sketch-export-dialog-text: rgba(255, 255, 255, 0.88);
+  --sketch-export-dialog-strong-text: #fff;
+  --sketch-toolbar-border: rgba(255, 255, 255, 0.12);
+  --sketch-toolbar-control-bg: rgba(255, 255, 255, 0.05);
+  --sketch-toolbar-control-border: rgba(255, 255, 255, 0.08);
+  --sketch-toolbar-hover-bg: rgba(255, 255, 255, 0.15);
+  --sketch-toolbar-shadow: 0 10px 30px rgba(0, 0, 0, 0.25), 0 2px 8px rgba(0, 0, 0, 0.12);
+}
+
+.sketch-export-dialog__panel {
+  width: min(340px, 100%);
+  border: 1px solid var(--sketch-toolbar-border);
+  border-radius: 12px;
+  background: var(--sketch-export-dialog-panel);
+  box-shadow: var(--sketch-toolbar-shadow);
+  padding: 14px;
+  color: var(--sketch-export-dialog-text);
+  box-sizing: border-box;
+}
+
+.sketch-export-dialog__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.sketch-export-dialog__title {
+  font-size: 15px;
+  color: var(--sketch-export-dialog-strong-text);
+}
+
+.sketch-export-dialog__close {
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 1px solid var(--sketch-toolbar-control-border);
+  border-radius: 8px;
+  background: var(--sketch-toolbar-control-bg);
+  color: var(--sketch-export-dialog-text);
+  cursor: pointer;
+  font-size: 18px;
+  line-height: 1;
+}
+
+.sketch-export-dialog__close:hover {
+  background: var(--sketch-toolbar-hover-bg);
+  color: var(--sketch-export-dialog-strong-text);
+}
+
+.sketch-export-dialog__section {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.sketch-export-dialog__row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 0;
+}
+
+.sketch-export-dialog__label {
+  font-size: 13px;
+  color: var(--sketch-export-dialog-text);
+}
+
+.sketch-export-format {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.sketch-export-format__option {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 34px;
+  border: 1px solid var(--sketch-toolbar-control-border);
+  border-radius: 8px;
+  background: var(--sketch-toolbar-control-bg);
+  color: var(--sketch-export-dialog-text);
+  cursor: pointer;
+  font-size: 13px;
+}
+
+.sketch-export-format__option :deep(.sketch-icon) {
+  color: currentColor;
+  font-size: 16px;
+}
+
+.sketch-export-format__option input {
+  margin: 0;
+}
+
+.sketch-export-format__option--active {
+  border-color: var(--b3-theme-primary);
+  color: var(--sketch-export-dialog-strong-text);
+}
+
+.sketch-export-dialog__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.sketch-export-dialog__button {
+  min-height: 32px;
+  padding: 0 14px;
+  border: 1px solid var(--sketch-toolbar-control-border);
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 13px;
+}
+
+.sketch-export-dialog__button--ghost {
+  background: var(--sketch-toolbar-control-bg);
+  color: var(--sketch-export-dialog-text);
+}
+
+.sketch-export-dialog__button--primary {
+  border-color: transparent;
+  background: var(--b3-theme-primary);
+  color: var(--sketch-export-dialog-strong-text);
 }
 
 /* ── iOS 风格 Toggle 开关 ── */

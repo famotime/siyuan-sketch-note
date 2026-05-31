@@ -24,6 +24,7 @@
         :stylusOnly="inputSettings.stylusOnly"
         :enablePressure="inputSettings.enablePressure ?? false"
         :t="t"
+        :themeMode="effectiveThemeMode"
         :templateId="currentTemplate"
         :templates="templates"
         @addPage="canvasRef?.addPage()"
@@ -33,9 +34,8 @@
         @clearSearch="onClearSearch"
         @deletePage="deleteCurrentPage"
         @duplicatePage="canvasRef?.duplicateCurrentPage()"
+        @export="onExport"
         @exportJson="exportJson"
-        @exportPdf="exportPdf"
-        @exportPng="exportPng"
         @goToPage="canvasRef?.goToPage($event)"
         @insertImage="triggerImageImport"
         @importBackground="triggerBackgroundImport"
@@ -493,6 +493,14 @@ function deleteCurrentPage() {
   if (!removed) {
     showMessage(t("deletePageFailed"), 4000, "error");
   }
+}
+
+async function onExport(format: "png" | "pdf") {
+  if (format === "png") {
+    await exportPng();
+    return;
+  }
+  await exportPdf();
 }
 
 // ─── Import / Background ───

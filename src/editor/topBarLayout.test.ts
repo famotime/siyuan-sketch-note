@@ -28,6 +28,78 @@ describe("editor top bar layout", () => {
     expect(topBar).toContain("{{ t(\"clear\") }}");
   });
 
+  it("opens export settings from the more menu and lets the editor dispatch the selected format", () => {
+    const topBar = readFileSync(resolve(process.cwd(), "src/editor/EditorTopBar.vue"), "utf8");
+    const editor = readFileSync(resolve(process.cwd(), "src/editor/SketchEditor.vue"), "utf8");
+
+    const exportEntryIndex = topBar.indexOf("openExportDialog");
+    const exportDialogIndex = topBar.indexOf("sketch-export-dialog");
+    const formatIndex = topBar.indexOf("exportFormat");
+    const backgroundIndex = topBar.indexOf("toggleExportBackground");
+    const confirmIndex = topBar.indexOf("confirmExport");
+
+    expect(exportEntryIndex).toBeGreaterThan(-1);
+    expect(exportDialogIndex).toBeGreaterThan(exportEntryIndex);
+    expect(formatIndex).toBeGreaterThan(exportDialogIndex);
+    expect(backgroundIndex).toBeGreaterThan(formatIndex);
+    expect(confirmIndex).toBeGreaterThan(backgroundIndex);
+    expect(topBar).toContain("(e: \"export\", format: \"png\" | \"pdf\"): void");
+    expect(topBar).toContain("{{ t(\"export\") }}");
+    expect(topBar).toContain("{{ t(\"exportFormat\") }}");
+    expect(topBar).toContain("{{ t(\"confirm\") }}");
+    expect(editor).toContain("@export=\"onExport\"");
+    expect(editor).toContain("async function onExport(format: \"png\" | \"pdf\")");
+    expect(editor).toContain("format === \"png\"");
+  });
+
+  it("teleports the export dialog to body so it is centered on the screen", () => {
+    const topBar = readFileSync(resolve(process.cwd(), "src/editor/EditorTopBar.vue"), "utf8");
+
+    const teleportIndex = topBar.indexOf('<Teleport to="body">');
+    const dialogIndex = topBar.indexOf('class="sketch-export-dialog"');
+    const teleportEndIndex = topBar.indexOf("</Teleport>");
+
+    expect(teleportIndex).toBeGreaterThan(-1);
+    expect(dialogIndex).toBeGreaterThan(teleportIndex);
+    expect(dialogIndex).toBeLessThan(teleportEndIndex);
+    expect(topBar).toMatch(/\.sketch-export-dialog\s*\{[^}]*position:\s*fixed;[^}]*inset:\s*0;[^}]*align-items:\s*center;[^}]*justify-content:\s*center/s);
+  });
+
+  it("shows image and book icons for PNG and PDF export choices", () => {
+    const topBar = readFileSync(resolve(process.cwd(), "src/editor/EditorTopBar.vue"), "utf8");
+    const icons = readFileSync(resolve(process.cwd(), "src/editor/iconParkIcons.ts"), "utf8");
+
+    expect(topBar).toContain('<IconParkIcon name="AddPic" />');
+    expect(topBar).toContain('<IconParkIcon name="BookOpen" />');
+    expect(icons).toContain("BookOpen:");
+  });
+
+  it("keeps export dialog text and icons visible after teleporting to body", () => {
+    const topBar = readFileSync(resolve(process.cwd(), "src/editor/EditorTopBar.vue"), "utf8");
+
+    expect(topBar).toMatch(/--sketch-export-dialog-text:\s*rgba\(255,\s*255,\s*255,\s*0\.88\)/);
+    expect(topBar).toMatch(/--sketch-export-dialog-strong-text:\s*#fff/);
+    expect(topBar).toMatch(/\.sketch-export-dialog__panel\s*\{[^}]*color:\s*var\(--sketch-export-dialog-text\)/s);
+    expect(topBar).toMatch(/\.sketch-export-format__option\s*\{[^}]*color:\s*var\(--sketch-export-dialog-text\)/s);
+    expect(topBar).toMatch(/\.sketch-export-format__option :deep\(\.sketch-icon\)\s*\{[^}]*color:\s*currentColor/s);
+    expect(topBar).toMatch(/\.sketch-export-format__option--active\s*\{[^}]*color:\s*var\(--sketch-export-dialog-strong-text\)/s);
+  });
+
+  it("uses a light export dialog panel in light theme", () => {
+    const topBar = readFileSync(resolve(process.cwd(), "src/editor/EditorTopBar.vue"), "utf8");
+    const editor = readFileSync(resolve(process.cwd(), "src/editor/SketchEditor.vue"), "utf8");
+
+    expect(editor).toContain(':themeMode="effectiveThemeMode"');
+    expect(topBar).toContain("themeMode: 'light' | 'dark'");
+    expect(topBar).toContain("'sketch-export-dialog--theme-light': themeMode === 'light'");
+    expect(topBar).toContain(".sketch-export-dialog--theme-light");
+    expect(topBar).toMatch(/:global\(html\[data-theme="light"\]\) \.sketch-export-dialog/);
+    expect(topBar).toMatch(/:global\(body\[data-theme="light"\]\) \.sketch-export-dialog/);
+    expect(topBar).toMatch(/--sketch-export-dialog-panel:\s*rgba\(255,\s*255,\s*255,\s*0\.98\)/);
+    expect(topBar).toMatch(/--sketch-export-dialog-text:\s*rgba\(15,\s*23,\s*42,\s*0\.78\)/);
+    expect(topBar).toMatch(/--sketch-export-dialog-strong-text:\s*rgba\(15,\s*23,\s*42,\s*0\.94\)/);
+  });
+
   it("adds a plus image import button immediately before zen mode", () => {
     const topBar = readFileSync(resolve(process.cwd(), "src/editor/EditorTopBar.vue"), "utf8");
     const editor = readFileSync(resolve(process.cwd(), "src/editor/SketchEditor.vue"), "utf8");
