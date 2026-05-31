@@ -1103,7 +1103,7 @@ function onHeightChanged(_h: number) {}
   top: var(--sketch-editor-header-top);
   left: 12px;
   right: 12px;
-  z-index: 1000;
+  z-index: 1200;
   background: var(--sketch-toolbar-surface);
   backdrop-filter: blur(14px) saturate(160%);
   -webkit-backdrop-filter: blur(14px) saturate(160%);
@@ -1134,6 +1134,7 @@ function onHeightChanged(_h: number) {}
   margin-top: 4px;
   padding-top: 4px;
   border-top: 1px solid var(--sketch-toolbar-separator);
+  overflow: visible;
 }
 .sketch-editor__title {
   font-weight: 500; font-size: 14px; color: var(--sketch-toolbar-strong-text);

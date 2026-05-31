@@ -123,6 +123,20 @@ describe("editor top bar layout", () => {
     expect(editor).toMatch(/\.sketch-editor__row--topbar\s*\{[^}]*overflow:\s*visible/);
   });
 
+  it("keeps pen and highlighter dropdown menus visible below the tools row", () => {
+    const editor = readFileSync(resolve(process.cwd(), "src/editor/SketchEditor.vue"), "utf8");
+
+    expect(editor).toMatch(/\.sketch-editor__row--tools\s*\{[^}]*overflow:\s*visible/);
+  });
+
+  it("keeps toolbar dropdown menus above the floating toolbar", () => {
+    const editor = readFileSync(resolve(process.cwd(), "src/editor/SketchEditor.vue"), "utf8");
+    const floatingToolbar = readFileSync(resolve(process.cwd(), "src/editor/FloatingToolbar.vue"), "utf8");
+
+    expect(editor).toMatch(/\.sketch-editor__header\s*\{[^}]*z-index:\s*1200/);
+    expect(floatingToolbar).toMatch(/\.sketch-float-panel\s*\{[^}]*z-index:\s*1000/);
+  });
+
   it("keeps the two header rows compact", () => {
     const topBar = readFileSync(resolve(process.cwd(), "src/editor/EditorTopBar.vue"), "utf8");
     const toolbar = readFileSync(resolve(process.cwd(), "src/editor/ToolBar.vue"), "utf8");

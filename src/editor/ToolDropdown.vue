@@ -7,14 +7,18 @@
     <!-- 触发器按钮 -->
     <div
       class="sketch-tool-dropdown__trigger"
-      @click="toggle"
     >
       <slot name="trigger" />
-      <span class="sketch-tool-dropdown__arrow">
+      <button
+        class="sketch-tool-dropdown__arrow"
+        type="button"
+        aria-label="Open tool menu"
+        @click.stop="toggle"
+      >
         <svg viewBox="0 0 10 10" fill="currentColor">
           <path d="M2 10L10 10L10 2Z" />
         </svg>
-      </span>
+      </button>
     </div>
 
     <!-- 下拉面板 -->
@@ -95,18 +99,22 @@ onUnmounted(() => {
   position: absolute;
   right: 0;
   bottom: 0;
-  width: 10px;
-  height: 10px;
+  width: 16px;
+  height: 16px;
   opacity: 0.5;
-  pointer-events: none;
   display: flex;
   align-items: center;
   justify-content: center;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: currentColor;
+  cursor: pointer;
 }
 
 .sketch-tool-dropdown__arrow svg {
-  width: 100%;
-  height: 100%;
+  width: 10px;
+  height: 10px;
 }
 
 .sketch-tool-dropdown__panel {
@@ -115,7 +123,7 @@ onUnmounted(() => {
   left: 0;
   z-index: 1000;
   min-width: 120px;
-  background: var(--sketch-toolbar-control-bg);
+  background: var(--sketch-toolbar-popover-surface);
   border: 1px solid var(--sketch-toolbar-control-border);
   border-radius: 8px;
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
