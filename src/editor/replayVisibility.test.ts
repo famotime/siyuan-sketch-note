@@ -14,18 +14,28 @@ describe("replay canvas visibility wiring", () => {
     expect(sketchCanvasOpeningTag).not.toContain('v-show="!isReplayMode"');
   });
 
-  it("keeps the floating toolbar visible in replay as a read-only operation indicator", () => {
+  it("keeps the floating toolbar visible in replay when tool-switch playback is enabled", () => {
     const editor = readFileSync(resolve(process.cwd(), "src/editor/SketchEditor.vue"), "utf8");
     const floatingToolbar = readFileSync(resolve(process.cwd(), "src/editor/FloatingToolbar.vue"), "utf8");
 
-    expect(editor).toContain('v-if="!isZenMode"');
+    expect(editor).toContain('v-if="showFloatingToolbar"');
     expect(editor).not.toContain('v-if="!isZenMode && !isReplayMode"');
     expect(editor).toContain(':replayActive="isReplayMode"');
+    expect(editor).toContain('const showFloatingToolbar = computed');
     expect(floatingToolbar).toContain("replayActive?: boolean");
     expect(floatingToolbar).toContain("sketch-float-panel--replay");
     expect(floatingToolbar).toContain("sketch-float-panel--replay-click");
     expect(floatingToolbar).toContain(":data-tool=\"shape.tool\"");
     expect(editor).toContain("recordFloatingToolbarAction");
+  });
+
+  it("hides the floating toolbar in replay when tool-switch playback is disabled", () => {
+    const editor = readFileSync(resolve(process.cwd(), "src/editor/SketchEditor.vue"), "utf8");
+
+    expect(editor).toContain("replayToolSwitchPlaybackEnabled");
+    expect(editor).toContain("props.replayRecordConfig");
+    expect(editor).toContain("toolSwitch");
+    expect(editor).toContain("!isReplayMode.value || replayToolSwitchPlaybackEnabled.value");
   });
 
   it("keeps the replay canvas origin aligned on narrow screens", () => {

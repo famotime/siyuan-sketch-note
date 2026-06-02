@@ -146,7 +146,7 @@
       @exit="exitReplayMode"
     />
     <FloatingToolbar
-      v-if="!isZenMode"
+      v-if="showFloatingToolbar"
       v-model:lassoMode="lassoMode"
       :activeTool="displayTool"
       :colors="colors"
@@ -312,6 +312,12 @@ const displayTool = computed(() => isReplayMode.value ? replayDisplayTool.value 
 const displayPreset = computed(() => isReplayMode.value && replayDisplayPreset.value ? replayDisplayPreset.value : activePreset.value);
 const displayFavoriteColors = computed(() => {
   return displayTool.value === "highlighter" ? favoriteColors.value.highlighter : favoriteColors.value.pen;
+});
+const replayToolSwitchPlaybackEnabled = computed(() => {
+  return { ...DEFAULT_RECORDER_CONFIG, ...props.replayRecordConfig }.toolSwitch;
+});
+const showFloatingToolbar = computed(() => {
+  return !isZenMode.value && (!isReplayMode.value || replayToolSwitchPlaybackEnabled.value);
 });
 
 // Record toolSwitch events
