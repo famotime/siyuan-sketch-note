@@ -33,7 +33,7 @@
           width: `${textEditor.width}px`,
           height: `${textEditor.height}px`,
           fontSize: `${textEditor.fontSize}px`,
-          lineHeight: `${textEditor.fontSize}px`,
+          lineHeight: `${textEditor.lineHeight}px`,
           color: textEditor.color,
           fontFamily: textEditor.fontFamily,
         }"

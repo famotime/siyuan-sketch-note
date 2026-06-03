@@ -1,8 +1,8 @@
-import { ref } from "vue";
+import { ref, watch } from "vue";
 import type { Ref } from "vue";
 import type { ToolPresetCollection } from "@/types/sketch";
 import type { EngineState } from "@/engine/canvasEngine";
-import { createTextElement, updateTextElement } from "@/elements/text";
+import { calculateTextBoundsHeight, createTextElement, getTextLineHeight, updateTextElement } from "@/elements/text";
 import { pushHistorySnapshot, fullRedrawStrokeCanvas } from "@/engine/canvasEngine";
 import { createInsertElementPosition } from "@/editor/insertPosition";
 import type { SketchElement } from "@/elements/model";
@@ -24,10 +24,23 @@ export function useTextEditing(ctx: {
     color: "#000000",
     fontFamily: "Inter, system-ui, sans-serif",
     fontSize: 20,
+    lineHeight: getTextLineHeight(20),
     val: "",
     elementId: null as string | null,
   });
   const textEditorInputRef = ref<HTMLTextAreaElement>();
+
+  function resolveTextEditorHeight(text: string, fontSize: number): number {
+    return calculateTextBoundsHeight(text, fontSize);
+  }
+
+  watch(
+    () => textEditor.value.val,
+    () => {
+      if (!textEditor.value.show) return;
+      textEditor.value.height = resolveTextEditorHeight(textEditor.value.val, textEditor.value.fontSize);
+    },
+  );
 
   function startNewTextEditing(x: number, y: number) {
     const textStyle = ctx.toolPresets.value.text ?? { color: "#000000", width: 20 };
@@ -37,10 +50,11 @@ export function useTextEditing(ctx: {
       x,
       y: y - fontSize / 2,
       width: 150,
-      height: fontSize + 8,
+      height: resolveTextEditorHeight("", fontSize),
       color: textStyle.color,
       fontFamily: "Inter, system-ui, sans-serif",
       fontSize,
+      lineHeight: getTextLineHeight(fontSize),
       val: "",
       elementId: null,
     };
@@ -65,10 +79,11 @@ export function useTextEditing(ctx: {
       x: position.x,
       y: position.y,
       width: 150,
-      height: fontSize + 8,
+      height: resolveTextEditorHeight("", fontSize),
       color: textStyle.color,
       fontFamily: "Inter, system-ui, sans-serif",
       fontSize,
+      lineHeight: getTextLineHeight(fontSize),
       val: "",
       elementId: null,
     };
@@ -87,6 +102,7 @@ export function useTextEditing(ctx: {
       color: element.style.color,
       fontFamily: element.style.fontFamily,
       fontSize: element.style.fontSize,
+      lineHeight: getTextLineHeight(element.style.fontSize),
       val: element.text,
       elementId: element.id,
     };
@@ -100,7 +116,8 @@ export function useTextEditing(ctx: {
 
   function finishTextEditing() {
     if (!textEditor.value.show) return;
-    const { elementId, val, x, y } = textEditor.value;
+    const { elementId, val, x, y, fontSize: editorFontSize } = textEditor.value;
+    const finalHeight = resolveTextEditorHeight(val, editorFontSize);
     textEditor.value.show = false;
     const state = ctx.state();
 
@@ -123,7 +140,10 @@ export function useTextEditing(ctx: {
     if (elementId) {
       state.elements = state.elements.map((item) => {
         if (item.id === elementId) {
-          const updated = updateTextElement(item as any, { text: val });
+          const updated = updateTextElement(item as any, {
+            text: val,
+            bounds: { ...item.bounds, height: finalHeight },
+          });
           recordedElement = updated;
           return updated;
         }
@@ -136,7 +156,7 @@ export function useTextEditing(ctx: {
       const lines = val.split("\n");
       const longestLine = lines.reduce((max, line) => Math.max(max, line.length), 0);
       const calculatedWidth = Math.max(150, longestLine * fontSize * 0.65);
-      const calculatedHeight = lines.length * fontSize + 8;
+      const calculatedHeight = resolveTextEditorHeight(val, fontSize);
       const element = createTextElement(`text-${Date.now()}`, {
         x,
         y,

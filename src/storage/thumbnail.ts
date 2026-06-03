@@ -4,6 +4,7 @@ import type { PngExportPlan } from "@/export/png";
 import type { SketchData, Stroke } from "@/types/sketch";
 import type { SketchElement } from "@/elements/model";
 import { splitElementsForRender } from "@/elements/renderOrder";
+import { getTextLineHeight } from "@/elements/text";
 import { renderStroke } from "@/engine/strokeRenderer";
 import { getCustomBackgroundDrawRect, getCustomBackgroundSource, getCustomBackgroundTemplate } from "@/template/customBackground";
 import { translateElementsForRender } from "./renderElements";
@@ -506,8 +507,9 @@ function renderNonStrokeElements(ctx: CanvasRenderingContext2D, elements: Sketch
     ctx.font = `${element.style.fontSize}px ${element.style.fontFamily}`;
     ctx.textBaseline = "top";
     const lines = element.text.split("\n");
+    const lineHeight = getTextLineHeight(element.style.fontSize);
     for (let i = 0; i < lines.length; i++) {
-      ctx.fillText(lines[i], element.bounds.x, element.bounds.y + i * element.style.fontSize, element.bounds.width);
+      ctx.fillText(lines[i], element.bounds.x, element.bounds.y + i * lineHeight, element.bounds.width);
     }
     ctx.restore();
   }
@@ -532,8 +534,9 @@ async function renderNonStrokeElementsAsync(ctx: CanvasRenderingContext2D, eleme
     ctx.font = `${element.style.fontSize}px ${element.style.fontFamily}`;
     ctx.textBaseline = "top";
     const lines = element.text.split("\n");
+    const lineHeight = getTextLineHeight(element.style.fontSize);
     for (let i = 0; i < lines.length; i++) {
-      ctx.fillText(lines[i], element.bounds.x, element.bounds.y + i * element.style.fontSize, element.bounds.width);
+      ctx.fillText(lines[i], element.bounds.x, element.bounds.y + i * lineHeight, element.bounds.width);
     }
     ctx.restore();
   }

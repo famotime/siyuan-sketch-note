@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
+  calculateTextBoundsHeight,
   createTextElement,
+  getTextLineHeight,
   updateTextElement,
 } from "./text";
 
@@ -62,5 +64,10 @@ describe("text elements", () => {
 
     expect(updated.style.fontFamily).toBe("monospace");
     expect(element.style.fontFamily).toBe("serif");
+  });
+
+  it("calculates multi-line text height with relaxed line spacing", () => {
+    expect(getTextLineHeight(20)).toBeGreaterThan(20);
+    expect(calculateTextBoundsHeight("Line 1\nLine 2\nLine 3", 20)).toBe(80);
   });
 });

@@ -1,6 +1,9 @@
 import type { Bounds, Transform } from "./model";
 import { defaultTransform } from "./model";
 
+export const TEXT_LINE_HEIGHT_RATIO = 1.2;
+export const TEXT_VERTICAL_PADDING = 8;
+
 export interface TextStyle {
   color: string;
   fontSize: number;
@@ -24,6 +27,15 @@ interface CreateTextElementInput {
   width?: number;
   height?: number;
   style?: Partial<TextStyle>;
+}
+
+export function getTextLineHeight(fontSize: number): number {
+  return Math.ceil(fontSize * TEXT_LINE_HEIGHT_RATIO);
+}
+
+export function calculateTextBoundsHeight(text: string, fontSize: number): number {
+  const lineCount = Math.max(1, text.split("\n").length);
+  return lineCount * getTextLineHeight(fontSize) + TEXT_VERTICAL_PADDING;
 }
 
 export function createTextElement(id: string, input: CreateTextElementInput): TextElement {
