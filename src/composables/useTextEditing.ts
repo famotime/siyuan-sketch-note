@@ -27,7 +27,7 @@ export function useTextEditing(ctx: {
     val: "",
     elementId: null as string | null,
   });
-  const textEditorInputRef = ref<HTMLInputElement>();
+  const textEditorInputRef = ref<HTMLTextAreaElement>();
 
   function startNewTextEditing(x: number, y: number) {
     const textStyle = ctx.toolPresets.value.text ?? { color: "#000000", width: 20 };
@@ -133,8 +133,10 @@ export function useTextEditing(ctx: {
       const textStyle = ctx.toolPresets.value.text ?? { color: "#000000", width: 20 };
       const fontSize = textStyle.width;
       const color = textStyle.color;
-      const calculatedWidth = Math.max(150, val.length * fontSize * 0.65);
-      const calculatedHeight = fontSize + 8;
+      const lines = val.split("\n");
+      const longestLine = lines.reduce((max, line) => Math.max(max, line.length), 0);
+      const calculatedWidth = Math.max(150, longestLine * fontSize * 0.65);
+      const calculatedHeight = lines.length * fontSize + 8;
       const element = createTextElement(`text-${Date.now()}`, {
         x,
         y,

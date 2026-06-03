@@ -25,11 +25,10 @@
       class="sketch-text-editor-overlay"
       :style="{ left: `${textEditor.x}px`, top: `${textEditor.y}px` }"
     >
-      <input
+      <textarea
         ref="textEditorInputRef"
         v-model="textEditor.val"
         class="sketch-text-editor-input"
-        type="text"
         :style="{
           width: `${textEditor.width}px`,
           height: `${textEditor.height}px`,
@@ -38,10 +37,9 @@
           color: textEditor.color,
           fontFamily: textEditor.fontFamily,
         }"
-        @keydown.enter="finishTextEditing"
         @keydown.esc="cancelTextEditing"
         @blur="finishTextEditing"
-      >
+      ></textarea>
     </div>
   </div>
   <Transition name="zoom-fade">
@@ -1462,10 +1460,13 @@ defineExpose({
   border-radius: 2px;
   padding: 0;
   min-width: 150px;
-  max-width: 300px;
   box-shadow: none;
   outline: 1px solid var(--b3-theme-primary, #2f80ed);
   font-weight: 500;
+  resize: none;
+  overflow: hidden;
+  white-space: pre-wrap;
+  word-wrap: break-word;
 }
 
 /* ── 浮动缩放指示器 ── */

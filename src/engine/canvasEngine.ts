@@ -382,7 +382,10 @@ function renderNonStrokeElements(
     ctx.fillStyle = element.style.color;
     ctx.font = `${element.style.fontSize}px ${element.style.fontFamily}`;
     ctx.textBaseline = "top";
-    ctx.fillText(element.text, element.bounds.x, element.bounds.y, element.bounds.width);
+    const lines = element.text.split("\n");
+    for (let i = 0; i < lines.length; i++) {
+      ctx.fillText(lines[i], element.bounds.x, element.bounds.y + i * element.style.fontSize, element.bounds.width);
+    }
     ctx.restore();
   }
 }
