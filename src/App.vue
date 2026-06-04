@@ -37,6 +37,7 @@ const replayPlaybackEnabled = ref(true);
 const replayRecordingEnabled = ref(false);
 const replayRecordConfig = ref<ReplayRecorderConfig>({ ...DEFAULT_RECORDER_CONFIG });
 const hideReplayControls = ref(false);
+const openInNewTab = ref(false);
 const hiddenTopbarKeys = ref<Set<string>>(new Set());
 let themeObserver: MutationObserver | null = null;
 let themeSyncTimer: number | null = null;
@@ -198,11 +199,22 @@ export function setHideReplayControls(value: boolean) {
   hideReplayControls.value = value;
 }
 
+export function setOpenInNewTab(value: boolean) {
+  openInNewTab.value = value;
+}
+
 export function setHiddenTopbarKeys(keys: Set<string>) {
   hiddenTopbarKeys.value = keys;
 }
 
 export async function openSketchEditor(sketchId: string) {
+  if (openInNewTab.value) {
+    // Open in a new tab
+    const url = `siyuan://plugins/siyuan-sketch-note?sketchId=${sketchId}`;
+    window.open(url, '_blank');
+    return;
+  }
+
   editorBlockId.value = sketchId;
   try {
     editorData.value = await loadSketchData(loadDataFn, sketchId);
@@ -274,6 +286,7 @@ export default {
       replayRecordingEnabled,
       replayRecordConfig,
       hideReplayControls,
+      openInNewTab,
       hiddenTopbarKeys,
       closeEditor,
     };

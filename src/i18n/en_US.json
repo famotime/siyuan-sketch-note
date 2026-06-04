@@ -136,6 +136,8 @@
   "replayRecordImage": "Images",
   "hideReplayControls": "Hide replay controls",
   "hideReplayControlsDesc": "Hide the replay control bar during playback.",
+  "openInNewTab": "Open in New Tab",
+  "openInNewTabDesc": "When enabled, the sketch editor opens in a new tab instead of the current overlay. Disabled by default.",
   "replayRebirth": "Rebirth",
   "replayRebirthConfirm": "Rebirth from this step? All subsequent operations will be discarded."
 }

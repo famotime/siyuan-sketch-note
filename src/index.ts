@@ -8,7 +8,7 @@ import {
 } from "siyuan";
 import "@/index.scss";
 import { init, destroy } from "./main";
-import { openSketchEditor, setI18n, setReplayPlaybackEnabled, setReplayRecordConfig, setReplayRecordingEnabled, setHideReplayControls, setHiddenTopbarKeys } from "./App.vue";
+import { openSketchEditor, setI18n, setReplayPlaybackEnabled, setReplayRecordConfig, setReplayRecordingEnabled, setHideReplayControls, setOpenInNewTab, setHiddenTopbarKeys } from "./App.vue";
 import { storageKey, createEmptySketchData, loadEditorPreferences, loadSketchData } from "./storage";
 import { loadPluginSettings, savePluginSettings } from "./storage/pluginSettings";
 import type { ReplayEventType, ReplayRecorderConfig } from "./recorder/types";
@@ -50,6 +50,7 @@ export default class SketchNotePlugin extends Plugin {
     setReplayRecordingEnabled(pluginSettings.replayRecordingEnabled);
     setReplayRecordConfig(pluginSettings.replayRecordConfig);
     setHideReplayControls(pluginSettings.hideReplayControls);
+    setOpenInNewTab(pluginSettings.openInNewTab);
     setHiddenTopbarKeys(getHiddenTopbarKeySet());
 
     // Initialize Vue app
@@ -118,6 +119,23 @@ export default class SketchNotePlugin extends Plugin {
         checkbox.addEventListener("change", async () => {
           settings.enableDebugLog = checkbox.checked;
           setDebugLogEnabled(checkbox.checked);
+          await savePluginSettings((key, data) => this.saveData(key, data), settings);
+        });
+        return checkbox;
+      },
+    });
+
+    setting.addItem({
+      title: this.i18n?.openInNewTab ?? "Open in New Tab",
+      description: this.i18n?.openInNewTabDesc ?? "When enabled, the sketch editor opens in a new tab instead of the current overlay. Disabled by default.",
+      createActionElement: () => {
+        const checkbox = document.createElement("input");
+        checkbox.type = "checkbox";
+        checkbox.className = "b3-switch fn__flex-center";
+        checkbox.checked = settings.openInNewTab;
+        checkbox.addEventListener("change", async () => {
+          settings.openInNewTab = checkbox.checked;
+          setOpenInNewTab(checkbox.checked);
           await savePluginSettings((key, data) => this.saveData(key, data), settings);
         });
         return checkbox;
