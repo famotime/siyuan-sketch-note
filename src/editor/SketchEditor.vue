@@ -2,7 +2,7 @@
   <div
     v-if="visible"
     ref="editorRootRef"
-    :class="[`sketch-editor--theme-${effectiveThemeMode}`]"
+    :class="[`sketch-editor--theme-${effectiveThemeMode}`, embedMode && 'sketch-editor--embed']"
     class="sketch-editor"
   >
     <div
@@ -235,6 +235,7 @@ const props = defineProps<{
   replayRecordingEnabled?: boolean;
   replayRecordConfig?: Partial<ReplayRecorderConfig>;
   hideReplayControls?: boolean;
+  embedMode?: boolean;
 }>();
 
 const emit = defineEmits<{ (e: "close"): void }>();
@@ -427,7 +428,9 @@ onMounted(() => {
 // ─── Lifecycle ───
 onMounted(() => {
   visible.value = true;
-  document.body.style.overflow = "hidden";
+  if (!props.embedMode) {
+    document.body.style.overflow = "hidden";
+  }
   bodyRef.value?.addEventListener("wheel", onBodyWheel, { passive: false });
   window.addEventListener("paste", onPaste);
   window.addEventListener("keydown", onKeyDown);
@@ -435,7 +438,9 @@ onMounted(() => {
 });
 
 onUnmounted(() => {
-  document.body.style.overflow = "";
+  if (!props.embedMode) {
+    document.body.style.overflow = "";
+  }
   bodyRef.value?.removeEventListener("wheel", onBodyWheel);
   window.removeEventListener("paste", onPaste);
   window.removeEventListener("keydown", onKeyDown);
@@ -987,6 +992,11 @@ function onHeightChanged(_h: number) {}
   --sketch-toolbar-shadow: 0 10px 30px rgba(0, 0, 0, 0.25), 0 2px 8px rgba(0, 0, 0, 0.12);
   --sketch-toolbar-hover-shadow: 0 12px 35px rgba(0, 0, 0, 0.35), 0 4px 12px rgba(0, 0, 0, 0.15);
   --sketch-toolbar-active-shadow: 0 4px 12px rgba(0, 0, 0, 0.18);
+}
+
+.sketch-editor--embed {
+  position: absolute;
+  z-index: auto;
 }
 
 .sketch-editor--theme-light {

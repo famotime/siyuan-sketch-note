@@ -12,6 +12,7 @@ describe("plugin settings", () => {
     expect(normalizePluginSettings()).toEqual({
       enableDebugLog: false,
       hideReplayControls: false,
+      openInNewTab: false,
       replayPlaybackEnabled: true,
       replayRecordingEnabled: false,
       replayRecordConfig: { ...DEFAULT_RECORDER_CONFIG },
@@ -31,6 +32,7 @@ describe("plugin settings", () => {
     expect(store.get(pluginSettingsKey())).toEqual({
       enableDebugLog: true,
       hideReplayControls: false,
+      openInNewTab: false,
       replayPlaybackEnabled: true,
       replayRecordingEnabled: false,
       replayRecordConfig: { ...DEFAULT_RECORDER_CONFIG },

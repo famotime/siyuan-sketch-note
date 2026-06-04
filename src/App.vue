@@ -30,7 +30,7 @@ import { DEFAULT_RECORDER_CONFIG } from "@/recorder/types";
 const editorVisible = ref(false);
 const editorBlockId = ref("");
 const editorData = ref<any>(null);
-const pluginI18n = ref<Record<string, string>>({});
+export const pluginI18n = ref<Record<string, string>>({});
 const pluginSaveData = ref<(key: string, data: any) => Promise<void>>(async () => {});
 const themeMode = ref<"light" | "dark">(resolveSiyuanThemeMode());
 const replayPlaybackEnabled = ref(true);
@@ -45,6 +45,11 @@ let lastThemeDiagnosticKey = "";
 const themeLogger = createLogger("Theme");
 
 let loadDataFn: (key: string) => Promise<any> = async () => null;
+let openSketchInNewTabFn: ((sketchId: string) => Promise<void>) | null = null;
+
+export function setOpenSketchInNewTabFn(fn: (sketchId: string) => Promise<void>) {
+  openSketchInNewTabFn = fn;
+}
 
 function parseThemeMode(value: unknown): "light" | "dark" | null {
   if (value === 0 || value === "0" || value === "light") return "light";
@@ -208,10 +213,11 @@ export function setHiddenTopbarKeys(keys: Set<string>) {
 }
 
 export async function openSketchEditor(sketchId: string) {
+  console.log("[Sketch Note] openSketchEditor called, openInNewTab =", openInNewTab.value, "openSketchInNewTabFn =", !!openSketchInNewTabFn);
   if (openInNewTab.value) {
-    // Open in a new tab
-    const url = `siyuan://plugins/siyuan-sketch-note?sketchId=${sketchId}`;
-    window.open(url, '_blank');
+    if (openSketchInNewTabFn) {
+      await openSketchInNewTabFn(sketchId);
+    }
     return;
   }
 
