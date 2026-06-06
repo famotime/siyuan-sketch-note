@@ -1,6 +1,6 @@
 import { createApp } from "vue";
 import { openTab } from "siyuan";
-import App, { setSaveDataFn, setLoadDataFn, pluginI18n, setOpenSketchInNewTabFn } from "./App.vue";
+import App, { setSaveDataFn, setLoadDataFn, pluginI18n, setOpenSketchInNewTabFn, refreshSketchImage } from "./App.vue";
 import SketchEditor from "./editor/SketchEditor.vue";
 import { loadSketchData } from "./storage";
 import type { Plugin, Custom } from "siyuan";
@@ -102,6 +102,9 @@ function registerSketchTab() {
       destroyTabApp();
     },
     beforeDestroy(this: Custom) {
+      if (currentTabSketchId) {
+        refreshSketchImage(currentTabSketchId);
+      }
       destroyTabApp();
     },
   });

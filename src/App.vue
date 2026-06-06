@@ -247,7 +247,7 @@ function closeEditor() {
  * Uses nextTick + setTimeout to wait for Vue DOM update, then
  * force-fetches to bust HTTP cache and updates both data-src and src.
  */
-function refreshSketchImage(sketchId: string) {
+export function refreshSketchImage(sketchId: string) {
   const canonicalSrc = `assets/${sketchAssetFileName(sketchId)}`;
 
   // Wait for Vue DOM update (editor overlay removal) to complete
