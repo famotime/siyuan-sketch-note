@@ -368,6 +368,27 @@ function onPointerDown(e: PointerEvent) {
       }, LASSO_LONG_PRESS_MS);
       return;
     }
+    // Click on already-selected element → drag directly without long-press
+    if (lasso.selectedIds.length > 0) {
+      const selectedHit = hitTestElement(
+        getSelectableElements().filter((el) => lasso.selectedIds.includes(el.id)),
+        point.x,
+        point.y,
+      );
+      if (selectedHit) {
+        cancelLongPressTimer();
+        interaction.longPressDrag = { elementId: selectedHit.id, lastPoint: point };
+        pushHistorySnapshot(state);
+        return;
+      }
+      // Click on empty canvas → deselect
+      cancelLongPressTimer();
+      lasso.selectedIds = [];
+      lasso.path = [];
+      lasso.box = null;
+      fullRedrawStrokeCanvas(getCanvas(), state);
+      return;
+    }
   }
 
   if (props.tool === "text") {
