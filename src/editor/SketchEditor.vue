@@ -435,6 +435,7 @@ onMounted(() => {
   window.addEventListener("paste", onPaste);
   window.addEventListener("keydown", onKeyDown);
   window.addEventListener("keydown", onReplayKeyDown);
+  window.addEventListener("keyup", onKeyUp);
 });
 
 onUnmounted(() => {
@@ -445,6 +446,7 @@ onUnmounted(() => {
   window.removeEventListener("paste", onPaste);
   window.removeEventListener("keydown", onKeyDown);
   window.removeEventListener("keydown", onReplayKeyDown);
+  window.removeEventListener("keyup", onKeyUp);
 });
 
 watchEffect((onCleanup) => {
@@ -675,7 +677,19 @@ function onKeyDown(event: KeyboardEvent) {
     case "save": manualSave(); break;
     case "undo": canvasRef.value?.doUndo(); break;
     case "redo": canvasRef.value?.doRedo(); break;
+    case "moveSelection": {
+      const dirMap = { up: { dx: 0, dy: -1 }, down: { dx: 0, dy: 1 }, left: { dx: -1, dy: 0 }, right: { dx: 1, dy: 0 } };
+      const { dx, dy } = dirMap[shortcut.direction];
+      canvasRef.value?.moveSelectionByKeyboard(dx, dy);
+      break;
+    }
     case "tool": selectTool(shortcut.tool); break;
+  }
+}
+
+function onKeyUp(event: KeyboardEvent) {
+  if (event.key.startsWith("Arrow")) {
+    canvasRef.value?.finishKeyboardMove();
   }
 }
 

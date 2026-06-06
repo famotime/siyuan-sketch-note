@@ -6,6 +6,7 @@ export type EditorShortcut =
   | { type: "save" }
   | { type: "undo" }
   | { type: "redo" }
+  | { type: "moveSelection"; direction: "up" | "down" | "left" | "right" }
   | { type: "tool"; tool: EditorTool };
 
 const numberToolMap: Record<string, EditorTool> = {
@@ -42,6 +43,18 @@ export function resolveEditorShortcut(event: KeyboardEvent): EditorShortcut | nu
   }
   if (hasCommandModifier && key === "y") {
     return { type: "redo" };
+  }
+  if (!hasCommandModifier && !event.altKey && !event.shiftKey && event.key === "ArrowUp") {
+    return { type: "moveSelection", direction: "up" };
+  }
+  if (!hasCommandModifier && !event.altKey && !event.shiftKey && event.key === "ArrowDown") {
+    return { type: "moveSelection", direction: "down" };
+  }
+  if (!hasCommandModifier && !event.altKey && !event.shiftKey && event.key === "ArrowLeft") {
+    return { type: "moveSelection", direction: "left" };
+  }
+  if (!hasCommandModifier && !event.altKey && !event.shiftKey && event.key === "ArrowRight") {
+    return { type: "moveSelection", direction: "right" };
   }
   if (!hasCommandModifier && !event.altKey && !event.shiftKey && numberToolMap[event.key]) {
     return { type: "tool", tool: numberToolMap[event.key] };

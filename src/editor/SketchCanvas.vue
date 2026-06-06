@@ -206,6 +206,9 @@ const interaction = {
   elementTransform: null as { elementId: string; lastPoint: StrokePoint; mode: "move" | "resize" } | null,
   textMove: null as { elementId: string; startPoint: StrokePoint; lastPoint: StrokePoint; moved: boolean } | null,
   selectedElementId: null as string | null,
+  longPressTimer: null as number | null,
+  longPressPending: null as { elementId: string; startPoint: StrokePoint; event: PointerEvent } | null,
+  longPressDrag: null as { elementId: string; lastPoint: StrokePoint } | null,
 };
 
 // Lasso selection state
@@ -342,6 +345,31 @@ function onPointerDown(e: PointerEvent) {
   if (!shouldDrawFromPointer(e, props.inputSettings)) return;
   (e.target as HTMLElement).setPointerCapture(e.pointerId);
 
+  // Long-press to select and drag any element (non-lasso, non-text tools)
+  if (props.tool !== "lasso" && props.tool !== "text") {
+    const point = eventPoint(e);
+    const hitElement = hitTestElement(getSelectableElements(), point.x, point.y);
+    if (hitElement) {
+      cancelLongPressTimer();
+      interaction.longPressPending = { elementId: hitElement.id, startPoint: point, event: e };
+      interaction.longPressTimer = window.setTimeout(() => {
+        interaction.longPressTimer = null;
+        interaction.longPressPending = null;
+        // Cancel any in-progress drawing
+        if (cancelCurrentStroke(state)) fullRedrawStrokeCanvas(getCanvas(), state);
+        interaction.shapeStart = null;
+        lasso.selectedIds = [hitElement.id];
+        lasso.path = [];
+        lasso.box = null;
+        interaction.longPressDrag = { elementId: hitElement.id, lastPoint: point };
+        pushHistorySnapshot(state);
+        fullRedrawStrokeCanvas(getCanvas(), state);
+        drawLassoSelectionOutline();
+      }, LASSO_LONG_PRESS_MS);
+      return;
+    }
+  }
+
   if (props.tool === "text") {
     if (textEditor.value.show) {
       finishTextEditing();
@@ -426,13 +454,13 @@ function onPointerDown(e: PointerEvent) {
       pushHistorySnapshot(state);
       return;
     }
-    const pressedImage = hitTestElement(
-      state.elements.filter((item) => item.type === "image"),
+    const pressedElement = hitTestElement(
+      getSelectableElements(),
       point.x,
       point.y,
     );
-    if (pressedImage) {
-      startLassoImageLongPress(point, pressedImage.id);
+    if (pressedElement) {
+      startLassoLongPress(point, pressedElement.id);
       return;
     }
     if (props.lassoMode === "box") {
@@ -516,13 +544,42 @@ function onPointerMove(e: PointerEvent) {
   const vpResult = viewport.handlePointerMove(e);
   if (vpResult) return;
 
+  // Cancel pending long-press if pointer moves beyond tolerance
+  if (interaction.longPressPending) {
+    const point = eventPoint(e);
+    const distance = Math.hypot(point.x - interaction.longPressPending.startPoint.x, point.y - interaction.longPressPending.startPoint.y);
+    if (distance > LASSO_LONG_PRESS_MOVE_TOLERANCE) {
+      const savedEvent = interaction.longPressPending.event;
+      cancelLongPressTimer();
+      // Replay the original press event to start normal tool drawing
+      onPointerDown(savedEvent);
+      // Continue with this move event
+    } else {
+      return;
+    }
+  }
+
+  // Handle active long-press drag
+  if (interaction.longPressDrag) {
+    const point = eventPoint(e);
+    const dx = point.x - interaction.longPressDrag.lastPoint.x;
+    const dy = point.y - interaction.longPressDrag.lastPoint.y;
+    state.elements = translateLassoSelection(state.elements, lasso.selectedIds, dx, dy);
+    state.strokes = translateStrokeSelection(state.strokes, lasso.selectedIds, dx, dy);
+    interaction.longPressDrag.lastPoint = point;
+    state.isDirty = true;
+    fullRedrawStrokeCanvas(getCanvas(), state);
+    drawLassoSelectionOutline();
+    return;
+  }
+
   if (props.tool === "lasso") {
     const point = eventPoint(e);
     if (lasso.longPress) {
       const distance = Math.hypot(point.x - lasso.longPress.point.x, point.y - lasso.longPress.point.y);
       if (!lasso.longPress.selected && distance > LASSO_LONG_PRESS_MOVE_TOLERANCE) {
         const start = lasso.longPress.point;
-        cancelLassoImageLongPress();
+        cancelLassoLongPress();
         if (props.lassoMode === "box") {
           lasso.box = { start, current: point };
           lasso.selectedIds = [];
@@ -681,10 +738,24 @@ function onPointerUp(e: PointerEvent) {
   const vpResult = viewport.handlePointerUp(e);
   if (vpResult) return;
 
+  // Long-press pending: user released before timer fired, cancel and fall through
+  if (interaction.longPressPending) {
+    cancelLongPressTimer();
+    // Fall through to normal tool handling
+  }
+
+  // Long-press drag: finalize the drag
+  if (interaction.longPressDrag) {
+    interaction.longPressDrag = null;
+    updateUndoRedoState();
+    emit("stroke");
+    return;
+  }
+
   if (props.tool === "lasso") {
     if (lasso.longPress) {
       const selected = lasso.longPress.selected;
-      cancelLassoImageLongPress();
+      cancelLassoLongPress();
       if (selected) {
         updateUndoRedoState();
         return;
@@ -1060,8 +1131,8 @@ function getSingleSelectedImage(): SketchElement | null {
   return element?.type === "image" ? element : null;
 }
 
-function startLassoImageLongPress(point: StrokePoint, elementId: string) {
-  cancelLassoImageLongPress();
+function startLassoLongPress(point: StrokePoint, elementId: string) {
+  cancelLassoLongPress();
   const timer = window.setTimeout(() => {
     if (!lasso.longPress || lasso.longPress.elementId !== elementId) return;
     lasso.longPress.selected = true;
@@ -1074,10 +1145,18 @@ function startLassoImageLongPress(point: StrokePoint, elementId: string) {
   lasso.longPress = { point, elementId, timer, selected: false };
 }
 
-function cancelLassoImageLongPress() {
+function cancelLassoLongPress() {
   if (!lasso.longPress) return;
   window.clearTimeout(lasso.longPress.timer);
   lasso.longPress = null;
+}
+
+function cancelLongPressTimer() {
+  if (interaction.longPressTimer != null) {
+    window.clearTimeout(interaction.longPressTimer);
+    interaction.longPressTimer = null;
+  }
+  interaction.longPressPending = null;
 }
 
 function getSelectableElements() {
@@ -1090,12 +1169,14 @@ function getSelectableElements() {
 }
 
 function clearInteractionState() {
-  cancelLassoImageLongPress();
+  cancelLassoLongPress();
+  cancelLongPressTimer();
   interaction.shapeStart = null;
   interaction.imageTransform = null;
   interaction.elementTransform = null;
   interaction.textMove = null;
   interaction.selectedElementId = null;
+  interaction.longPressDrag = null;
   lasso.path = [];
   lasso.box = null;
   lasso.selectedIds = [];
@@ -1396,6 +1477,30 @@ function highlightSearchResult(result: OcrSearchResult) {
   scrollActivePageIntoView();
 }
 
+// ── Keyboard move selection ──
+
+let keyboardMoveActive = false;
+
+function moveSelectionByKeyboard(dx: number, dy: number) {
+  if (lasso.selectedIds.length === 0) return;
+  if (!keyboardMoveActive) {
+    pushHistorySnapshot(state);
+    keyboardMoveActive = true;
+  }
+  state.elements = translateLassoSelection(state.elements, lasso.selectedIds, dx, dy);
+  state.strokes = translateStrokeSelection(state.strokes, lasso.selectedIds, dx, dy);
+  state.isDirty = true;
+  fullRedrawStrokeCanvas(getCanvas(), state);
+  drawLassoSelectionOutline();
+}
+
+function finishKeyboardMove() {
+  if (!keyboardMoveActive) return;
+  keyboardMoveActive = false;
+  updateUndoRedoState();
+  emit("stroke");
+}
+
 defineExpose({
   doUndo,
   doRedo,
@@ -1418,6 +1523,8 @@ defineExpose({
   goToNextPage,
   handleWheelZoom,
   resetViewport,
+  moveSelectionByKeyboard,
+  finishKeyboardMove,
 });
 </script>
 
