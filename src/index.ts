@@ -191,7 +191,7 @@ export default class SketchNotePlugin extends Plugin {
         }),
       });
 
-      const recordTypeLabels: Record<Exclude<ReplayEventType, "imageTransform" | "imageDelete">, () => string> = {
+      const recordTypeLabels: Record<Exclude<ReplayEventType, "imageTransform" | "imageDelete" | "elementTransform">, () => string> = {
         stroke: () => this.i18n?.replayRecordStroke ?? "Strokes",
         erase: () => this.i18n?.replayRecordErase ?? "Eraser",
         shape: () => this.i18n?.replayRecordShape ?? "Shapes",
@@ -200,7 +200,7 @@ export default class SketchNotePlugin extends Plugin {
         toolSwitch: () => this.i18n?.replayToolSwitch ?? "Tool Switch",
       };
 
-      const recordTypes: Array<Exclude<ReplayEventType, "imageTransform" | "imageDelete">> = ["stroke", "erase", "shape", "text", "image", "toolSwitch"];
+      const recordTypes: Array<Exclude<ReplayEventType, "imageTransform" | "imageDelete" | "elementTransform">> = ["stroke", "erase", "shape", "text", "image", "toolSwitch"];
 
       for (const type of recordTypes) {
         const childSwitch = createSwitch(settings.replayRecordConfig[type], async (checked) => {

@@ -222,7 +222,7 @@ describe("replayPlayer", () => {
     expect(redrawBackground).toHaveBeenCalledTimes(2);
   });
 
-  it("does not draw stored eraser strokes as visible black replay paths", () => {
+  it("does not draw stored eraser strokes with normal source-over compositing", () => {
     const eraserEvents: ReplayEvent[] = [
       {
         type: "stroke",
@@ -248,7 +248,112 @@ describe("replayPlayer", () => {
     tickFrame(16);
     tickFrame(32);
 
-    expect(ctx.stroke).not.toHaveBeenCalled();
+    expect(ctx.stroke).toHaveBeenCalled();
+    expect(ctx.globalCompositeOperation).toBe("destination-out");
+  });
+
+  it("replays pixel eraser strokes with destination-out compositing", () => {
+    const eraserEvents: ReplayEvent[] = [
+      {
+        type: "stroke",
+        id: "pen-event",
+        timestamp: 1000,
+        stroke: {
+          id: "pen-stroke",
+          points: [
+            { x: 0, y: 0, pressure: 0.5, timestamp: 1000 },
+            { x: 20, y: 20, pressure: 0.5, timestamp: 1010 },
+          ],
+          color: "#000000",
+          width: 4,
+          tool: "pen",
+        },
+      },
+      {
+        type: "stroke",
+        id: "eraser-event",
+        timestamp: 1020,
+        stroke: {
+          id: "eraser-stroke",
+          points: [
+            { x: 5, y: 5, pressure: 0.5, timestamp: 1020 },
+            { x: 15, y: 15, pressure: 0.5, timestamp: 1030 },
+          ],
+          color: "#000000",
+          width: 20,
+          tool: "eraser",
+          brushProfileId: "eraser.pixel",
+        },
+      },
+    ];
+    const canvas = createMockCanvas();
+    const ctx = canvas.getContext("2d")!;
+    const player = new ReplayPlayer(eraserEvents, canvas);
+
+    player.goToEvent(2);
+
+    expect(ctx.stroke).toHaveBeenCalled();
+    expect(ctx.globalCompositeOperation).toBe("destination-out");
+  });
+
+  it("replays moved handwriting from element transform events", () => {
+    const initialStroke = {
+      id: "stroke-1",
+      points: [
+        { x: 0, y: 0, pressure: 0.5, timestamp: 1000 },
+        { x: 20, y: 20, pressure: 0.5, timestamp: 1010 },
+      ],
+      color: "#000000",
+      width: 4,
+      tool: "pen" as const,
+      bounds: { x: -2, y: -2, width: 24, height: 24 },
+    };
+    const movedStroke = {
+      ...initialStroke,
+      points: initialStroke.points.map((point) => ({ ...point, x: point.x + 50, y: point.y + 30 })),
+      bounds: { x: 48, y: 28, width: 24, height: 24 },
+    };
+    const events: ReplayEvent[] = [
+      {
+        type: "stroke",
+        id: "stroke-event",
+        timestamp: 1000,
+        stroke: initialStroke,
+      },
+      {
+        type: "elementTransform",
+        id: "move-event",
+        timestamp: 1100,
+        op: "move",
+        elementIds: ["stroke-1"],
+        initialElements: [
+          {
+            id: "stroke-1",
+            type: "stroke",
+            stroke: initialStroke,
+            bounds: initialStroke.bounds,
+            transform: { x: 0, y: 0, scaleX: 1, scaleY: 1, rotation: 0 },
+            zIndex: 0,
+          },
+        ],
+        finalElements: [
+          {
+            id: "stroke-1",
+            type: "stroke",
+            stroke: movedStroke,
+            bounds: movedStroke.bounds,
+            transform: { x: 50, y: 30, scaleX: 1, scaleY: 1, rotation: 0 },
+            zIndex: 0,
+          },
+        ],
+      },
+    ];
+    const canvas = createMockCanvas();
+    const player = new ReplayPlayer(events, canvas);
+
+    player.goToEvent(2);
+
+    expect(player.getCompletedStrokes().get("stroke-1")?.points[0]).toMatchObject({ x: 50, y: 30 });
   });
 
   it("animates text without clearing a black rectangle behind the text", () => {

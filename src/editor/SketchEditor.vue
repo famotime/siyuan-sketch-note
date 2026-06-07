@@ -188,11 +188,10 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted, watch, watchEffect, nextTick } from "vue";
-import type { SketchData, ToolPreset } from "@/types/sketch";
+import type { HighlighterSubtype, PenSubtype, SketchData, ToolPreset } from "@/types/sketch";
 import { getAllTemplates, getTemplate } from "@/template";
 import { showMessage } from "siyuan";
 import { normalizeToolPresets, updateToolPreset, applyPenSubtypeDefaults, applyHighlighterSubtypeDefaults } from "@/tools/presets";
-import type { PenSubtype, HighlighterSubtype } from "@/types/sketch";
 import { importSketchJson } from "@/export/json";
 import { importSketchFromFile } from "@/export/embedding";
 import { normalizeInputSettings } from "./inputMode";
@@ -843,6 +842,16 @@ function filterReplayEventsForPlayback(
   return events.filter((event) => {
     if (event.type === "imageTransform" || event.type === "imageDelete") {
       return mergedConfig.image;
+    }
+    if (event.type === "stroke" && event.stroke.tool === "eraser") {
+      return mergedConfig.erase;
+    }
+    if (event.type === "elementTransform") {
+      return event.finalElements.some((element) => {
+        if (element.type === "image") return mergedConfig.image;
+        if (element.type === "text") return mergedConfig.text;
+        return mergedConfig.stroke;
+      });
     }
     return mergedConfig[event.type];
   });

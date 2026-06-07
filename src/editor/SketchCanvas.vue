@@ -139,7 +139,7 @@ import { hasTextPointerDrag, resolveTextPointerAction } from "./textPointerActio
 import { useViewport } from "@/composables/useViewport";
 import { useTextEditing } from "@/composables/useTextEditing";
 import type { ReplayRecorder } from "@/recorder/recorder";
-import type { ImageTransformSample, ReplayToolSource } from "@/recorder/types";
+import type { ElementTransformReplayEvent, ImageTransformSample, ReplayToolSource } from "@/recorder/types";
 
 const props = defineProps<{
   initialData: SketchData | null;
@@ -208,7 +208,7 @@ const interaction = {
   selectedElementId: null as string | null,
   longPressTimer: null as number | null,
   longPressPending: null as { elementId: string; startPoint: StrokePoint; event: PointerEvent } | null,
-  longPressDrag: null as { elementId: string; lastPoint: StrokePoint } | null,
+  longPressDrag: null as { elementId: string; lastPoint: StrokePoint; initialElements: SketchElement[] } | null,
 };
 
 // Lasso selection state
@@ -218,6 +218,7 @@ const lasso = {
   box: null as { start: LassoPoint; current: LassoPoint } | null,
   move: null as {
     lastPoint: StrokePoint;
+    initialElements: SketchElement[];
     initialImage?: ImageElement;
     startedAt?: number;
     lastSampleAt?: number;
@@ -300,6 +301,35 @@ function getEngineTool(tool: EditorTool): SketchTool {
   return "pen";
 }
 
+function cloneReplayElement(element: SketchElement): SketchElement {
+  return JSON.parse(JSON.stringify(element)) as SketchElement;
+}
+
+function getSelectedReplayElements(selectedIds: string[]): SketchElement[] {
+  const selected = new Set(selectedIds);
+  return getSelectableElements()
+    .filter((element) => selected.has(element.id))
+    .map(cloneReplayElement);
+}
+
+function recordElementTransform(
+  op: ElementTransformReplayEvent["op"],
+  initialElements: SketchElement[],
+) {
+  if (!props.recorder || initialElements.length === 0) return;
+  const finalElements = getSelectedReplayElements(initialElements.map((element) => element.id));
+  if (finalElements.length === 0) return;
+  props.recorder.record({
+    type: "elementTransform",
+    id: `et-${Date.now()}`,
+    timestamp: Date.now(),
+    op,
+    elementIds: finalElements.map((element) => element.id),
+    initialElements,
+    finalElements,
+  });
+}
+
 function isDirectDrawingTool(tool: EditorTool): boolean {
   return tool === "pen" || tool === "highlighter" || tool === "eraser";
 }
@@ -371,7 +401,7 @@ function onPointerDown(e: PointerEvent) {
         lasso.selectedIds = [hitElement.id];
         lasso.path = [];
         lasso.box = null;
-        interaction.longPressDrag = { elementId: hitElement.id, lastPoint: point };
+        interaction.longPressDrag = { elementId: hitElement.id, lastPoint: point, initialElements: getSelectedReplayElements(lasso.selectedIds) };
         pushHistorySnapshot(state);
         fullRedrawStrokeCanvas(getCanvas(), state);
         drawLassoSelectionOutline();
@@ -387,7 +417,7 @@ function onPointerDown(e: PointerEvent) {
       );
       if (selectedHit) {
         cancelLongPressTimer();
-        interaction.longPressDrag = { elementId: selectedHit.id, lastPoint: point };
+        interaction.longPressDrag = { elementId: selectedHit.id, lastPoint: point, initialElements: getSelectedReplayElements(lasso.selectedIds) };
         pushHistorySnapshot(state);
         return;
       }
@@ -476,6 +506,7 @@ function onPointerDown(e: PointerEvent) {
       const selectedImage = selectedElement.type === "image" && lasso.selectedIds.length === 1 ? selectedElement as ImageElement : undefined;
       lasso.move = {
         lastPoint: point,
+        initialElements: getSelectedReplayElements(lasso.selectedIds),
         initialImage: selectedImage,
         startedAt: selectedImage ? startTime : undefined,
         lastSampleAt: selectedImage ? startTime : undefined,
@@ -777,7 +808,9 @@ function onPointerUp(e: PointerEvent) {
 
   // Long-press drag: finalize the drag
   if (interaction.longPressDrag) {
+    const initialElements = interaction.longPressDrag.initialElements;
     interaction.longPressDrag = null;
+    recordElementTransform("move", initialElements);
     updateUndoRedoState();
     emit("stroke");
     return;
@@ -810,6 +843,9 @@ function onPointerUp(e: PointerEvent) {
             samples: [...move.samples, createImageTransformSample(element, Date.now() - move.startedAt, move.points.at(-1))],
           });
         }
+      }
+      if (!move.initialImage) {
+        recordElementTransform("move", move.initialElements);
       }
       lasso.move = null;
       updateUndoRedoState();
@@ -926,6 +962,17 @@ function onPointerUp(e: PointerEvent) {
             timestamp: Date.now(),
             erasedIds,
           });
+        }
+        if (props.toolPresets.eraser.mode !== "stroke") {
+          const lastStroke = state.strokes[state.strokes.length - 1];
+          if (lastStroke?.tool === "eraser") {
+            props.recorder.record({
+              type: "stroke",
+              id: `re-${Date.now()}`,
+              timestamp: Date.now(),
+              stroke: lastStroke,
+            });
+          }
         }
       } else if (props.tool !== "eraser") {
         const lastStroke = state.strokes[state.strokes.length - 1];
@@ -1511,11 +1558,13 @@ function highlightSearchResult(result: OcrSearchResult) {
 // ── Keyboard move selection ──
 
 let keyboardMoveActive = false;
+let keyboardMoveInitialElements: SketchElement[] = [];
 
 function moveSelectionByKeyboard(dx: number, dy: number) {
   if (lasso.selectedIds.length === 0) return;
   if (!keyboardMoveActive) {
     pushHistorySnapshot(state);
+    keyboardMoveInitialElements = getSelectedReplayElements(lasso.selectedIds);
     keyboardMoveActive = true;
   }
   state.elements = translateLassoSelection(state.elements, lasso.selectedIds, dx, dy);
@@ -1528,6 +1577,8 @@ function moveSelectionByKeyboard(dx: number, dy: number) {
 function finishKeyboardMove() {
   if (!keyboardMoveActive) return;
   keyboardMoveActive = false;
+  recordElementTransform("move", keyboardMoveInitialElements);
+  keyboardMoveInitialElements = [];
   updateUndoRedoState();
   emit("stroke");
 }

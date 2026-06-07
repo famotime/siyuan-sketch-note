@@ -1,7 +1,9 @@
 import type { ReplayEvent, StrokeReplayEvent, ShapeReplayEvent, ToolSwitchReplayEvent, ImageTransformReplayEvent, ReplayToolSource, ImageTransformSample, ImageReplayEvent } from "./types";
 import type { Stroke, StrokePoint } from "@/types/sketch";
+import type { SketchElement } from "@/elements/model";
 import type { ImageElement } from "@/elements/image";
 import type { TextElement } from "@/elements/text";
+import { migrateStrokesToElements } from "@/elements/model";
 import { getBrushOpacity, getBrushPressureWidth, getSmoothedSegments } from "@/engine/strokeSmoothing";
 import { resolveBrushProfile } from "@/tools/brushProfiles";
 
@@ -48,6 +50,7 @@ export class ReplayPlayer {
 
   // Text element tracking
   private completedTextElements: Map<string, TextElement> = new Map();
+  private elementStates: Map<string, SketchElement> = new Map();
   private imageCache: Map<string, HTMLImageElement> = new Map();
   private imageTransformAnim: {
     elementId: string;
@@ -101,6 +104,7 @@ export class ReplayPlayer {
       this.completedStrokes.clear();
       this.imageStates.clear();
       this.completedTextElements.clear();
+      this.elementStates.clear();
     }
     this.preloadAllImages();
     this.state = "playing";
@@ -133,6 +137,7 @@ export class ReplayPlayer {
     this.completedStrokes.clear();
     this.imageStates.clear();
     this.completedTextElements.clear();
+    this.elementStates.clear();
     this.imageTransformAnim = null;
     this.imageDeleteAnim = null;
     this.clearCanvas();
@@ -150,6 +155,7 @@ export class ReplayPlayer {
     this.completedStrokes.clear();
     this.imageStates.clear();
     this.completedTextElements.clear();
+    this.elementStates.clear();
     this.imageTransformAnim = null;
     this.imageDeleteAnim = null;
     this.currentIndex = Math.max(0, Math.min(index, this.events.length));
@@ -222,6 +228,9 @@ export class ReplayPlayer {
         return this.animateImageTransform(event);
       case "imageDelete":
         return this.animateImageDeleteEvent(event.elementId);
+      case "elementTransform":
+        this.applyElementTransform(event.finalElements);
+        return true;
       case "toolSwitch":
         return this.animateToolSwitch(event);
     }
@@ -503,6 +512,22 @@ export class ReplayPlayer {
 
   private applyErase(erasedIds: string[]): void {
     for (const id of erasedIds) this.completedStrokes.delete(id);
+    for (const id of erasedIds) this.elementStates.delete(id);
+    this.fullRedraw();
+  }
+
+  private applyElementTransform(finalElements: SketchElement[]): void {
+    for (const element of finalElements) {
+      this.elementStates.set(element.id, element);
+      if (element.type === "stroke") {
+        this.completedStrokes.set(element.id, element.stroke);
+      } else if (element.type === "text") {
+        this.completedTextElements.set(element.id, element);
+      } else if (element.type === "image") {
+        this.imageStates.set(element.id, element);
+        this.loadImage(element.src);
+      }
+    }
     this.fullRedraw();
   }
 
@@ -510,6 +535,7 @@ export class ReplayPlayer {
     if (this.layerCtx) {
       this.clearLayer();
       for (const stroke of this.completedStrokes.values()) this.renderStrokeFull(stroke);
+      for (const element of this.completedTextElements.values()) this.renderTextFull(element.text, element);
       for (const element of this.imageStates.values()) this.drawImageWithTransform(element, 1);
       this.presentLayer();
       return;
@@ -517,6 +543,7 @@ export class ReplayPlayer {
 
     this.clearCanvas();
     for (const stroke of this.completedStrokes.values()) this.renderStrokeFull(stroke);
+    for (const element of this.completedTextElements.values()) this.renderTextFull(element.text, element);
     for (const element of this.imageStates.values()) this.drawImageWithTransform(element, 1);
   }
 
@@ -547,6 +574,7 @@ export class ReplayPlayer {
         this.renderStrokeFull(event.stroke);
         this.presentLayer();
         this.completedStrokes.set(event.stroke.id, event.stroke);
+        this.elementStates.set(event.stroke.id, migrateStrokesToElements([event.stroke])[0]);
         break;
       case "erase":
         this.applyErase(event.erasedIds);
@@ -555,21 +583,28 @@ export class ReplayPlayer {
         this.renderTextFull(event.element.text, event.element);
         this.presentLayer();
         this.completedTextElements.set(event.element.id, event.element);
+        this.elementStates.set(event.element.id, event.element);
         break;
       case "image":
         this.imageStates.set(event.element.id, event.element);
+        this.elementStates.set(event.element.id, event.element);
         this.loadImage(event.element.src);
         this.drawImageWithTransform(event.element, 1);
         this.presentLayer();
         break;
       case "imageTransform":
         this.imageStates.set(event.elementId, event.finalElement);
+        this.elementStates.set(event.elementId, event.finalElement);
         this.loadImage(event.finalElement.src);
         this.drawImageWithTransform(event.finalElement, 1);
         this.presentLayer();
         break;
       case "imageDelete":
         this.imageStates.delete(event.elementId);
+        this.elementStates.delete(event.elementId);
+        break;
+      case "elementTransform":
+        this.applyElementTransform(event.finalElements);
         break;
       case "toolSwitch":
         break;
@@ -579,7 +614,6 @@ export class ReplayPlayer {
   private renderStrokeFull(stroke: Stroke): void {
     const { points, color, width, tool, isShape } = stroke;
     if (points.length < 2) return;
-    if (tool === "eraser" && !this.layerCtx) return;
     const profile = resolveBrushProfile(stroke.brushProfileId, stroke.tool, {
       tool: stroke.tool,
       penSubtype: stroke.penSubtype,
@@ -640,7 +674,6 @@ export class ReplayPlayer {
   }
 
   private renderStrokeSegment(stroke: Stroke, prev: StrokePoint, curr: StrokePoint): void {
-    if (stroke.tool === "eraser" && !this.layerCtx) return;
     const profile = resolveBrushProfile(stroke.brushProfileId, stroke.tool, {
       tool: stroke.tool,
       penSubtype: stroke.penSubtype,

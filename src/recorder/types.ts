@@ -22,6 +22,7 @@ export type ReplayEvent =
   | ImageReplayEvent
   | ImageTransformReplayEvent
   | ImageDeleteReplayEvent
+  | ElementTransformReplayEvent
   | ToolSwitchReplayEvent;
 
 export interface StrokeReplayEvent {
@@ -80,6 +81,16 @@ export interface ImageDeleteReplayEvent {
   elementId: string;
 }
 
+export interface ElementTransformReplayEvent {
+  type: "elementTransform";
+  id: string;
+  timestamp: number;
+  op: "move" | "resize";
+  elementIds: string[];
+  initialElements: SketchElement[];
+  finalElements: SketchElement[];
+}
+
 export interface ToolSwitchReplayEvent {
   type: "toolSwitch";
   id: string;
@@ -97,6 +108,7 @@ export interface ReplayRecorderConfig {
   image: boolean;
   imageTransform: boolean;
   imageDelete: boolean;
+  elementTransform: boolean;
   toolSwitch: boolean;
 }
 
@@ -108,5 +120,6 @@ export const DEFAULT_RECORDER_CONFIG: ReplayRecorderConfig = {
   image: true,
   imageTransform: true,
   imageDelete: true,
+  elementTransform: true,
   toolSwitch: true,
 };
