@@ -1,6 +1,7 @@
 import type { SketchData } from "@/types/sketch";
 import { createPageNavigator } from "@/pages/model";
 import { pad } from "@/utils/date";
+import { embedInPng } from "./embedding";
 
 export interface PngExportPlan {
   blockId: string;
@@ -60,4 +61,12 @@ export function downloadBlob(blob: Blob, fileName: string): void {
   link.click();
   link.remove();
   URL.revokeObjectURL(url);
+}
+
+/** 将渲染好的 PNG blob 嵌入矢量 SketchData，返回新的 PNG blob */
+export async function embedSketchDataInPngBlob(
+  pngBlob: Blob,
+  sketchData: SketchData,
+): Promise<Blob> {
+  return embedInPng(pngBlob, sketchData);
 }

@@ -92,6 +92,13 @@
           <span class="sketch-more-label">{{ t("export") }}</span>
           <IconParkIcon name="ArrowRight" />
         </div>
+        <div
+          class="sketch-more-row sketch-more-row--action"
+          @click="$emit('importSketch'); moreOpen = false"
+        >
+          <span class="sketch-more-label">{{ t("importSketch") }}</span>
+          <IconParkIcon name="Download" />
+        </div>
         <div class="sketch-more-divider" />
         <label class="sketch-more-row sketch-more-row--select">
           <span class="sketch-more-label">{{ t("noteBackground") }}</span>
@@ -210,6 +217,16 @@
               <span class="sketch-toggle__knob" />
             </span>
           </label>
+          <label class="sketch-export-dialog__row">
+            <span class="sketch-export-dialog__label">{{ t("exportSketchData") }}</span>
+            <span
+              class="sketch-toggle"
+              :class="{ 'sketch-toggle--on': exportIncludeSketchData }"
+              @click="$emit('toggleExportSketchData')"
+            >
+              <span class="sketch-toggle__knob" />
+            </span>
+          </label>
           <div class="sketch-export-dialog__actions">
             <button
               class="sketch-export-dialog__button sketch-export-dialog__button--ghost"
@@ -244,6 +261,7 @@ defineProps<{
   canRedo: boolean;
   canUndo: boolean;
   exportIncludeBackground: boolean;
+  exportIncludeSketchData: boolean;
   hiddenTopbarKeys: Set<string>;
   ocrState: "idle" | "recognizing" | "completed" | "error";
   pageOverview: PageOverviewItem[];
@@ -266,9 +284,11 @@ const emit = defineEmits<{
   (e: "export", format: "png" | "pdf"): void;
   (e: "replay"): void;
   (e: "insertImage"): void;
+  (e: "importSketch"): void;
   (e: "toggleStylusOnly"): void;
   (e: "togglePressure"): void;
   (e: "toggleExportBackground"): void;
+  (e: "toggleExportSketchData"): void;
   (e: "toggleZenMode"): void;
   (e: "undo"): void;
   (e: "redo"): void;

@@ -1,6 +1,7 @@
 import type { SketchData } from "@/types/sketch";
 import { getSketchPages } from "@/pages/model";
 import { pad } from "@/utils/date";
+import { embedInPdf } from "./embedding";
 
 export const DEFAULT_PDF_PAGE_HEIGHT = 1000;
 
@@ -148,6 +149,14 @@ export async function exportPdf(plan: PdfExportPlan, options: PdfExportOptions):
 
   const pdf = buildPdf(objects, catalogId);
   return new Blob([binaryStringToUint8Array(pdf)], { type: "application/pdf" });
+}
+
+/** 将生成的 PDF blob 嵌入矢量 SketchData，返回新的 PDF blob */
+export async function embedSketchDataInPdfBlob(
+  pdfBlob: Blob,
+  sketchData: SketchData,
+): Promise<Blob> {
+  return embedInPdf(pdfBlob, sketchData);
 }
 
 function addObject(objects: string[], body: string): number {

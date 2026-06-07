@@ -2,8 +2,8 @@ import { ref } from "vue";
 import type { Ref } from "vue";
 import type { SketchData } from "@/types/sketch";
 import { renderSketchPdfPageImages, renderSketchPngPageImage } from "@/storage/thumbnail";
-import { createCurrentPagePngExportPlan, dataUrlToBlob, downloadBlob, createExportPngFileName } from "@/export/png";
-import { createExportPdfFileName, createPdfExportPlanFromSketch, exportPdf as exportPdfBlob } from "@/export/pdf";
+import { createCurrentPagePngExportPlan, dataUrlToBlob, downloadBlob, createExportPngFileName, embedSketchDataInPngBlob } from "@/export/png";
+import { createExportPdfFileName, createPdfExportPlanFromSketch, exportPdf as exportPdfBlob, embedSketchDataInPdfBlob } from "@/export/pdf";
 import { createExportJsonFileName, exportSketchJson } from "@/export/json";
 
 export function useExportManager(ctx: {
@@ -17,6 +17,7 @@ export function useExportManager(ctx: {
   blockId: Ref<string>;
 }) {
   const exportIncludeBackground = ref(true);
+  const exportIncludeSketchData = ref(true);
 
   async function exportPng() {
     if (!ctx.canvasRef.value) return;
@@ -28,7 +29,8 @@ export function useExportManager(ctx: {
     data.highlighterFavoriteColors = ctx.favoriteColors.value.highlighter;
     const plan = createCurrentPagePngExportPlan(ctx.blockId.value, data);
     const pngDataUrl = await renderSketchPngPageImage(data, plan, exportIncludeBackground.value);
-    const blob = dataUrlToBlob(pngDataUrl);
+    const pngBlob = dataUrlToBlob(pngDataUrl);
+    const blob = exportIncludeSketchData.value ? await embedSketchDataInPngBlob(pngBlob, data) : pngBlob;
     downloadBlob(blob, createExportPngFileName(ctx.blockId.value, new Date(), plan.pageNumber));
   }
 
@@ -47,7 +49,8 @@ export function useExportManager(ctx: {
       exportIncludeBackground.value,
     );
     const pageImages = await renderSketchPdfPageImages(data, plan);
-    const blob = await exportPdfBlob(plan, { pageImages });
+    const pdfBlob = await exportPdfBlob(plan, { pageImages });
+    const blob = exportIncludeSketchData.value ? await embedSketchDataInPdfBlob(pdfBlob, data) : pdfBlob;
     downloadBlob(blob, createExportPdfFileName(ctx.blockId.value));
   }
 
@@ -66,5 +69,5 @@ export function useExportManager(ctx: {
     downloadBlob(blob, createExportJsonFileName(ctx.blockId.value));
   }
 
-  return { exportIncludeBackground, exportPng, exportPdf, exportJson };
+  return { exportIncludeBackground, exportIncludeSketchData, exportPng, exportPdf, exportJson };
 }

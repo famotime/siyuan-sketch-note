@@ -14,6 +14,7 @@
         :canRedo="canRedo"
         :canUndo="canUndo"
         :exportIncludeBackground="exportIncludeBackground"
+        :exportIncludeSketchData="exportIncludeSketchData"
         :hiddenTopbarKeys="hiddenTopbarKeys"
         :ocrState="ocrState"
         :pageOverview="pageOverview"
@@ -40,6 +41,7 @@
         @insertImage="triggerImageImport"
         @importBackground="triggerBackgroundImport"
         @importJson="triggerJsonImport"
+        @importSketch="triggerJsonImport"
         @nextPage="canvasRef?.goToNextPage()"
         @previousPage="canvasRef?.goToPreviousPage()"
         @recognize="recognizeText"
@@ -49,6 +51,7 @@
         @searchNext="onSearchNext"
         @searchPrev="onSearchPrev"
         @toggleExportBackground="exportIncludeBackground = !exportIncludeBackground"
+        @toggleExportSketchData="exportIncludeSketchData = !exportIncludeSketchData"
         @toggleStylusOnly="toggleStylusOnly"
         @togglePressure="togglePressure"
         @toggleZenMode="enterZenMode"
@@ -78,7 +81,7 @@
         ref="jsonInputRef"
         class="sketch-file-input"
         type="file"
-        accept="application/json,.json"
+        accept="application/json,.json,image/png,.png,application/pdf,.pdf"
         @change="onJsonSelected"
       >
       <input
@@ -191,6 +194,7 @@ import { showMessage } from "siyuan";
 import { normalizeToolPresets, updateToolPreset, applyPenSubtypeDefaults, applyHighlighterSubtypeDefaults } from "@/tools/presets";
 import type { PenSubtype, HighlighterSubtype } from "@/types/sketch";
 import { importSketchJson } from "@/export/json";
+import { importSketchFromFile } from "@/export/embedding";
 import { normalizeInputSettings } from "./inputMode";
 import { createCustomBackgroundTemplate, getCustomBackgroundDrawRect, getCustomBackgroundTemplate, updateCustomBackgroundFit } from "@/template/customBackground";
 import type { CustomBackgroundTemplate } from "@/template/customBackground";
@@ -389,7 +393,7 @@ const { ocrState, searchResults, recognizeText, onSearch, onSearchNext, onSearch
   autoSave,
 });
 
-const { exportIncludeBackground, exportPng, exportPdf, exportJson } = useExportManager({
+const { exportIncludeBackground, exportIncludeSketchData, exportPng, exportPdf, exportJson } = useExportManager({
   canvasRef: canvasRef as any,
   currentTemplate,
   colorPalettes,
@@ -578,8 +582,25 @@ async function onJsonSelected(event: Event) {
   const file = input.files?.[0];
   input.value = "";
   if (!file || !canvasRef.value) return;
+
+  let imported: SketchData | null = null;
+  const name = file.name.toLowerCase();
   try {
-    const imported = importSketchJson(await file.text());
+    if (name.endsWith(".json")) {
+      imported = importSketchJson(await file.text());
+    } else {
+      imported = await importSketchFromFile(file);
+    }
+  } catch (error) {
+    console.error("[Sketch Note] import parse error:", error);
+  }
+
+  if (!imported) {
+    window.alert(t("importSketchFileFailed"));
+    return;
+  }
+
+  try {
     const importedPresets = normalizeToolPresets(imported.toolPresets);
     imported.toolPresets = importedPresets;
     currentTemplate.value = imported.template;
@@ -598,7 +619,7 @@ async function onJsonSelected(event: Event) {
     await canvasRef.value.restoreData(imported);
     onStroke();
   } catch (error) {
-    console.error("[Sketch Note] JSON restore failed:", error);
+    console.error("[Sketch Note] restore failed:", error);
     showMessage(t("importJsonFailed"), 5000, "error");
   }
 }
