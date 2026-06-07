@@ -404,6 +404,16 @@ it("declares scroll-blocking wheel and touch listeners explicitly", () => {
   expect(colorPicker).toContain('addEventListener("touchstart", onSpectrumPointerStart, { passive: false })');
 });
 
+it("lets stroke tools start drawing before long-press element selection", () => {
+  const canvas = readFileSync(resolve(process.cwd(), "src/editor/SketchCanvas.vue"), "utf8");
+
+  expect(canvas).toContain("if (isDirectDrawingTool(props.tool))");
+  expect(canvas.indexOf("if (isDirectDrawingTool(props.tool))")).toBeLessThan(
+    canvas.indexOf("Long-press to select and drag any element"),
+  );
+  expect(canvas).toContain('return tool === "pen" || tool === "highlighter" || tool === "eraser"');
+});
+
 it("uses image transform handles instead of lasso group handles for a single selected image", () => {
   const canvas = readFileSync(resolve(process.cwd(), "src/editor/SketchCanvas.vue"), "utf8");
 

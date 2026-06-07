@@ -300,6 +300,10 @@ function getEngineTool(tool: EditorTool): SketchTool {
   return "pen";
 }
 
+function isDirectDrawingTool(tool: EditorTool): boolean {
+  return tool === "pen" || tool === "highlighter" || tool === "eraser";
+}
+
 watch(() => props.tool, (t) => { if (state) state.tool = getEngineTool(t); });
 watch(() => props.toolPresets, (presets) => { if (state) state.toolPresets = presets; }, { deep: true });
 watch(() => props.inputSettings?.enablePressure, (val) => { if (state) state.enablePressure = val ?? true; }, { immediate: true });
@@ -344,6 +348,12 @@ function onPointerDown(e: PointerEvent) {
   if (viewport.isPostPinchGuard()) return;
   if (!shouldDrawFromPointer(e, props.inputSettings)) return;
   (e.target as HTMLElement).setPointerCapture(e.pointerId);
+
+  if (isDirectDrawingTool(props.tool)) {
+    const point = eventPoint(e);
+    enginePointerDown(state, { ...point, canvasX: point.x, canvasY: point.y }, getCanvas());
+    return;
+  }
 
   // Long-press to select and drag any element (non-lasso, non-text tools)
   if (props.tool !== "lasso" && props.tool !== "text") {

@@ -10,6 +10,7 @@ const DELETE_HANDLE_OFFSET = 28;
 const DELETE_HANDLE_SIZE = 16;
 const OPACITY_HANDLE_OFFSET = 28;
 const OPACITY_HANDLE_SIZE = 16;
+const STROKE_HIT_MIN_TOLERANCE = 6;
 
 export interface ElementTransformAction {
   element: SketchElement;
@@ -110,11 +111,48 @@ export function hitTestElement(elements: SketchElement[], x: number, y: number):
   const ordered = [...elements].sort((a, b) => b.zIndex - a.zIndex);
   return ordered.find((element) => {
     const point = inverseRotatePointForElement(element, x, y);
+    if (element.type === "stroke") {
+      return isPointInStrokeElement(element, point.x, point.y);
+    }
     return point.x >= element.bounds.x
       && point.x <= element.bounds.x + element.bounds.width
       && point.y >= element.bounds.y
       && point.y <= element.bounds.y + element.bounds.height;
   }) ?? null;
+}
+
+function isPointInStrokeElement(element: SketchElement & { type: "stroke" }, x: number, y: number): boolean {
+  const tolerance = Math.max(STROKE_HIT_MIN_TOLERANCE, element.stroke.width / 2);
+  if (
+    x < element.bounds.x - tolerance
+    || x > element.bounds.x + element.bounds.width + tolerance
+    || y < element.bounds.y - tolerance
+    || y > element.bounds.y + element.bounds.height + tolerance
+  ) {
+    return false;
+  }
+
+  const points = element.stroke.points;
+  if (points.length === 0) return false;
+  if (points.length === 1) return Math.hypot(x - points[0].x, y - points[0].y) <= tolerance;
+
+  for (let index = 1; index < points.length; index++) {
+    if (distanceToSegment(x, y, points[index - 1].x, points[index - 1].y, points[index].x, points[index].y) <= tolerance) {
+      return true;
+    }
+  }
+  return false;
+}
+
+function distanceToSegment(px: number, py: number, ax: number, ay: number, bx: number, by: number): number {
+  const dx = bx - ax;
+  const dy = by - ay;
+  const lengthSq = dx * dx + dy * dy;
+  if (lengthSq === 0) return Math.hypot(px - ax, py - ay);
+  const t = Math.max(0, Math.min(1, ((px - ax) * dx + (py - ay) * dy) / lengthSq));
+  const x = ax + t * dx;
+  const y = ay + t * dy;
+  return Math.hypot(px - x, py - y);
 }
 
 function getRotatedCorner(element: SketchElement, corner: ResizeCorner) {

@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
+import type { Stroke } from "@/types/sketch";
 import { createImageElement } from "./image";
+import { migrateStrokesToElements } from "./model";
 import {
   getDeleteHandlePoint,
   getOpacityHandlePoint,
@@ -113,6 +115,24 @@ describe("element transforms", () => {
 
     expect(hitTestElement([element], 50, 65)?.id).toBe("image-1");
     expect(hitTestElement([element], 95, 20)).toBeNull();
+  });
+
+  it("hit-tests stroke elements by path distance instead of the whole bounds rectangle", () => {
+    const stroke: Stroke = {
+      id: "stroke-1",
+      tool: "pen",
+      color: "#000000",
+      width: 10,
+      opacity: 1,
+      points: [
+        { x: 10, y: 10, pressure: 0.5, timestamp: 1 },
+        { x: 110, y: 110, pressure: 0.5, timestamp: 2 },
+      ],
+    };
+    const [element] = migrateStrokesToElements([stroke]);
+
+    expect(hitTestElement([element], 50, 50)?.id).toBe("stroke-1");
+    expect(hitTestElement([element], 20, 100)).toBeNull();
   });
 
   it("resolves selected resize handles outside the image bounds", () => {
