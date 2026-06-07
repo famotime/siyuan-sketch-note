@@ -577,6 +577,12 @@ async function onBackgroundFitChange(value: string) {
   onStroke();
 }
 
+function hasContent(): boolean {
+  if (!canvasRef.value) return false;
+  const data = canvasRef.value.getData();
+  return (data.strokes?.length ?? 0) > 0 || (data.elements?.length ?? 0) > 0;
+}
+
 async function onJsonSelected(event: Event) {
   const input = event.target as HTMLInputElement;
   const file = input.files?.[0];
@@ -597,6 +603,11 @@ async function onJsonSelected(event: Event) {
 
   if (!imported) {
     window.alert(t("importSketchFileFailed"));
+    return;
+  }
+
+  // 当前已有内容时，确认是否覆盖
+  if (hasContent() && !window.confirm(t("importOverwriteConfirm"))) {
     return;
   }
 

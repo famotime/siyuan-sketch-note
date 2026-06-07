@@ -76,6 +76,7 @@
   "cancel": "取消",
   "importJson": "恢复 JSON",
   "importSketch": "导入笔记",
+  "importOverwriteConfirm": "当前笔记已有内容，导入将覆盖现有内容。确定继续？",
   "importBackground": "导入背景",
   "backgroundFitCover": "背景铺满",
   "backgroundFitContain": "背景完整",

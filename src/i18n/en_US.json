@@ -76,6 +76,7 @@
   "cancel": "Cancel",
   "importJson": "Restore JSON",
   "importSketch": "Import Sketch",
+  "importOverwriteConfirm": "The current note has content. Importing will overwrite it. Continue?",
   "importBackground": "Import Background",
   "backgroundFitCover": "Cover",
   "backgroundFitContain": "Contain",
