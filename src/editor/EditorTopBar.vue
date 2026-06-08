@@ -99,6 +99,13 @@
           <span class="sketch-more-label">{{ t("importSketch") }}</span>
           <IconParkIcon name="Download" />
         </div>
+        <div
+          class="sketch-more-row sketch-more-row--action"
+          @click="$emit('cleanupInvalidSketches'); moreOpen = false"
+        >
+          <span class="sketch-more-label">{{ t("cleanupInvalidSketches") }}</span>
+          <IconParkIcon name="Delete" />
+        </div>
         <div class="sketch-more-divider" />
         <label class="sketch-more-row sketch-more-row--select">
           <span class="sketch-more-label">{{ t("noteBackground") }}</span>
@@ -285,6 +292,7 @@ const emit = defineEmits<{
   (e: "replay"): void;
   (e: "insertImage"): void;
   (e: "importSketch"): void;
+  (e: "cleanupInvalidSketches"): void;
   (e: "toggleStylusOnly"): void;
   (e: "togglePressure"): void;
   (e: "toggleExportBackground"): void;

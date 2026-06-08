@@ -2,6 +2,8 @@ import { ref, onUnmounted } from "vue";
 import type { Ref } from "vue";
 import type { SketchData } from "@/types/sketch";
 import { storageKey } from "@/storage";
+import { normalizeSketchDataForSave } from "@/storage/sketchIdentity";
+import { loadSketchIndex, saveSketchIndex, upsertSketchIndexItem } from "@/storage/sketchIndex";
 import { thumbnailSketchDataAsync } from "@/storage/thumbnail";
 import { showMessage } from "siyuan";
 import { sketchAssetFileName, uploadDataUrlToAssets } from "@/utils/uploadPng";
@@ -11,6 +13,8 @@ import type { SaveStatus } from "@/storage/saveStatus";
 export function useSaveManager(ctx: {
   canvasRef: Ref<{ getData: () => SketchData; getState: () => { isDirty: boolean } } | undefined>;
   blockId: Ref<string>;
+  sourceBlockId?: Ref<string | null | undefined>;
+  loadData?: (key: string) => Promise<any>;
   saveData: (key: string, data: any) => Promise<void>;
   currentTemplate: Ref<string>;
   toolPresets: Ref<Record<string, any>>;
@@ -53,7 +57,7 @@ export function useSaveManager(ctx: {
   async function runSave(): Promise<boolean> {
     if (!ctx.canvasRef.value) return false;
     saveStatus.value = "saving";
-    const data = ctx.canvasRef.value.getData();
+    let data = ctx.canvasRef.value.getData();
     data.template = ctx.currentTemplate.value;
     data.toolPresets = ctx.toolPresets.value;
     data.inputSettings = ctx.inputSettings.value;
@@ -66,6 +70,10 @@ export function useSaveManager(ctx: {
       data.ocrIndex = ctx.ocrIndex.value;
     }
     delete data.recovery;
+    data = normalizeSketchDataForSave(data, {
+      sketchId: ctx.blockId.value,
+      sourceBlockId: ctx.sourceBlockId?.value,
+    });
 
     let pngDataUrl: string;
     try {
@@ -79,6 +87,14 @@ export function useSaveManager(ctx: {
       const fileName = sketchAssetFileName(ctx.blockId.value);
       await uploadDataUrlToAssets(pngDataUrl, fileName);
       await ctx.saveData(storageKey(ctx.blockId.value), data);
+      if (ctx.loadData) {
+        const index = await loadSketchIndex(ctx.loadData);
+        await saveSketchIndex(ctx.saveData, upsertSketchIndexItem(index, {
+          sketchId: ctx.blockId.value,
+          blockIds: data.id?.references.map(reference => reference.blockId) ?? [],
+          assetName: fileName,
+        }));
+      }
       saveStatus.value = "saved";
       lastSavedAt.value = Date.now();
       ctx.canvasRef.value.getState().isDirty = false;

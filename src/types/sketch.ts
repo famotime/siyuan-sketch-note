@@ -25,8 +25,21 @@ export interface Stroke {
   isShape?: boolean; // 是否为几何形状（跳过贝塞尔平滑）
 }
 
+export interface SketchReference {
+  blockId: string;
+  updatedAt: number;
+}
+
+export interface SketchDataIdentity {
+  sketchId: string;
+  references: SketchReference[];
+  createdAt: number;
+  updatedAt: number;
+}
+
 export interface SketchData {
-  version: 1;
+  version: 1 | 2;
+  id?: SketchDataIdentity;
   template: string; // template id: "blank" | "grid"
   canvasWidth: number;
   canvasHeight: number;

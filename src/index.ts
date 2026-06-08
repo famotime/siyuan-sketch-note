@@ -10,6 +10,9 @@ import "@/index.scss";
 import { init, destroy } from "./main";
 import { openSketchEditor, setI18n, setReplayPlaybackEnabled, setReplayRecordConfig, setReplayRecordingEnabled, setHideReplayControls, setOpenInNewTab, setHiddenTopbarKeys } from "./App.vue";
 import { storageKey, createEmptySketchData, loadEditorPreferences, loadSketchData } from "./storage";
+import { normalizeSketchDataForSave } from "./storage/sketchIdentity";
+import { loadSketchIndex, saveSketchIndex, upsertSketchIndexItem } from "./storage/sketchIndex";
+import { extractInsertedBlockId } from "./storage/insertedBlockId";
 import { loadPluginSettings, savePluginSettings } from "./storage/pluginSettings";
 import type { ReplayEventType, ReplayRecorderConfig } from "./recorder/types";
 import { setDebugLogEnabled } from "./utils/logger";
@@ -82,7 +85,7 @@ export default class SketchNotePlugin extends Plugin {
 
     // Expose openEditor for renderer callbacks
     window.sySketchNote = {
-      openEditor: (blockId: string) => openSketchEditor(blockId),
+      openEditor: (blockId: string, sourceBlockId?: string | null) => openSketchEditor(blockId, sourceBlockId),
     };
   }
 
@@ -349,7 +352,7 @@ export default class SketchNotePlugin extends Plugin {
     editBtn.addEventListener("click", (e) => {
       e.preventDefault();
       e.stopPropagation();
-      openSketchEditor(sketchId);
+      openSketchEditor(sketchId, blockElement.getAttribute("data-node-id"));
     });
     actionBar.insertAdjacentElement("afterbegin", editBtn);
   }
@@ -384,7 +387,7 @@ export default class SketchNotePlugin extends Plugin {
       id: "edit-sketch-note",
       icon: "iconEdit",
       label: this.i18n?.editSketch ?? "Edit Sketch",
-      click: () => openSketchEditor(sketchId),
+      click: () => openSketchEditor(sketchId, selectedElement.closest("[data-node-id]")?.getAttribute("data-node-id")),
     });
     window.siyuan.menus.menu.addItem({
       id: "duplicate-sketch-note-copy",
@@ -415,7 +418,8 @@ export default class SketchNotePlugin extends Plugin {
         : createPlaceholderPng(sourceData.template);
 
       await uploadPngToAssets(imageBlob, sketchAssetFileName(newSketchId));
-      await this.saveData(storageKey(newSketchId), JSON.parse(JSON.stringify(sourceData)));
+      const copiedData = JSON.parse(JSON.stringify(sourceData));
+      delete copiedData.id;
 
       const anchorBlockId = selectedElement.closest("[data-node-id]")?.getAttribute("data-node-id");
       const docId = this.getCurrentDocId();
@@ -437,6 +441,21 @@ export default class SketchNotePlugin extends Plugin {
         console.error("[Sketch Note] 插入独立手写副本失败:", result.msg);
         showMessage(this.i18n?.duplicateSketchCopyFailed ?? "Failed to copy sketch", 5000, "error");
         return;
+      }
+
+      const insertedBlockId = extractInsertedBlockId(result);
+      const normalizedCopiedData = normalizeSketchDataForSave(copiedData, {
+        sketchId: newSketchId,
+        sourceBlockId: insertedBlockId,
+      });
+      await this.saveData(storageKey(newSketchId), normalizedCopiedData);
+      if (insertedBlockId) {
+        const index = await loadSketchIndex((key) => this.loadData(key));
+        await saveSketchIndex((key, data) => this.saveData(key, data), upsertSketchIndexItem(index, {
+          sketchId: newSketchId,
+          blockIds: [insertedBlockId],
+          assetName: sketchAssetFileName(newSketchId),
+        }));
       }
     } catch (e) {
       console.error("[Sketch Note] 复制手写副本失败:", e);
@@ -566,11 +585,25 @@ export default class SketchNotePlugin extends Plugin {
         return;
       }
 
-      // 4. 保存初始空手写数据
-      await this.saveData(storageKey(sketchId), createEmptySketchData(editorPreferences));
+      const insertedBlockId = extractInsertedBlockId(result);
+
+      // 4. 保存初始空手写数据，并记录实际插入的思源块引用
+      const initialData = normalizeSketchDataForSave(createEmptySketchData(editorPreferences), {
+        sketchId,
+        sourceBlockId: insertedBlockId,
+      });
+      await this.saveData(storageKey(sketchId), initialData);
+      if (insertedBlockId) {
+        const index = await loadSketchIndex((key) => this.loadData(key));
+        await saveSketchIndex((key, data) => this.saveData(key, data), upsertSketchIndexItem(index, {
+          sketchId,
+          blockIds: [insertedBlockId],
+          assetName: fileName,
+        }));
+      }
 
       // 5. 打开手写编辑器
-      await openSketchEditor(sketchId);
+      await openSketchEditor(sketchId, insertedBlockId);
     } catch (e) {
       console.error("[Sketch Note] 插入手写块失败:", e);
       showMessage(this.i18n?.insertSketchFailed ?? "Failed to insert sketch block", 5000, "error");

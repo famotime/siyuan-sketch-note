@@ -42,6 +42,7 @@
         @importBackground="triggerBackgroundImport"
         @importJson="triggerJsonImport"
         @importSketch="triggerJsonImport"
+        @cleanupInvalidSketches="cleanupInvalidSketches"
         @nextPage="canvasRef?.goToNextPage()"
         @previousPage="canvasRef?.goToPreviousPage()"
         @recognize="recognizeText"
@@ -190,7 +191,7 @@
 import { ref, computed, onMounted, onUnmounted, watch, watchEffect, nextTick } from "vue";
 import type { HighlighterSubtype, PenSubtype, SketchData, ToolPreset } from "@/types/sketch";
 import { getAllTemplates, getTemplate } from "@/template";
-import { showMessage } from "siyuan";
+import { fetchSyncPost, showMessage } from "siyuan";
 import { normalizeToolPresets, updateToolPreset, applyPenSubtypeDefaults, applyHighlighterSubtypeDefaults } from "@/tools/presets";
 import { importSketchJson } from "@/export/json";
 import { importSketchFromFile } from "@/export/embedding";
@@ -217,6 +218,9 @@ import type { PlaybackSpeed } from "@/recorder/player";
 import { reconstructFromData } from "@/recorder/reconstruct";
 import { migrateStrokesToElements, withStrokeBounds } from "@/elements/model";
 import ReplayControls from "./ReplayControls.vue";
+import { createCleanupPlan, executeCleanupPlan, resolveSketchReferenceStatus } from "@/storage/cleanup";
+import { loadSketchData } from "@/storage";
+import { loadSketchIndex } from "@/storage/sketchIndex";
 
 import { useThemeDetection } from "@/composables/useThemeDetection";
 import { useSaveManager } from "@/composables/useSaveManager";
@@ -231,6 +235,9 @@ const props = defineProps<{
   initialData: SketchData | null;
   i18n: Record<string, string>;
   saveData: (key: string, data: any) => Promise<void>;
+  loadData?: (key: string) => Promise<any>;
+  removeData?: (key: string) => Promise<any>;
+  sourceBlockId?: string | null;
   ocrProvider?: OcrProvider;
   themeMode: 'light' | 'dark';
   hiddenTopbarKeys?: Set<string>;
@@ -358,6 +365,8 @@ const {
 } = useSaveManager({
   canvasRef: canvasRef as any,
   blockId: computed(() => props.blockId),
+  sourceBlockId: computed(() => props.sourceBlockId),
+  loadData: props.loadData,
   saveData: props.saveData,
   currentTemplate,
   toolPresets,
@@ -556,6 +565,59 @@ async function onExport(format: "png" | "pdf") {
     return;
   }
   await exportPdf();
+}
+
+async function cleanupInvalidSketches() {
+  if (!props.loadData || !props.removeData) {
+    showMessage(t("cleanupInvalidSketchesUnavailable"), 5000, "error");
+    return;
+  }
+  if (!window.confirm(t("cleanupInvalidSketchesConfirmScan"))) return;
+
+  try {
+    const index = await loadSketchIndex(props.loadData);
+    const plan = await createCleanupPlan({
+      index,
+      loadSketchData: sketchId => loadSketchData(props.loadData!, sketchId),
+      checkReference: async (sketchId, blockId) => {
+        try {
+          return resolveSketchReferenceStatus(sketchId, await fetchSyncPost("/api/block/getBlockKramdown", { id: blockId }));
+        } catch {
+          return "unknown";
+        }
+      },
+    });
+
+    const summary = t("cleanupInvalidSketchesConfirmDelete")
+      .replace("{total}", String(plan.total))
+      .replace("{valid}", String(plan.validCount))
+      .replace("{delete}", String(plan.deleteCount))
+      .replace("{update}", String(plan.updateCount))
+      .replace("{unknown}", String(plan.unknownCount));
+    if (!window.confirm(summary)) return;
+
+    const result = await executeCleanupPlan({
+      index,
+      plan,
+      loadSketchData: sketchId => loadSketchData(props.loadData!, sketchId),
+      saveData: props.saveData,
+      removeData: props.removeData,
+      removeAsset: async (path) => {
+        const removeResult = await fetchSyncPost("/api/file/removeFile", { path });
+        if (removeResult?.code !== 0) throw new Error(removeResult?.msg || "remove asset failed");
+      },
+    });
+
+    const done = t("cleanupInvalidSketchesDone")
+      .replace("{deleted}", String(result.deleted))
+      .replace("{updated}", String(result.updated));
+    showMessage(result.assetDeleteFailed > 0
+      ? `${done} ${t("cleanupInvalidSketchesAssetFailed").replace("{count}", String(result.assetDeleteFailed))}`
+      : done, 5000);
+  } catch (error) {
+    console.error("[Sketch Note] cleanup invalid sketches failed:", error);
+    showMessage(t("cleanupInvalidSketchesFailed"), 5000, "error");
+  }
 }
 
 // ─── Import / Background ───

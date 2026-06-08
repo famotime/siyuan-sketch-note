@@ -96,7 +96,7 @@ describe("json export helpers", () => {
   it("rejects invalid sketch json text", () => {
     expect(() => importSketchJson("{")).toThrow("Invalid sketch JSON");
     expect(() => importSketchJson(JSON.stringify({
-      version: 2,
+      version: 3,
       template: "blank",
       canvasWidth: 800,
       canvasHeight: 1200,

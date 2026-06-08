@@ -2,9 +2,12 @@
   <SketchEditor
     v-if="editorVisible"
     :blockId="editorBlockId"
+    :sourceBlockId="editorSourceBlockId"
     :initialData="editorData"
     :i18n="pluginI18n"
     :saveData="pluginSaveData"
+    :loadData="pluginLoadData"
+    :removeData="pluginRemoveData"
     :themeMode="themeMode"
     :replayPlaybackEnabled="replayPlaybackEnabled"
     :replayRecordingEnabled="replayRecordingEnabled"
@@ -30,8 +33,11 @@ import { DEFAULT_RECORDER_CONFIG } from "@/recorder/types";
 const editorVisible = ref(false);
 const editorBlockId = ref("");
 const editorData = ref<any>(null);
+const editorSourceBlockId = ref<string | null>(null);
 export const pluginI18n = ref<Record<string, string>>({});
 const pluginSaveData = ref<(key: string, data: any) => Promise<void>>(async () => {});
+const pluginLoadData = ref<(key: string) => Promise<any>>(async () => null);
+const pluginRemoveData = ref<(key: string) => Promise<any>>(async () => null);
 const themeMode = ref<"light" | "dark">(resolveSiyuanThemeMode());
 const replayPlaybackEnabled = ref(true);
 const replayRecordingEnabled = ref(false);
@@ -45,9 +51,9 @@ let lastThemeDiagnosticKey = "";
 const themeLogger = createLogger("Theme");
 
 let loadDataFn: (key: string) => Promise<any> = async () => null;
-let openSketchInNewTabFn: ((sketchId: string) => Promise<void>) | null = null;
+let openSketchInNewTabFn: ((sketchId: string, sourceBlockId?: string | null) => Promise<void>) | null = null;
 
-export function setOpenSketchInNewTabFn(fn: (sketchId: string) => Promise<void>) {
+export function setOpenSketchInNewTabFn(fn: (sketchId: string, sourceBlockId?: string | null) => Promise<void>) {
   openSketchInNewTabFn = fn;
 }
 
@@ -186,6 +192,11 @@ export function setSaveDataFn(fn: (key: string, data: any) => Promise<void>) {
 
 export function setLoadDataFn(fn: (key: string) => Promise<any>) {
   loadDataFn = fn;
+  pluginLoadData.value = fn;
+}
+
+export function setRemoveDataFn(fn: (key: string) => Promise<any>) {
+  pluginRemoveData.value = fn;
 }
 
 export function setReplayRecordConfig(config?: Partial<ReplayRecorderConfig>) {
@@ -212,22 +223,24 @@ export function setHiddenTopbarKeys(keys: Set<string>) {
   hiddenTopbarKeys.value = keys;
 }
 
-export async function openSketchEditor(sketchId: string) {
+export async function openSketchEditor(sketchId: string, sourceBlockId?: string | null) {
   console.log("[Sketch Note] openSketchEditor called, openInNewTab =", openInNewTab.value, "openSketchInNewTabFn =", !!openSketchInNewTabFn);
   if (openInNewTab.value) {
     if (openSketchInNewTabFn) {
-      await openSketchInNewTabFn(sketchId);
+      await openSketchInNewTabFn(sketchId, sourceBlockId);
     }
     return;
   }
 
   editorBlockId.value = sketchId;
+  editorSourceBlockId.value = sourceBlockId ?? null;
   try {
     editorData.value = await loadSketchData(loadDataFn, sketchId);
   } catch (e) {
     createLogger().error("Failed to load sketch data:", e);
     showMessage(`Sketch Note: ${pluginI18n.value.loadFailed || "Data load failed"}`, 5000, "error");
     editorData.value = null;
+    editorSourceBlockId.value = null;
   }
   editorVisible.value = true;
 }
@@ -237,6 +250,7 @@ function closeEditor() {
   editorVisible.value = false;
   editorBlockId.value = "";
   editorData.value = null;
+  editorSourceBlockId.value = null;
 
   // Refresh the sketch-note image in the document to show updated content
   refreshSketchImage(savedSketchId);

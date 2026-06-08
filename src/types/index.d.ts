@@ -10,6 +10,6 @@ interface Window {
     languages: any;
   };
   sySketchNote?: {
-    openEditor: (blockId: string) => void;
+    openEditor: (blockId: string, sourceBlockId?: string | null) => void;
   };
 }

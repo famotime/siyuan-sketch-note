@@ -1,6 +1,6 @@
 import { createApp } from "vue";
 import { openTab } from "siyuan";
-import App, { setSaveDataFn, setLoadDataFn, pluginI18n, setOpenSketchInNewTabFn, refreshSketchImage } from "./App.vue";
+import App, { setSaveDataFn, setLoadDataFn, setRemoveDataFn, pluginI18n, setOpenSketchInNewTabFn, refreshSketchImage } from "./App.vue";
 import SketchEditor from "./editor/SketchEditor.vue";
 import { loadSketchData } from "./storage";
 import type { Plugin, Custom } from "siyuan";
@@ -29,7 +29,7 @@ function destroyTabApp() {
   currentTabSketchId = null;
 }
 
-async function mountSketchEditor(container: HTMLElement, sketchId: string, plugin: Plugin) {
+async function mountSketchEditor(container: HTMLElement, sketchId: string, plugin: Plugin, sourceBlockId?: string | null) {
   console.log("[Sketch Note] mountSketchEditor: loading data for", sketchId);
   const data = await loadSketchData((key) => plugin.loadData(key), sketchId);
   console.log("[Sketch Note] mountSketchEditor: data loaded", data ? "OK" : "NULL");
@@ -39,6 +39,9 @@ async function mountSketchEditor(container: HTMLElement, sketchId: string, plugi
     initialData: data,
     i18n: pluginI18n.value,
     saveData: (key: string, val: any) => plugin.saveData(key, val),
+    loadData: (key: string) => plugin.loadData(key),
+    removeData: (key: string) => plugin.removeData(key),
+    sourceBlockId,
     themeMode: "light",
     embedMode: true,
   });
@@ -74,7 +77,7 @@ function registerSketchTab() {
         return;
       }
 
-      mountSketchEditor(container, sketchId, plugin).catch((err) => {
+      mountSketchEditor(container, sketchId, plugin, this.data?.sourceBlockId as string | undefined).catch((err) => {
         console.error("[Sketch Note] mountSketchEditor failed", err);
       });
     },
@@ -93,7 +96,7 @@ function registerSketchTab() {
       container.style.position = "relative";
       hostElement.appendChild(container);
 
-      mountSketchEditor(container, sketchId, plugin).catch((err) => {
+      mountSketchEditor(container, sketchId, plugin, this.data?.sourceBlockId as string | undefined).catch((err) => {
         console.error("[Sketch Note] mountSketchEditor (update) failed", err);
       });
     },
@@ -112,7 +115,7 @@ function registerSketchTab() {
   tabRegistered = true;
 }
 
-export async function openSketchInNewTab(sketchId: string) {
+export async function openSketchInNewTab(sketchId: string, sourceBlockId?: string | null) {
   console.log("[Sketch Note] openSketchInNewTab called, sketchId =", sketchId);
   if (!pluginInstance) return;
 
@@ -125,7 +128,7 @@ export async function openSketchInNewTab(sketchId: string) {
         id: customId,
         icon: "iconPencil",
         title: pluginI18n.value.editSketch || "Sketch Note",
-        data: { sketchId },
+        data: { sketchId, sourceBlockId },
       },
     });
   } catch (err) {
@@ -144,6 +147,7 @@ export function init(plugin: Plugin) {
 
   setSaveDataFn((key, data) => plugin.saveData(key, data));
   setLoadDataFn((key) => plugin.loadData(key));
+  setRemoveDataFn((key) => plugin.removeData(key));
   setOpenSketchInNewTabFn(openSketchInNewTab);
 
   registerSketchTab();

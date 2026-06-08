@@ -47,7 +47,7 @@ export function migrateSketchData(raw: unknown): SketchData {
     strokes,
     template: data.template || DEFAULT_SKETCH_DATA.template,
     toolPresets: normalizeToolPresets(data.toolPresets),
-    version: 1,
+    version: data.version === 2 ? 2 : 1,
   };
 }
 
@@ -83,7 +83,7 @@ function assertSketchDataShape(raw: unknown): asserts raw is SketchData {
   }
 
   const candidate = raw as Partial<SketchData>;
-  if (candidate.version !== 1) {
+  if (candidate.version !== 1 && candidate.version !== 2) {
     throw new Error(`Unsupported sketch data version: ${String(candidate.version)}`);
   }
 
