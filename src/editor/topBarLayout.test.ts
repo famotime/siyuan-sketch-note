@@ -28,6 +28,41 @@ describe("editor top bar layout", () => {
     expect(topBar).toContain("{{ t(\"clear\") }}");
   });
 
+  it("wires invalid sketch cleanup through a kebab-case event", () => {
+    const topBar = readFileSync(resolve(process.cwd(), "src/editor/EditorTopBar.vue"), "utf8");
+    const editor = readFileSync(resolve(process.cwd(), "src/editor/SketchEditor.vue"), "utf8");
+
+    expect(topBar).toContain('@click="onCleanupInvalidSketchesClick"');
+    expect(topBar).toContain('(e: "cleanup-invalid-sketches"): void');
+    expect(topBar).toContain('logger.info("cleanup menu item clicked")');
+    expect(editor).toContain('@cleanup-invalid-sketches="cleanupInvalidSketches"');
+    expect(editor).toContain("resolvePluginStorageAccess");
+    expect(editor).toContain("propsHasLoadData");
+    expect(editor).toContain('cleanupLogger.info("cleanup handler entered"');
+    expect(editor).toContain('cleanupLogger.info("cleanup plan created"');
+  });
+
+  it("uses an in-editor cleanup confirmation dialog instead of global confirm dialogs", () => {
+    const editor = readFileSync(resolve(process.cwd(), "src/editor/SketchEditor.vue"), "utf8");
+
+    expect(editor).toContain("cleanupConfirmDialog");
+    expect(editor).toContain("requestEditorConfirm");
+    expect(editor).toContain("sketch-cleanup-dialog");
+    expect(editor).not.toContain("siyuanConfirm");
+    expect(editor).not.toContain("requestSiyuanConfirm");
+  });
+
+  it("shows the workspace path in the destructive cleanup confirmation", () => {
+    const editor = readFileSync(resolve(process.cwd(), "src/editor/SketchEditor.vue"), "utf8");
+    const zh = readFileSync(resolve(process.cwd(), "src/i18n/zh_CN.json"), "utf8");
+    const en = readFileSync(resolve(process.cwd(), "src/i18n/en_US.json"), "utf8");
+
+    expect(editor).toContain("resolveSiyuanWorkspaceDir");
+    expect(editor).toContain('.replace("{workspace}", resolveSiyuanWorkspaceDir() || t("cleanupInvalidSketchesWorkspaceUnknown"))');
+    expect(zh).toContain("工作空间：{workspace}");
+    expect(en).toContain("Workspace: {workspace}");
+  });
+
   it("opens export settings from the more menu and lets the editor dispatch the selected format", () => {
     const topBar = readFileSync(resolve(process.cwd(), "src/editor/EditorTopBar.vue"), "utf8");
     const editor = readFileSync(resolve(process.cwd(), "src/editor/SketchEditor.vue"), "utf8");

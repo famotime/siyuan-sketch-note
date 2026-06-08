@@ -81,6 +81,33 @@ describe('createCleanupPlan', () => {
       unknownBlockIds: ['block-b'],
     });
   });
+
+  it('cleans index items that have no recorded references', async () => {
+    const plan = await createCleanupPlan({
+      index: {
+        version: 1,
+        items: {
+          orphan: {
+            sketchId: 'orphan',
+            blockIds: [],
+            assetName: 'sketch-note-orphan.png',
+            createdAt: 1,
+            updatedAt: 1,
+          },
+        },
+      },
+      loadSketchData: async sketchId => sketch(sketchId, []),
+      checkReference: async () => {
+        throw new Error('orphan items should not need reference checks');
+      },
+    });
+
+    expect(plan.total).toBe(1);
+    expect(plan.deleteCount).toBe(1);
+    expect(plan.itemsToDelete).toEqual([
+      { sketchId: 'orphan', assetName: 'sketch-note-orphan.png', invalidBlockIds: [] },
+    ]);
+  });
 });
 
 describe('executeCleanupPlan', () => {

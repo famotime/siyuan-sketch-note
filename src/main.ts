@@ -138,6 +138,7 @@ export async function openSketchInNewTab(sketchId: string, sourceBlockId?: strin
 
 export function init(plugin: Plugin) {
   pluginInstance = plugin;
+  usePlugin(plugin);
   container = document.createElement("div");
   container.className = "sketch-note-app";
   document.body.appendChild(container);

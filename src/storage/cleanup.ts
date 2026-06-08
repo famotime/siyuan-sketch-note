@@ -55,6 +55,15 @@ export async function createCleanupPlan(ctx: {
       referenceBlockIds.add(reference.blockId);
     }
 
+    if (referenceBlockIds.size === 0) {
+      itemsToDelete.push({
+        sketchId: item.sketchId,
+        assetName: item.assetName || sketchAssetFileName(item.sketchId),
+        invalidBlockIds: [],
+      });
+      continue;
+    }
+
     const validBlockIds: string[] = [];
     const invalidBlockIds: string[] = [];
     const unknownBlockIds: string[] = [];

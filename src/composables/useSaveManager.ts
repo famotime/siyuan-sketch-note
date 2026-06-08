@@ -2,6 +2,7 @@ import { ref, onUnmounted } from "vue";
 import type { Ref } from "vue";
 import type { SketchData } from "@/types/sketch";
 import { storageKey } from "@/storage";
+import { resolvePluginStorageAccess } from "@/storage/pluginAccess";
 import { normalizeSketchDataForSave } from "@/storage/sketchIdentity";
 import { loadSketchIndex, saveSketchIndex, upsertSketchIndexItem } from "@/storage/sketchIndex";
 import { thumbnailSketchDataAsync } from "@/storage/thumbnail";
@@ -56,6 +57,10 @@ export function useSaveManager(ctx: {
 
   async function runSave(): Promise<boolean> {
     if (!ctx.canvasRef.value) return false;
+    const storageAccess = resolvePluginStorageAccess({
+      loadData: ctx.loadData,
+      saveData: ctx.saveData,
+    });
     saveStatus.value = "saving";
     let data = ctx.canvasRef.value.getData();
     data.template = ctx.currentTemplate.value;
@@ -86,10 +91,10 @@ export function useSaveManager(ctx: {
     try {
       const fileName = sketchAssetFileName(ctx.blockId.value);
       await uploadDataUrlToAssets(pngDataUrl, fileName);
-      await ctx.saveData(storageKey(ctx.blockId.value), data);
-      if (ctx.loadData) {
-        const index = await loadSketchIndex(ctx.loadData);
-        await saveSketchIndex(ctx.saveData, upsertSketchIndexItem(index, {
+      await storageAccess.saveData(storageKey(ctx.blockId.value), data);
+      if (storageAccess.loadData) {
+        const index = await loadSketchIndex(storageAccess.loadData);
+        await saveSketchIndex(storageAccess.saveData, upsertSketchIndexItem(index, {
           sketchId: ctx.blockId.value,
           blockIds: data.id?.references.map(reference => reference.blockId) ?? [],
           assetName: fileName,

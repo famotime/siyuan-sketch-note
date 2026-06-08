@@ -101,7 +101,7 @@
         </div>
         <div
           class="sketch-more-row sketch-more-row--action"
-          @click="$emit('cleanupInvalidSketches'); moreOpen = false"
+          @click="onCleanupInvalidSketchesClick"
         >
           <span class="sketch-more-label">{{ t("cleanupInvalidSketches") }}</span>
           <IconParkIcon name="Delete" />
@@ -260,6 +260,7 @@
 import { computed, ref, onMounted, onUnmounted } from "vue";
 import type { PageOverviewItem } from "@/pages/model";
 import type { Template } from "@/template";
+import { createLogger } from "@/utils/logger";
 import IconParkIcon from "./IconParkIcon.vue";
 import { createZenToggleState } from "./zenMode";
 
@@ -292,7 +293,7 @@ const emit = defineEmits<{
   (e: "replay"): void;
   (e: "insertImage"): void;
   (e: "importSketch"): void;
-  (e: "cleanupInvalidSketches"): void;
+  (e: "cleanup-invalid-sketches"): void;
   (e: "toggleStylusOnly"): void;
   (e: "togglePressure"): void;
   (e: "toggleExportBackground"): void;
@@ -309,6 +310,7 @@ const moreOpen = ref(false);
 const exportDialogOpen = ref(false);
 const exportFormat = ref<"png" | "pdf">("png");
 const moreWrapRef = ref<HTMLDivElement>();
+const logger = createLogger(["EditorTopBar", "Cleanup"]);
 
 function openExportDialog() {
   moreOpen.value = false;
@@ -322,6 +324,12 @@ function closeExportDialog() {
 function confirmExport() {
   emit("export", exportFormat.value);
   closeExportDialog();
+}
+
+function onCleanupInvalidSketchesClick() {
+  logger.info("cleanup menu item clicked");
+  emit("cleanup-invalid-sketches");
+  moreOpen.value = false;
 }
 
 function onDocClick(e: MouseEvent) {

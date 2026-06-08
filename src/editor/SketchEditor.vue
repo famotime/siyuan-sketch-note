@@ -42,7 +42,7 @@
         @importBackground="triggerBackgroundImport"
         @importJson="triggerJsonImport"
         @importSketch="triggerJsonImport"
-        @cleanupInvalidSketches="cleanupInvalidSketches"
+        @cleanup-invalid-sketches="cleanupInvalidSketches"
         @nextPage="canvasRef?.goToNextPage()"
         @previousPage="canvasRef?.goToPreviousPage()"
         @recognize="recognizeText"
@@ -184,6 +184,45 @@
     >
       <IconParkIcon :name="zenToggleState.icon" />
     </button>
+    <div
+      v-if="cleanupConfirmDialog"
+      class="sketch-cleanup-dialog"
+      role="dialog"
+      aria-modal="true"
+      :aria-label="cleanupConfirmDialog.title"
+      @click.self="resolveCleanupConfirm(false)"
+    >
+      <div class="sketch-cleanup-dialog__panel">
+        <div class="sketch-cleanup-dialog__header">
+          <strong class="sketch-cleanup-dialog__title">{{ cleanupConfirmDialog.title }}</strong>
+          <button
+            class="sketch-cleanup-dialog__close"
+            type="button"
+            :aria-label="t('cancel')"
+            @click="resolveCleanupConfirm(false)"
+          >
+            ×
+          </button>
+        </div>
+        <p class="sketch-cleanup-dialog__message">{{ cleanupConfirmDialog.message }}</p>
+        <div class="sketch-cleanup-dialog__actions">
+          <button
+            class="sketch-cleanup-dialog__button sketch-cleanup-dialog__button--ghost"
+            type="button"
+            @click="resolveCleanupConfirm(false)"
+          >
+            {{ t("cancel") }}
+          </button>
+          <button
+            class="sketch-cleanup-dialog__button sketch-cleanup-dialog__button--primary"
+            type="button"
+            @click="resolveCleanupConfirm(true)"
+          >
+            {{ t("confirm") }}
+          </button>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -220,7 +259,10 @@ import { migrateStrokesToElements, withStrokeBounds } from "@/elements/model";
 import ReplayControls from "./ReplayControls.vue";
 import { createCleanupPlan, executeCleanupPlan, resolveSketchReferenceStatus } from "@/storage/cleanup";
 import { loadSketchData } from "@/storage";
+import { resolvePluginStorageAccess } from "@/storage/pluginAccess";
 import { loadSketchIndex } from "@/storage/sketchIndex";
+import { createLogger } from "@/utils/logger";
+import { resolveSiyuanWorkspaceDir } from "@/utils/workspace";
 
 import { useThemeDetection } from "@/composables/useThemeDetection";
 import { useSaveManager } from "@/composables/useSaveManager";
@@ -288,6 +330,12 @@ const currentTemplate = ref(props.initialData?.template ?? "blank");
 const templates = computed(() => [...getAllTemplates(), ...customBackgrounds.value]);
 const loadedData = ref<SketchData | null>(props.initialData);
 const ocrIndex = ref<SketchData["ocrIndex"]>(props.initialData?.ocrIndex);
+const cleanupLogger = createLogger(["Editor", "Cleanup"]);
+const cleanupConfirmDialog = ref<{
+  title: string;
+  message: string;
+  resolve: (confirmed: boolean) => void;
+} | null>(null);
 
 // ─── Replay ───
 const isReplayMode = ref(false);
@@ -568,24 +616,56 @@ async function onExport(format: "png" | "pdf") {
 }
 
 async function cleanupInvalidSketches() {
-  if (!props.loadData || !props.removeData) {
-    showMessage(t("cleanupInvalidSketchesUnavailable"), 5000, "error");
-    return;
-  }
-  if (!window.confirm(t("cleanupInvalidSketchesConfirmScan"))) return;
-
   try {
-    const index = await loadSketchIndex(props.loadData);
+    const storageAccess = resolvePluginStorageAccess({
+      loadData: props.loadData,
+      saveData: props.saveData,
+      removeData: props.removeData,
+    });
+    cleanupLogger.info("cleanup handler entered", {
+      hasLoadData: Boolean(storageAccess.loadData),
+      hasRemoveData: Boolean(storageAccess.removeData),
+      propsHasLoadData: Boolean(props.loadData),
+      propsHasRemoveData: Boolean(props.removeData),
+      blockId: props.blockId,
+      sourceBlockId: props.sourceBlockId,
+    });
+    showMessage(t("cleanupInvalidSketchesPreparing"), 3000);
+    if (!storageAccess.loadData || !storageAccess.removeData) {
+      cleanupLogger.warn("cleanup unavailable: missing storage functions");
+      showMessage(t("cleanupInvalidSketchesUnavailable"), 5000, "error");
+      return;
+    }
+    cleanupLogger.info("opening scan confirmation dialog");
+    const scanConfirmed = await requestEditorConfirm(t("cleanupInvalidSketches"), t("cleanupInvalidSketchesConfirmScan"));
+    cleanupLogger.info("scan confirmation resolved", { confirmed: scanConfirmed });
+    if (!scanConfirmed) return;
+    showMessage(t("cleanupInvalidSketchesScanning"), 3000);
+
+    cleanupLogger.info("loading sketch index");
+    const index = await loadSketchIndex(storageAccess.loadData);
+    cleanupLogger.info("sketch index loaded", { total: Object.keys(index.items).length });
     const plan = await createCleanupPlan({
       index,
-      loadSketchData: sketchId => loadSketchData(props.loadData!, sketchId),
+      loadSketchData: sketchId => loadSketchData(storageAccess.loadData!, sketchId),
       checkReference: async (sketchId, blockId) => {
+        cleanupLogger.info("checking sketch reference", { sketchId, blockId });
         try {
-          return resolveSketchReferenceStatus(sketchId, await fetchSyncPost("/api/block/getBlockKramdown", { id: blockId }));
+          const status = resolveSketchReferenceStatus(sketchId, await fetchSyncPost("/api/block/getBlockKramdown", { id: blockId }));
+          cleanupLogger.info("checked sketch reference", { sketchId, blockId, status });
+          return status;
         } catch {
+          cleanupLogger.warn("checking sketch reference failed", { sketchId, blockId });
           return "unknown";
         }
       },
+    });
+    cleanupLogger.info("cleanup plan created", {
+      total: plan.total,
+      valid: plan.validCount,
+      delete: plan.deleteCount,
+      update: plan.updateCount,
+      unknown: plan.unknownCount,
     });
 
     const summary = t("cleanupInvalidSketchesConfirmDelete")
@@ -593,20 +673,26 @@ async function cleanupInvalidSketches() {
       .replace("{valid}", String(plan.validCount))
       .replace("{delete}", String(plan.deleteCount))
       .replace("{update}", String(plan.updateCount))
-      .replace("{unknown}", String(plan.unknownCount));
-    if (!window.confirm(summary)) return;
+      .replace("{unknown}", String(plan.unknownCount))
+      .replace("{workspace}", resolveSiyuanWorkspaceDir() || t("cleanupInvalidSketchesWorkspaceUnknown"));
+    cleanupLogger.info("opening delete confirmation dialog");
+    const deleteConfirmed = await requestEditorConfirm(t("cleanupInvalidSketches"), summary);
+    cleanupLogger.info("delete confirmation resolved", { confirmed: deleteConfirmed });
+    if (!deleteConfirmed) return;
 
+    cleanupLogger.info("executing cleanup plan");
     const result = await executeCleanupPlan({
       index,
       plan,
-      loadSketchData: sketchId => loadSketchData(props.loadData!, sketchId),
-      saveData: props.saveData,
-      removeData: props.removeData,
+      loadSketchData: sketchId => loadSketchData(storageAccess.loadData!, sketchId),
+      saveData: storageAccess.saveData,
+      removeData: storageAccess.removeData,
       removeAsset: async (path) => {
         const removeResult = await fetchSyncPost("/api/file/removeFile", { path });
         if (removeResult?.code !== 0) throw new Error(removeResult?.msg || "remove asset failed");
       },
     });
+    cleanupLogger.info("cleanup plan executed", result);
 
     const done = t("cleanupInvalidSketchesDone")
       .replace("{deleted}", String(result.deleted))
@@ -615,9 +701,26 @@ async function cleanupInvalidSketches() {
       ? `${done} ${t("cleanupInvalidSketchesAssetFailed").replace("{count}", String(result.assetDeleteFailed))}`
       : done, 5000);
   } catch (error) {
-    console.error("[Sketch Note] cleanup invalid sketches failed:", error);
+    cleanupLogger.error("cleanup invalid sketches failed:", error);
     showMessage(t("cleanupInvalidSketchesFailed"), 5000, "error");
   }
+}
+
+function requestEditorConfirm(title: string, message: string): Promise<boolean> {
+  return new Promise((resolve) => {
+    cleanupConfirmDialog.value = {
+      title,
+      message,
+      resolve: (confirmed) => {
+        cleanupConfirmDialog.value = null;
+        resolve(confirmed);
+      },
+    };
+  });
+}
+
+function resolveCleanupConfirm(confirmed: boolean) {
+  cleanupConfirmDialog.value?.resolve(confirmed);
 }
 
 // ─── Import / Background ───
@@ -1641,5 +1744,91 @@ function onHeightChanged(_h: number) {}
   width: max-content;
   max-width: calc(100vw - 24px);
   box-sizing: border-box;
+}
+
+.sketch-cleanup-dialog {
+  position: absolute;
+  inset: 0;
+  z-index: 3000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  background: rgba(0, 0, 0, 0.28);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  box-sizing: border-box;
+}
+
+.sketch-cleanup-dialog__panel {
+  width: min(520px, 100%);
+  border: 1px solid var(--sketch-toolbar-border);
+  border-radius: 12px;
+  background: var(--sketch-toolbar-surface);
+  color: var(--sketch-toolbar-text);
+  box-shadow: var(--sketch-toolbar-shadow);
+  padding: 14px;
+  box-sizing: border-box;
+}
+
+.sketch-cleanup-dialog__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.sketch-cleanup-dialog__title {
+  color: var(--sketch-toolbar-strong-text);
+  font-size: 15px;
+}
+
+.sketch-cleanup-dialog__close {
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 1px solid var(--sketch-toolbar-control-border);
+  border-radius: 8px;
+  background: var(--sketch-toolbar-control-bg);
+  color: var(--sketch-toolbar-text);
+  cursor: pointer;
+  font-size: 18px;
+  line-height: 1;
+}
+
+.sketch-cleanup-dialog__message {
+  margin: 0;
+  color: var(--sketch-toolbar-text);
+  font-size: 13px;
+  line-height: 1.65;
+  white-space: pre-wrap;
+}
+
+.sketch-cleanup-dialog__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 16px;
+}
+
+.sketch-cleanup-dialog__button {
+  min-height: 32px;
+  padding: 0 14px;
+  border: 1px solid var(--sketch-toolbar-control-border);
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 13px;
+}
+
+.sketch-cleanup-dialog__button--ghost {
+  background: var(--sketch-toolbar-control-bg);
+  color: var(--sketch-toolbar-text);
+}
+
+.sketch-cleanup-dialog__button--primary {
+  border-color: transparent;
+  background: var(--b3-theme-primary);
+  color: var(--sketch-toolbar-active-text);
 }
 </style>
