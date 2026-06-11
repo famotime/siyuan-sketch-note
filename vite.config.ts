@@ -47,6 +47,7 @@ export default defineConfig(({
     resolve: {
       alias: {
         "@": resolve(__dirname, "src"),
+        ...(mode === "test" ? { "siyuan": resolve(__dirname, "__mocks__/siyuan.ts") } : {}),
       },
     },
 
