@@ -491,7 +491,7 @@ const { isZenMode, zenTogglePos, zenToggleState, enterZenMode, onZenToggleClick,
 // ─── Live Sync ───
 const sketchId = computed(() => props.initialData?.id?.sketchId ?? "");
 const liveSession = useLiveSession({
-  sketchId: sketchId.value,
+  get sketchId() { return sketchId.value; },
   getSnapshotData: () => canvasRef.value?.getData() ?? props.initialData ?? { version: 1, template: "blank", canvasWidth: 800, canvasHeight: 1200, strokes: [] },
 });
 const {

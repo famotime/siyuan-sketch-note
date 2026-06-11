@@ -82,6 +82,7 @@ import {
   pushHistorySnapshot,
 } from "@/engine/canvasEngine";
 import type { EngineState } from "@/engine/canvasEngine";
+import { renderStroke } from "@/engine/strokeRenderer";
 import {
   createArrowStroke,
   createEllipseStroke,
@@ -1012,7 +1013,7 @@ function onPointerUp(e: PointerEvent) {
               stroke: lastStroke,
             };
             props.recorder.record(event);
-            props.onLiveEvent?.(event);
+            // 不广播 eraser 笔迹——viewer 不应看到橡皮的拖拽轨迹
           }
         }
       } else if (props.tool !== "eraser") {
@@ -1379,6 +1380,19 @@ async function restoreData(data: SketchData) {
   resetViewport();
 }
 
+function applyLiveEvent(event: { type: string; [key: string]: any }): void {
+  if (!strokeCanvasRef.value) return;
+  if (event.type === "stroke" || event.type === "shape") {
+    state.strokes.push(event.stroke);
+    const ctx = strokeCanvasRef.value.getContext("2d");
+    if (ctx) renderStroke(ctx, event.stroke);
+  } else if (event.type === "erase") {
+    const erasedSet = new Set(event.erasedIds);
+    state.strokes = state.strokes.filter((s) => !erasedSet.has(s.id));
+    fullRedrawStrokeCanvas(strokeCanvasRef.value, state);
+  }
+}
+
 function addPage() {
   const next = addSketchPage(serializeState(state));
   pushHistorySnapshot(state);
@@ -1640,6 +1654,7 @@ defineExpose({
   insertText: () => insertText(state),
   insertImage,
   restoreData,
+  applyLiveEvent,
   highlightSearchResult,
   deleteLassoSelection,
   duplicateLassoSelection,

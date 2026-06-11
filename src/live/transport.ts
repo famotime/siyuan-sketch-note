@@ -1,5 +1,8 @@
 import { fetchSyncPost } from "siyuan";
 import type { LiveMessage } from "./types";
+import { createLogger } from "@/utils/logger";
+
+const log = createLogger("live-transport");
 
 export interface LiveTransport {
   start(): Promise<void>;
@@ -31,9 +34,9 @@ export class BroadcastTransport implements LiveTransport {
       this.handleRawMessage(event.data);
     });
 
-    this.es.onmessage = (event) => {
-      this.handleRawMessage(event.data);
-    };
+    // 不设置 onmessage 兜底——思源 SSE 的 event type = 频道名，
+    // addEventListener 已覆盖所有消息，onmessage 只会收到 type="message" 的事件
+    // （思源不会发送此类事件），保留它反而可能导致重复处理
 
     this.es.onerror = () => {
       for (const handler of this.errorHandlers) {
@@ -97,7 +100,7 @@ export class BroadcastTransport implements LiveTransport {
         handler(msg);
       }
     } catch {
-      // ignore unparseable messages
+      log("无法解析 SSE 消息，已忽略", data.slice(0, 100));
     }
   }
 }
