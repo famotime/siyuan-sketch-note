@@ -423,8 +423,8 @@ git commit -m "feat: 添加笔型/笔尖图标资产和标签映射"
   "penBallpoint": "圆珠笔",
   "penFountain": "钢笔",
   "penBrush": "毛笔",
-  "highlighterRound": "圆形笔尖",
-  "highlighterSquare": "方形笔尖",
+  "highlighterRound": "圆头荧光笔",
+  "highlighterSquare": "方头荧光笔",
   "highlighterWatercolor": "水彩笔",
 ```
 
@@ -1001,7 +1001,7 @@ function renderStroke(
       }
 ```
 
-对于荧光笔方形笔尖，在 allSame 分支的 `ctx.lineCap = "round"` 之后添加：
+对于荧光笔方头荧光笔，在 allSame 分支的 `ctx.lineCap = "round"` 之后添加：
 
 ```typescript
     if (tool === "highlighter") {
