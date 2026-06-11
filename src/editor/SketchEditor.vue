@@ -28,6 +28,9 @@
         :themeMode="effectiveThemeMode"
         :templateId="currentTemplate"
         :templates="templates"
+        :liveMode="liveMode"
+        :liveAvailable="!!sketchId"
+        :liveStartLabel="t('liveStartViewer')"
         @addPage="canvasRef?.addPage()"
         @back="goBack"
         @backgroundFitChange="onBackgroundFitChange"
@@ -58,6 +61,8 @@
         @toggleZenMode="enterZenMode"
         @undo="canvasRef?.doUndo()"
         @update:templateId="onTemplateChange"
+        @liveStart="onLiveStart"
+        @liveDisconnect="disconnectLive"
       />
       <ToolBar
         ref="toolbarRef"
@@ -95,6 +100,17 @@
     </div>
 
     <div
+      v-if="liveMode === 'viewer'"
+      class="sketch-live-status"
+      :class="{
+        'sketch-live-status--connected': liveConnectionState === 'connected',
+        'sketch-live-status--disconnected': liveConnectionState === 'disconnected' || liveConnectionState === 'error',
+      }"
+    >
+      <span>{{ liveStatusText }}</span>
+    </div>
+
+    <div
       ref="bodyRef"
       class="sketch-editor__body"
       :class="{ 'sketch-editor__body--zen': isZenMode }"
@@ -112,6 +128,7 @@
           :templateId="currentTemplate"
           :lassoMode="lassoMode"
           :recorder="replayRecordingEnabled ? replayRecorder : undefined"
+          :onLiveEvent="liveMode === 'writer' ? sendLiveEvent : undefined"
           @update:canUndo="canUndo = $event"
           @update:canRedo="canRedo = $event"
           @heightChanged="onHeightChanged"
@@ -271,6 +288,7 @@ import { useOcrSearch } from "@/composables/useOcrSearch";
 import { useExportManager } from "@/composables/useExportManager";
 import { useEditorPreferences } from "@/composables/useEditorPreferences";
 import { useZenMode } from "@/composables/useZenMode";
+import { useLiveSession } from "@/live/useLiveSession";
 
 const props = defineProps<{
   blockId: string;
@@ -469,6 +487,48 @@ const { toggleStylusOnly, togglePressure, onTemplateChange, persistEditorPrefere
 });
 
 const { isZenMode, zenTogglePos, zenToggleState, enterZenMode, onZenToggleClick, onZenToggleDragStart } = useZenMode();
+
+// ─── Live Sync ───
+const sketchId = computed(() => props.initialData?.id?.sketchId ?? "");
+const liveSession = useLiveSession({
+  sketchId: sketchId.value,
+  getSnapshotData: () => canvasRef.value?.getData() ?? props.initialData ?? { version: 1, template: "blank", canvasWidth: 800, canvasHeight: 1200, strokes: [] },
+});
+const {
+  role: liveMode,
+  connectionState: liveConnectionState,
+  startViewer,
+  sendEvent: sendLiveEvent,
+  disconnect: disconnectLive,
+} = liveSession;
+
+// Viewer 模式：接收快照和事件
+liveSession.onSnapshot((data) => {
+  if (canvasRef.value) {
+    canvasRef.value.restoreData(data);
+  }
+});
+
+liveSession.onLiveEvent((event) => {
+  if (canvasRef.value) {
+    canvasRef.value.applyLiveEvent(event);
+  }
+});
+
+function onLiveStart(): void {
+  startViewer();
+}
+
+const liveStatusText = computed(() => {
+  switch (liveConnectionState.value) {
+    case "connecting": return t("liveWaitingSnapshot");
+    case "connected": return t("liveViewerReadOnly");
+    case "reconnecting": return t("liveReconnecting");
+    case "disconnected": return t("liveDisconnected");
+    case "error": return t("liveConnectionFailed");
+    default: return "";
+  }
+});
 
 // ─── Text preset persistence ───
 onMounted(() => {
@@ -1830,5 +1890,28 @@ function onHeightChanged(_h: number) {}
   border-color: transparent;
   background: var(--b3-theme-primary);
   color: var(--sketch-toolbar-active-text);
+}
+
+.sketch-live-status {
+  position: absolute;
+  top: 48px;
+  left: 0;
+  right: 0;
+  z-index: 10;
+  text-align: center;
+  padding: 4px 12px;
+  font-size: 12px;
+  color: #fff;
+  background: rgba(0, 0, 0, 0.6);
+  pointer-events: none;
+  transition: opacity 0.3s;
+}
+
+.sketch-live-status--connected {
+  background: rgba(46, 204, 113, 0.8);
+}
+
+.sketch-live-status--disconnected {
+  background: rgba(231, 76, 60, 0.8);
 }
 </style>
