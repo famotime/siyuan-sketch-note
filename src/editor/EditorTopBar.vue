@@ -106,6 +106,22 @@
           <span class="sketch-more-label">{{ t("cleanupInvalidSketches") }}</span>
           <IconParkIcon name="Delete" />
         </div>
+        <div
+          v-if="liveMode !== 'off'"
+          class="sketch-more-row sketch-more-row--action"
+          @click="$emit('liveDisconnect'); moreOpen = false"
+        >
+          <span class="sketch-more-label">{{ t("liveDisconnect") }}</span>
+          <IconParkIcon name="SmartOptimization" />
+        </div>
+        <div
+          v-else-if="liveAvailable"
+          class="sketch-more-row sketch-more-row--action"
+          @click="$emit('liveStart'); moreOpen = false"
+        >
+          <span class="sketch-more-label">{{ liveStartLabel ?? t("liveStartViewer") }}</span>
+          <IconParkIcon name="SmartOptimization" />
+        </div>
         <div class="sketch-more-divider" />
         <label class="sketch-more-row sketch-more-row--select">
           <span class="sketch-more-label">{{ t("noteBackground") }}</span>
@@ -283,6 +299,9 @@ defineProps<{
   themeMode: 'light' | 'dark';
   templates: Template[];
   t: (key: string) => string;
+  liveMode?: "off" | "writer" | "viewer";
+  liveAvailable?: boolean;
+  liveStartLabel?: string;
 }>();
 
 const emit = defineEmits<{
@@ -302,6 +321,8 @@ const emit = defineEmits<{
   (e: "undo"): void;
   (e: "redo"): void;
   (e: "update:templateId", value: string): void;
+  (e: "liveStart"): void;
+  (e: "liveDisconnect"): void;
 }>();
 
 const zenToggleState = computed(() => createZenToggleState(false));
