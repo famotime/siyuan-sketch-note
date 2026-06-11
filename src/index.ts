@@ -1,5 +1,6 @@
 import {
   Plugin,
+  Menu,
   Setting,
   fetchSyncPost,
   getFrontend,
@@ -73,7 +74,35 @@ export default class SketchNotePlugin extends Plugin {
     this.addTopBar({
       icon: ICON_SVG,
       title: this.i18n?.insertSketch ?? "Insert Sketch Block",
-      callback: () => this.insertSketchBlock(),
+      callback: (event: MouseEvent) => {
+        const menu = new Menu("sketch-note-topbar");
+        menu.addItem({
+          icon: ICON_SVG,
+          label: this.i18n?.insertSketch ?? "Insert Sketch Block",
+          click: () => this.insertSketchBlock(),
+        });
+
+        // 开发模式下显示技术验证入口
+        if (import.meta.env.DEV) {
+          menu.addSeparator();
+          menu.addItem({
+            label: "WS 连接测试",
+            click: async () => {
+              const { openWsVerifyDialog } = await import("./live/verifyDialog");
+              openWsVerifyDialog();
+            },
+          });
+          menu.addItem({
+            label: "Broadcast 测试",
+            click: async () => {
+              const { openBroadcastVerifyDialog } = await import("./live/verifyDialog");
+              openBroadcastVerifyDialog();
+            },
+          });
+        }
+
+        menu.open({ x: event.clientX, y: event.clientY, isLeft: true });
+      },
     });
 
     // Register command
