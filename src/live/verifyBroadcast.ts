@@ -1,27 +1,21 @@
 /**
  * 验证 2：思源 Broadcast API 跨设备消息传递
  *
- * 逐步测试 6 个 broadcast 端点，判断是否可跨设备传递自定义消息。
+ * 逐步测试 broadcast 端点，判断是否可跨设备传递自定义消息。
  * 结果决定是否可走方案 C（思源 broadcast API）。
  *
  * Broadcast API 端点（均需 admin 认证）：
- *   POST /api/broadcast/getChannels
- *   POST /api/broadcast/getChannelInfo
- *   POST /api/broadcast/publish
- *   POST /api/broadcast/postMessage
- *   GET  /es/broadcast/subscribe   (SSE)
- *   GET  /ws/broadcast             (WebSocket)
+ *   POST /api/broadcast/getChannels      — JSON: 无参数
+ *   POST /api/broadcast/getChannelInfo    — JSON: name
+ *   POST /api/broadcast/publish           — multipart/form-data: field name=频道名, value=消息
+ *   POST /api/broadcast/postMessage       — JSON: channel, message
+ *   GET  /es/broadcast/subscribe?channel= — SSE（event=频道名）
+ *   GET  /ws/broadcast?channel=           — WebSocket
  */
 
 import { fetchSyncPost, getFrontend, getBackend } from 'siyuan';
 
 // ---- 类型 ----
-
-export interface BroadcastChannel {
-  name: string
-  subscriberCount?: number
-  [key: string]: unknown
-}
 
 export interface BroadcastVerifyStep {
   name: string
@@ -45,30 +39,20 @@ export interface BroadcastReport {
 // ---- 工具函数 ----
 
 function getApiToken(): string {
-  // 优先从 window.siyuan 配置获取
   try {
     const cfg = (window as any).siyuan?.config;
     if (cfg?.system?.apiToken) return cfg.system.apiToken;
   } catch {}
-
-  // 从 cookie 获取（思源使用 cookie 认证）
   const match = document.cookie.match(/symplishuyuan=([^;]+)/);
   if (match) return match[1];
-
-  // 尝试 Authorization header 模式（某些版本）
-  try {
-    const meta = document.querySelector('meta[name="siyuan-api-token"]');
-    if (meta) return meta.getAttribute('content') || '';
-  } catch {}
-
   return '';
 }
 
-// ---- API 调用封装 ----
+// ---- API 调用封装（JSON POST） ----
 
-async function callBroadcastAPI(
+async function callAPI(
   endpoint: string,
-  params: Record<string, unknown>,
+  params: Record<string, unknown> = {},
 ): Promise<{ ok: boolean; data?: any; error?: string; latencyMs: number }> {
   const start = performance.now();
   try {
@@ -85,9 +69,47 @@ async function callBroadcastAPI(
   }
 }
 
-// ---- SSE 订阅测试 ----
+// ---- publish（FormData，field name=频道名，value=消息） ----
 
-function testSSESubscribe(channel: string, timeoutMs = 5000): Promise<BroadcastVerifyStep> {
+async function callPublish(
+  channelName: string,
+  message: string,
+): Promise<{ ok: boolean; data?: any; error?: string; latencyMs: number }> {
+  const start = performance.now();
+  try {
+    const form = new FormData();
+    form.append(channelName, message);
+
+    const token = getApiToken();
+    const headers: Record<string, string> = {};
+    if (token) headers['Authorization'] = `Token ${token}`;
+
+    const res = await fetch('/api/broadcast/publish', {
+      method: 'POST',
+      headers,
+      body: form,
+    });
+    const result = await res.json();
+    const latencyMs = Math.round(performance.now() - start);
+    if (result.code === 0) {
+      return { ok: true, data: result.data, latencyMs };
+    } else {
+      return { ok: false, error: result.msg || `code=${result.code}`, latencyMs };
+    }
+  } catch (err: any) {
+    const latencyMs = Math.round(performance.now() - start);
+    return { ok: false, error: err.message || String(err), latencyMs };
+  }
+}
+
+// ---- SSE 订阅测试 ----
+// 思源 SSE 事件类型 = 频道名（非默认 message），需用 addEventListener
+
+function testSSESubscribe(
+  channel: string,
+  triggerFn: () => Promise<void>,
+  timeoutMs = 8000,
+): Promise<BroadcastVerifyStep> {
   return new Promise((resolve) => {
     const token = getApiToken();
     const url = `/es/broadcast/subscribe?channel=${encodeURIComponent(channel)}${token ? `&token=${encodeURIComponent(token)}` : ''}`;
@@ -100,13 +122,14 @@ function testSSESubscribe(channel: string, timeoutMs = 5000): Promise<BroadcastV
 
     let es: EventSource;
     const timer = setTimeout(() => {
-      es.close();
+      try { es.close(); } catch {}
       settle({
         name: 'SSE 订阅',
         success: false,
         error: `订阅超时 (${timeoutMs}ms) — 未收到消息`,
       });
     }, timeoutMs);
+
     try {
       es = new EventSource(url);
     } catch (err: any) {
@@ -115,10 +138,20 @@ function testSSESubscribe(channel: string, timeoutMs = 5000): Promise<BroadcastV
       return;
     }
 
-    es.onopen = () => {
-      // SSE 连接成功，等待消息
-    };
+    // 监听频道名作为 event type（思源 SSE 的 event = 频道名）
+    es.addEventListener(channel, (event: MessageEvent) => {
+      clearTimeout(timer);
+      es.close();
+      let parsed: unknown;
+      try { parsed = JSON.parse(event.data); } catch { parsed = event.data; }
+      settle({
+        name: 'SSE 订阅',
+        success: true,
+        data: { raw: event.data, parsed },
+      });
+    });
 
+    // 也监听默认 message 事件作为兜底
     es.onmessage = (event) => {
       clearTimeout(timer);
       es.close();
@@ -129,6 +162,11 @@ function testSSESubscribe(channel: string, timeoutMs = 5000): Promise<BroadcastV
         success: true,
         data: { raw: event.data, parsed },
       });
+    };
+
+    es.onopen = () => {
+      // SSE 连接已建立，触发消息发送
+      triggerFn().catch(() => {});
     };
 
     es.onerror = () => {
@@ -147,7 +185,11 @@ function testSSESubscribe(channel: string, timeoutMs = 5000): Promise<BroadcastV
 
 // ---- WebSocket 订阅测试 ----
 
-function testWsSubscribe(channel: string, timeoutMs = 5000): Promise<BroadcastVerifyStep> {
+function testWsSubscribe(
+  channel: string,
+  triggerFn: () => Promise<void>,
+  timeoutMs = 8000,
+): Promise<BroadcastVerifyStep> {
   return new Promise((resolve) => {
     const token = getApiToken();
     const host = location.host;
@@ -179,7 +221,8 @@ function testWsSubscribe(channel: string, timeoutMs = 5000): Promise<BroadcastVe
     }
 
     ws.onopen = () => {
-      // WebSocket 连接成功
+      // WebSocket 连接已建立，触发消息发送
+      triggerFn().catch(() => {});
     };
 
     ws.onmessage = (event) => {
@@ -227,8 +270,16 @@ export async function runBroadcastVerification(channelName = 'sketch-live-verify
   const backend = getBackend();
   const steps: BroadcastVerifyStep[] = [];
 
+  const makeTriggerMsg = (type: string) => JSON.stringify({
+    type,
+    source: frontend,
+    backend,
+    ts: Date.now(),
+    testId,
+  });
+
   // 步骤 1：获取频道列表
-  const channelsResult = await callBroadcastAPI('/api/broadcast/getChannels', {});
+  const channelsResult = await callAPI('/api/broadcast/getChannels');
   steps.push({
     name: '获取频道列表 (getChannels)',
     success: channelsResult.ok,
@@ -237,8 +288,8 @@ export async function runBroadcastVerification(channelName = 'sketch-live-verify
     latencyMs: channelsResult.latencyMs,
   });
 
-  // 步骤 2：查询特定频道信息
-  const channelInfoResult = await callBroadcastAPI('/api/broadcast/getChannelInfo', { channel: channelName });
+  // 步骤 2：查询特定频道信息（JSON，参数名 name）
+  const channelInfoResult = await callAPI('/api/broadcast/getChannelInfo', { name: channelName });
   steps.push({
     name: '查询频道信息 (getChannelInfo)',
     success: channelInfoResult.ok,
@@ -247,23 +298,8 @@ export async function runBroadcastVerification(channelName = 'sketch-live-verify
     latencyMs: channelInfoResult.latencyMs,
   });
 
-  // 步骤 3：SSE 订阅测试（异步启动，不阻塞后续步骤）
-  const ssePromise = testSSESubscribe(channelName, 6000);
-
-  // 等待一小段时间确保订阅已建立
-  await new Promise((r) => setTimeout(r, 500));
-
-  // 步骤 4：发布消息（publish）
-  const publishResult = await callBroadcastAPI('/api/broadcast/publish', {
-    channel: channelName,
-    message: JSON.stringify({
-      type: 'verify-ping',
-      source: frontend,
-      backend,
-      ts: Date.now(),
-      testId,
-    }),
-  });
+  // 步骤 3：发布消息（FormData，field name = 频道名）
+  const publishResult = await callPublish(channelName, makeTriggerMsg('verify-publish'));
   steps.push({
     name: '发布消息 (publish)',
     success: publishResult.ok,
@@ -272,16 +308,10 @@ export async function runBroadcastVerification(channelName = 'sketch-live-verify
     latencyMs: publishResult.latencyMs,
   });
 
-  // 步骤 5：发送消息（postMessage）— 使用不同内容区分
-  const postMsgResult = await callBroadcastAPI('/api/broadcast/postMessage', {
+  // 步骤 4：发送消息（JSON）
+  const postMsgResult = await callAPI('/api/broadcast/postMessage', {
     channel: channelName,
-    message: JSON.stringify({
-      type: 'verify-post',
-      source: frontend,
-      backend,
-      ts: Date.now(),
-      testId,
-    }),
+    message: makeTriggerMsg('verify-post'),
   });
   steps.push({
     name: '发送消息 (postMessage)',
@@ -291,35 +321,50 @@ export async function runBroadcastVerification(channelName = 'sketch-live-verify
     latencyMs: postMsgResult.latencyMs,
   });
 
-  // 等待 SSE 订阅结果
-  const sseStep = await ssePromise;
+  // 步骤 5：SSE 订阅 — 建立连接后用 postMessage 触发
+  const sseStep = await testSSESubscribe(channelName, async () => {
+    await callAPI('/api/broadcast/postMessage', {
+      channel: channelName,
+      message: makeTriggerMsg('verify-sse-trigger'),
+    });
+  }, 8000);
   steps.push(sseStep);
 
-  // 步骤 6：WebSocket 订阅测试
-  const wsStep = await testWsSubscribe(channelName, 3000);
+  // 步骤 6：WebSocket 订阅 — 建立连接后用 postMessage 触发
+  const wsStep = await testWsSubscribe(channelName, async () => {
+    await callAPI('/api/broadcast/postMessage', {
+      channel: channelName,
+      message: makeTriggerMsg('verify-ws-trigger'),
+    });
+  }, 8000);
   steps.push(wsStep);
 
   // 综合判定
   const passed = steps.filter((s) => s.success).length;
-  const total = steps.length;
+  const hasSubscribe = sseStep.success || wsStep.success;
+  const hasPublish = publishResult.ok || postMsgResult.ok;
 
   let summary: BroadcastReport['summary'];
   let conclusion: string;
 
-  if (passed === total) {
+  if (passed === steps.length) {
     summary = 'all_pass';
     conclusion = '所有 broadcast API 端点均可访问，跨设备消息传递已验证。可作为传输层候选。';
-  } else if (steps.find((s) => s.name.includes('getChannels') && s.success)) {
-    if (sseStep.success || wsStep.success) {
-      summary = 'partial';
-      conclusion = `频道列表 API 可用，但 publish/postMessage 可能失败。订阅方式: SSE=${sseStep.success ? '可用' : '不可用'}, WS=${wsStep.success ? '可用' : '不可用'}。需进一步排查。`;
-    } else {
-      summary = 'partial';
-      conclusion = '频道列表 API 可用，但订阅和消息发布失败。broadcast API 可能仅限内部使用，不支持插件自定义消息。';
-    }
+  } else if (hasSubscribe && hasPublish) {
+    summary = 'partial';
+    const details = [
+      `publish=${publishResult.ok ? '✓' : '✗'}`,
+      `postMessage=${postMsgResult.ok ? '✓' : '✗'}`,
+      `SSE=${sseStep.success ? '✓' : '✗'}`,
+      `WS=${wsStep.success ? '✓' : '✗'}`,
+    ].join(', ');
+    conclusion = `核心消息收发可用（${details}）。${passed}/${steps.length} 项通过。`;
+  } else if (hasPublish) {
+    summary = 'partial';
+    conclusion = '消息发布可用但订阅失败。broadcast API 可能仅限内部使用，不支持插件自定义订阅。';
   } else {
     summary = 'fail';
-    conclusion = 'broadcast API 不可用（404 或权限不足）。该 API 可能未对外暴露或需要特殊权限。应放弃方案 C。';
+    conclusion = 'broadcast API 不可用。该 API 可能未对外暴露或需要特殊权限。应放弃方案 C。';
   }
 
   return {

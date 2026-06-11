@@ -12,9 +12,8 @@
  */
 
 import { createServer } from 'node:http'
-import { createHash } from 'node:crypto'
 import { networkInterfaces } from 'node:os'
-import { parse } from 'node:url'
+import { WebSocketServer } from 'ws'
 
 const PORT = Number.parseInt(process.argv[2] || '9527', 10)
 
@@ -36,8 +35,18 @@ function getLocalIPs() {
 // ---- HTTP 服务 ----
 
 const server = createServer((req, res) => {
-  const { pathname } = parse(req.url || '/', true)
-  if (pathname === '/') {
+  if (req.method === 'OPTIONS') {
+    res.writeHead(204, {
+      'Access-Control-Allow-Origin': '*',
+      'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+      'Access-Control-Allow-Headers': '*',
+    })
+    res.end()
+    return
+  }
+
+  const url = new URL(req.url || '/', `http://${req.headers.host || 'localhost'}`)
+  if (url.pathname === '/') {
     res.writeHead(200, {
       'Content-Type': 'application/json',
       'Access-Control-Allow-Origin': '*',
@@ -51,180 +60,49 @@ const server = createServer((req, res) => {
       port: PORT,
       timestamp: Date.now(),
     }, null, 2))
-  } else if (req.method === 'OPTIONS') {
-    res.writeHead(204, {
-      'Access-Control-Allow-Origin': '*',
-      'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-      'Access-Control-Allow-Headers': '*',
-    })
-    res.end()
   } else {
     res.writeHead(404, { 'Content-Type': 'application/json' })
     res.end(JSON.stringify({ error: 'not found' }))
   }
 })
 
-// ---- WebSocket 升级处理 ----
-// 使用原生 HTTP upgrade 事件实现轻量 WebSocket echo，
-// 避免引入 ws 依赖（减少脚本外部依赖）
+// ---- WebSocket 服务 ----
 
-server.on('upgrade', (req, socket, head) => {
-  const { pathname } = parse(req.url || '/', true)
-  if (pathname !== '/') {
-    socket.destroy()
-    return
-  }
+const wss = new WebSocketServer({ server })
 
-  // WebSocket 握手
-  const key = req.headers['sec-websocket-key']
-  if (!key) {
-    socket.destroy()
-    return
-  }
-
-  // RFC 6455 magic string
-  const MAGIC = '258EAFA5-E914-47DA-95CA-5AB5DC7185D3'
-  const acceptKey = createHash('sha1')
-    .update(key + MAGIC)
-    .digest('base64')
-
-  const headers = [
-    'HTTP/1.1 101 Switching Protocols',
-    'Upgrade: websocket',
-    'Connection: Upgrade',
-    `Sec-WebSocket-Accept: ${acceptKey}`,
-    '',
-    '',
-  ]
-  socket.write(headers.join('\r\n'))
-
+wss.on('connection', (ws, req) => {
   const clientAddr = `${req.socket.remoteAddress}:${req.socket.remotePort}`
   console.log(`[WS] 客户端已连接: ${clientAddr}`)
 
-  // ---- WebSocket 帧解析/构造 ----
+  ws.on('message', (data) => {
+    const text = data.toString('utf-8')
+    console.log(`[WS] 收到消息: ${text}`)
 
-  function decodeFrame(buf) {
-    if (buf.length < 2) return null
-    const firstByte = buf[0]
-    const secondByte = buf[1]
-    const fin = (firstByte & 0x80) !== 0
-    const opcode = firstByte & 0x0f
-    const masked = (secondByte & 0x80) !== 0
-    let payloadLen = secondByte & 0x7f
-    let offset = 2
-
-    if (payloadLen === 126) {
-      if (buf.length < offset + 2) return null
-      payloadLen = buf.readUInt16BE(offset)
-      offset += 2
-    } else if (payloadLen === 127) {
-      if (buf.length < offset + 8) return null
-      payloadLen = Number(buf.readBigUInt64BE(offset))
-      offset += 8
+    let echoData
+    try {
+      const msg = JSON.parse(text)
+      echoData = JSON.stringify({
+        ...msg,
+        echoFromServer: true,
+        serverTimestamp: Date.now(),
+        serverIP: getLocalIPs()[0]?.address || 'unknown',
+      })
+    } catch {
+      echoData = JSON.stringify({
+        echo: text,
+        echoFromServer: true,
+        serverTimestamp: Date.now(),
+      })
     }
 
-    let maskingKey = null
-    if (masked) {
-      if (buf.length < offset + 4) return null
-      maskingKey = buf.subarray(offset, offset + 4)
-      offset += 4
-    }
-
-    if (buf.length < offset + payloadLen) return null
-
-    const payload = Buffer.from(buf.subarray(offset, offset + payloadLen))
-    if (masked && maskingKey) {
-      for (let i = 0; i < payload.length; i++) {
-        payload[i] ^= maskingKey[i % 4]
-      }
-    }
-
-    return {
-      fin,
-      opcode,
-      payload,
-      totalLength: offset + payloadLen,
-    }
-  }
-
-  function encodeFrame(payload, opcode = 0x01) {
-    const data = Buffer.from(payload)
-    let header
-    if (data.length < 126) {
-      header = Buffer.alloc(2)
-      header[0] = 0x80 | opcode
-      header[1] = data.length
-    } else if (data.length < 65536) {
-      header = Buffer.alloc(4)
-      header[0] = 0x80 | opcode
-      header[1] = 126
-      header.writeUInt16BE(data.length, 2)
-    } else {
-      header = Buffer.alloc(10)
-      header[0] = 0x80 | opcode
-      header[1] = 127
-      header.writeBigUInt64BE(BigInt(data.length), 2)
-    }
-    return Buffer.concat([header, data])
-  }
-
-  let buffer = Buffer.alloc(0)
-
-  socket.on('data', (chunk) => {
-    buffer = Buffer.concat([buffer, chunk])
-
-    while (buffer.length > 0) {
-      const frame = decodeFrame(buffer)
-      if (!frame) break
-
-      buffer = buffer.subarray(frame.totalLength)
-
-      // Ping → Pong
-      if (frame.opcode === 0x09) {
-        socket.write(encodeFrame(frame.payload, 0x0a))
-        continue
-      }
-
-      // Close
-      if (frame.opcode === 0x08) {
-        socket.write(encodeFrame(frame.payload, 0x08))
-        socket.end()
-        console.log(`[WS] 客户端断开: ${clientAddr}`)
-        return
-      }
-
-      // Text frame → echo 回复
-      if (frame.opcode === 0x01) {
-        const text = frame.payload.toString('utf-8')
-        console.log(`[WS] 收到消息: ${text}`)
-
-        let echoData
-        try {
-          const msg = JSON.parse(text)
-          echoData = JSON.stringify({
-            ...msg,
-            echoFromServer: true,
-            serverTimestamp: Date.now(),
-            serverIP: getLocalIPs()[0]?.address || 'unknown',
-          })
-        } catch {
-          echoData = JSON.stringify({
-            echo: text,
-            echoFromServer: true,
-            serverTimestamp: Date.now(),
-          })
-        }
-
-        socket.write(encodeFrame(echoData))
-      }
-    }
+    ws.send(echoData)
   })
 
-  socket.on('close', () => {
+  ws.on('close', () => {
     console.log(`[WS] 连接关闭: ${clientAddr}`)
   })
 
-  socket.on('error', (err) => {
+  ws.on('error', (err) => {
     console.error(`[WS] 错误: ${clientAddr}`, err.message)
   })
 })
