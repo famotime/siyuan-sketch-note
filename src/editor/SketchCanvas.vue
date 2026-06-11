@@ -417,6 +417,31 @@ function onPointerDown(e: PointerEvent) {
       );
       if (selectedHit) {
         cancelLongPressTimer();
+        // 单个图片选中时检测变换手柄（缩放/旋转/透明度/删除）
+        if (lasso.selectedIds.length === 1 && selectedHit.type === "image") {
+          const action = resolveElementTransformAction([selectedHit], selectedHit.id, point.x, point.y);
+          if (action?.mode === "opacity") { cycleImageOpacity(action.element.id); return; }
+          if (action?.mode === "delete") { deleteLassoSelection(); return; }
+          if (action && action.mode !== "move") {
+            const startTime = Date.now();
+            const imageElement = action.element as ImageElement;
+            interaction.imageTransform = {
+              elementId: imageElement.id,
+              lastPoint: point,
+              mode: action.mode,
+              corner: action.corner,
+              startAngle: angleFromElementCenter(imageElement, point.x, point.y),
+              startRotation: imageElement.transform.rotation || 0,
+              points: [{ x: point.x, y: point.y, timestamp: startTime }],
+              initialElement: imageElement,
+              startedAt: startTime,
+              lastSampleAt: startTime,
+              samples: [createImageTransformSample(imageElement, 0, { x: point.x, y: point.y })],
+            };
+            pushHistorySnapshot(state);
+            return;
+          }
+        }
         interaction.longPressDrag = { elementId: selectedHit.id, lastPoint: point, initialElements: getSelectedReplayElements(lasso.selectedIds) };
         pushHistorySnapshot(state);
         return;
@@ -728,7 +753,8 @@ function onPointerMove(e: PointerEvent) {
     }
     state.isDirty = true;
     fullRedrawStrokeCanvas(getCanvas(), state);
-    drawSelectionOutline();
+    if (interaction.selectedElementId) drawSelectionOutline();
+    else drawLassoSelectionOutline();
     return;
   }
 
