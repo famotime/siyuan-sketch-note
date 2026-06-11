@@ -139,7 +139,7 @@ import { hasTextPointerDrag, resolveTextPointerAction } from "./textPointerActio
 import { useViewport } from "@/composables/useViewport";
 import { useTextEditing } from "@/composables/useTextEditing";
 import type { ReplayRecorder } from "@/recorder/recorder";
-import type { ElementTransformReplayEvent, ImageTransformSample, ReplayToolSource } from "@/recorder/types";
+import type { ElementTransformReplayEvent, ImageTransformSample, ReplayEvent, ReplayToolSource } from "@/recorder/types";
 
 const props = defineProps<{
   initialData: SketchData | null;
@@ -149,6 +149,7 @@ const props = defineProps<{
   templateId: string;
   lassoMode: "freehand" | "box";
   recorder?: ReplayRecorder;
+  onLiveEvent?: (event: ReplayEvent) => void;
 }>();
 
 const emit = defineEmits<{
@@ -319,15 +320,17 @@ function recordElementTransform(
   if (!props.recorder || initialElements.length === 0) return;
   const finalElements = getSelectedReplayElements(initialElements.map((element) => element.id));
   if (finalElements.length === 0) return;
-  props.recorder.record({
-    type: "elementTransform",
+  const event = {
+    type: "elementTransform" as const,
     id: `et-${Date.now()}`,
     timestamp: Date.now(),
     op,
     elementIds: finalElements.map((element) => element.id),
     initialElements,
     finalElements,
-  });
+  };
+  props.recorder.record(event);
+  props.onLiveEvent?.(event);
 }
 
 function isDirectDrawingTool(tool: EditorTool): boolean {
@@ -577,12 +580,14 @@ function onPointerDown(e: PointerEvent) {
     }
     if (action?.mode === "delete") {
       if (props.recorder) {
-        props.recorder.record({
-          type: "imageDelete",
+        const event = {
+          type: "imageDelete" as const,
           id: `id-${Date.now()}`,
           timestamp: Date.now(),
           elementId: action.element.id,
-        });
+        };
+        props.recorder.record(event);
+        props.onLiveEvent?.(event);
       }
       pushHistorySnapshot(state);
       state.elements = state.elements.filter((element) => element.id !== action.element.id);
@@ -857,17 +862,19 @@ function onPointerUp(e: PointerEvent) {
       if (move.initialImage && move.startedAt != null && move.points && move.samples && props.recorder) {
         const element = state.elements.find((el): el is ImageElement => el.id === move.initialImage?.id && el.type === "image");
         if (element) {
-          props.recorder.record({
-            type: "imageTransform",
+          const event = {
+            type: "imageTransform" as const,
             id: `lm-${Date.now()}`,
             timestamp: Date.now(),
             elementId: element.id,
-            op: "move",
+            op: "move" as const,
             initialElement: move.initialImage,
             finalElement: element,
             points: move.points,
             samples: [...move.samples, createImageTransformSample(element, Date.now() - move.startedAt, move.points.at(-1))],
-          });
+          };
+          props.recorder.record(event);
+          props.onLiveEvent?.(event);
         }
       }
       if (!move.initialImage) {
@@ -906,8 +913,8 @@ function onPointerUp(e: PointerEvent) {
     const element = state.elements.find((el) => el.id === imgTransform.elementId);
     if (element && element.type === "image" && props.recorder) {
       const finalSample = createImageTransformSample(element, Date.now() - imgTransform.startedAt, imgTransform.points.at(-1));
-      props.recorder.record({
-        type: "imageTransform",
+      const event = {
+        type: "imageTransform" as const,
         id: `it-${Date.now()}`,
         timestamp: Date.now(),
         elementId: imgTransform.elementId,
@@ -916,7 +923,9 @@ function onPointerUp(e: PointerEvent) {
         finalElement: element,
         points: imgTransform.points,
         samples: [...imgTransform.samples, finalSample],
-      });
+      };
+      props.recorder.record(event);
+      props.onLiveEvent?.(event);
     }
     interaction.imageTransform = null;
     updateUndoRedoState();
@@ -949,12 +958,14 @@ function onPointerUp(e: PointerEvent) {
       state.strokes.push(stroke);
       // Record replay event
       if (props.recorder) {
-        props.recorder.record({
-          type: "shape",
+        const event = {
+          type: "shape" as const,
           id: `re-${Date.now()}`,
           timestamp: Date.now(),
           stroke,
-        });
+        };
+        props.recorder.record(event);
+        props.onLiveEvent?.(event);
       }
     }
     interaction.shapeStart = null;
@@ -982,33 +993,39 @@ function onPointerUp(e: PointerEvent) {
       if (props.tool === "eraser" && preStrokeIds) {
         const erasedIds = [...preStrokeIds].filter((id) => !state.strokes.some((s) => s.id === id));
         if (erasedIds.length > 0) {
-          props.recorder.record({
-            type: "erase",
+          const event = {
+            type: "erase" as const,
             id: `re-${Date.now()}`,
             timestamp: Date.now(),
             erasedIds,
-          });
+          };
+          props.recorder.record(event);
+          props.onLiveEvent?.(event);
         }
         if (props.toolPresets.eraser.mode !== "stroke") {
           const lastStroke = state.strokes[state.strokes.length - 1];
           if (lastStroke?.tool === "eraser") {
-            props.recorder.record({
-              type: "stroke",
+            const event = {
+              type: "stroke" as const,
               id: `re-${Date.now()}`,
               timestamp: Date.now(),
               stroke: lastStroke,
-            });
+            };
+            props.recorder.record(event);
+            props.onLiveEvent?.(event);
           }
         }
       } else if (props.tool !== "eraser") {
         const lastStroke = state.strokes[state.strokes.length - 1];
         if (lastStroke) {
-          props.recorder.record({
-            type: "stroke",
+          const event = {
+            type: "stroke" as const,
             id: `re-${Date.now()}`,
             timestamp: Date.now(),
             stroke: lastStroke,
-          });
+          };
+          props.recorder.record(event);
+          props.onLiveEvent?.(event);
         }
       }
     }
@@ -1475,19 +1492,21 @@ function cycleImageOpacity(elementId: string) {
   if (props.recorder) {
     const updated = state.elements.find((el) => el.id === elementId);
     if (updated && updated.type === "image") {
-      props.recorder.record({
-        type: "imageTransform",
+      const event = {
+        type: "imageTransform" as const,
         id: `io-${Date.now()}`,
         timestamp: Date.now(),
         elementId,
-        op: "opacity",
+        op: "opacity" as const,
         initialElement: initial,
         finalElement: updated,
         samples: [
           createImageTransformSample(initial, 0),
           createImageTransformSample(updated, 120),
         ],
-      });
+      };
+      props.recorder.record(event);
+      props.onLiveEvent?.(event);
     }
   }
   emit("stroke");
@@ -1548,14 +1567,16 @@ async function insertImage(src: string, options: { source?: ReplayToolSource; lo
   updateUndoRedoState();
   // Record replay event
   if (props.recorder) {
-    props.recorder.record({
-      type: "image",
+    const event = {
+      type: "image" as const,
       id: `re-${Date.now()}`,
       timestamp: Date.now(),
       element,
       source: options.source,
       loadingMs: options.loadingMs,
-    });
+    };
+    props.recorder.record(event);
+    props.onLiveEvent?.(event);
   }
 }
 
