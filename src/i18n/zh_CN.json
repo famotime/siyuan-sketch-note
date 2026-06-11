@@ -153,5 +153,14 @@
   "openInNewTab": "从新页签打开",
   "openInNewTabDesc": "开启后手写界面从新页签打开，而非当前独立界面。默认关闭。",
   "replayRebirth": "重生",
-  "replayRebirthConfirm": "从当前步骤重生，将清除后续所有操作记录。确定继续？"
+  "replayRebirthConfirm": "从当前步骤重生，将清除后续所有操作记录。确定继续？",
+  "liveStartViewer": "开始观看手机书写",
+  "liveConnectWriter": "投屏到 PC",
+  "liveDisconnect": "断开连接",
+  "liveConnected": "已连接",
+  "liveDisconnected": "连接已断开",
+  "liveReconnecting": "重新连接中...",
+  "liveConnectionFailed": "连接失败",
+  "liveViewerReadOnly": "观看模式（只读）",
+  "liveWaitingSnapshot": "等待同步数据..."
 }

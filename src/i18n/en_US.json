@@ -153,5 +153,14 @@
   "openInNewTab": "Open in New Tab",
   "openInNewTabDesc": "When enabled, the sketch editor opens in a new tab instead of the current overlay. Disabled by default.",
   "replayRebirth": "Rebirth",
-  "replayRebirthConfirm": "Rebirth from this step? All subsequent operations will be discarded."
+  "replayRebirthConfirm": "Rebirth from this step? All subsequent operations will be discarded.",
+  "liveStartViewer": "Start watching phone writing",
+  "liveConnectWriter": "Cast to PC",
+  "liveDisconnect": "Disconnect",
+  "liveConnected": "Connected",
+  "liveDisconnected": "Disconnected",
+  "liveReconnecting": "Reconnecting...",
+  "liveConnectionFailed": "Connection failed",
+  "liveViewerReadOnly": "Viewing mode (read-only)",
+  "liveWaitingSnapshot": "Waiting for sync data..."
 }
