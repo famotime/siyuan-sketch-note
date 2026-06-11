@@ -21,7 +21,7 @@ export function createEditorToolButtons(): EditorToolButton[] {
     { icon: "FormatBrush", labelKey: "highlighter", tool: "highlighter" },
     { icon: "DeleteKey", labelKey: "eraser", tool: "eraser" },
     { icon: "Selected", labelKey: "lasso", tool: "lasso" },
-    { icon: "Minus", labelKey: "shape", tool: "line" },
+    { icon: "Rectangle", labelKey: "shape", tool: "rectangle" },
     { icon: "Text", labelKey: "text", tool: "text" },
     { icon: "AddPic", labelKey: "image", tool: "image" },
   ];

@@ -14,7 +14,7 @@ describe("editor toolbar model", () => {
       "highlighter",
       "eraser",
       "lasso",
-      "line",
+      "rectangle",
       "text",
       "image",
     ]);
@@ -23,8 +23,8 @@ describe("editor toolbar model", () => {
       icon: "Write",
       labelKey: "pen",
     });
-    expect(buttons.find((button) => button.tool === "line")).toMatchObject({
-      icon: "Minus",
+    expect(buttons.find((button) => button.tool === "rectangle")).toMatchObject({
+      icon: "Rectangle",
       labelKey: "shape",
     });
     expect(buttons.find((button) => button.tool === "text")).toMatchObject({

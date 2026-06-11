@@ -16,26 +16,7 @@
       <span class="sketch-float-panel__handle-dot" />
     </div>
 
-    <!-- 1. 形状工具选择（仅在选择图形工具时显示在最上方） -->
-    <div
-      v-if="isShapeMode"
-      class="sketch-float-group sketch-float-group--shapes"
-    >
-      <button
-        v-for="shape in shapeOptions"
-        :key="shape.tool"
-        class="sketch-float-btn"
-        :class="{ 'sketch-float-btn--active': activeTool === shape.tool }"
-        :title="t(shape.labelKey)"
-        :data-tool="shape.tool"
-        @click="$emit('selectTool', shape.tool)"
-      >
-        <IconParkIcon :name="shape.icon" />
-      </button>
-      <div class="sketch-float-divider" />
-    </div>
-
-    <!-- 2. 套索操作（仅在选择套索工具时显示） -->
+    <!-- 1. 套索操作（仅在选择套索工具时显示） -->
     <div
       v-if="activeTool === 'lasso'"
       class="sketch-float-group"
@@ -319,7 +300,6 @@ import type { EditorTool } from "./tools";
 import IconParkIcon from "./IconParkIcon.vue";
 import ColorPickerPopup from "./ColorPickerPopup.vue";
 import PresetColorPalette from "./PresetColorPalette.vue";
-import type { IconParkName } from "./iconParkIcons";
 import { createColorLongPressState, shouldCancelColorLongPress, shouldSwallowColorClick } from "./colorLongPress";
 import { isShapeEditorTool } from "./tools";
 
@@ -677,18 +657,6 @@ const rainbowPresetColors = [
   "#d16cae",
   "#db7090",
 ] as const;
-
-const shapeOptions = [
-  { tool: "line", labelKey: "line", icon: "Minus" },
-  { tool: "arrow", labelKey: "arrow", icon: "ArrowRight" },
-  { tool: "rectangle", labelKey: "rectangle", icon: "Rectangle" },
-  { tool: "ellipse", labelKey: "ellipse", icon: "Round" },
-  { tool: "triangle", labelKey: "triangle", icon: "Triangle" },
-] as const satisfies readonly {
-  tool: EditorTool;
-  labelKey: string;
-  icon: IconParkName;
-}[];
 
 onMounted(() => {
   document.addEventListener("pointerdown", closeFloatingPopoversOnOutsidePointerDown, true);

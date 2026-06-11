@@ -244,10 +244,6 @@ it("keeps replay click selectors available for toolbar playback", () => {
   for (const tool of ["pen", "highlighter", "eraser", "lasso", "shape", "text"]) {
     expect(toolbar).toContain(`data-tool="${tool}"`);
   }
-  for (const shape of ["line", "arrow", "rectangle", "ellipse", "triangle"]) {
-    expect(floatingToolbar).toContain(`:data-tool="shape.tool"`);
-    expect(floatingToolbar).toContain(shape);
-  }
   expect(editor).toContain("triggerToolbarClickAnimation(tool, source)");
   expect(editor).toContain("triggerToolbarClickAnimation(\"image\", source)");
 });

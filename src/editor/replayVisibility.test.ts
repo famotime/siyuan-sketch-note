@@ -25,7 +25,6 @@ describe("replay canvas visibility wiring", () => {
     expect(floatingToolbar).toContain("replayActive?: boolean");
     expect(floatingToolbar).toContain("sketch-float-panel--replay");
     expect(floatingToolbar).toContain("sketch-float-panel--replay-click");
-    expect(floatingToolbar).toContain(":data-tool=\"shape.tool\"");
     expect(editor).toContain("recordFloatingToolbarAction");
   });
 

@@ -142,22 +142,40 @@
         </span>
       </button>
 
-      <!-- 图形（图形合一主按钮） -->
-      <button
-        class="sketch-btn sketch-btn--tool sketch-btn--icon-tool"
-        :class="{ 'sketch-btn--tool-active': getToolButtonActiveState(activeTool, lastShapeTool) }"
-        :title="t('shape')"
-        :aria-label="t('shape')"
-        data-tool="shape"
-        @click="$emit('selectTool', lastShapeTool)"
-      >
-        <span
-          class="sketch-btn__icon"
-          aria-hidden="true"
-        >
-          <IconParkIcon :name="currentShapeIcon" />
-        </span>
-      </button>
+      <!-- 图形（下拉） -->
+      <ToolDropdown v-model="showShapeDropdown">
+        <template #trigger>
+          <button
+            class="sketch-btn sketch-btn--tool sketch-btn--icon-tool sketch-btn--dropdown-trigger"
+            :class="{ 'sketch-btn--tool-active': getToolButtonActiveState(activeTool, lastShapeTool) }"
+            :title="t(lastShapeTool === 'rectangle' ? 'shape' : lastShapeTool)"
+            :aria-label="t('shape')"
+            data-tool="shape"
+            @click="$emit('selectTool', lastShapeTool)"
+          >
+            <span
+              class="sketch-btn__icon"
+              aria-hidden="true"
+            >
+              <IconParkIcon :name="currentShapeIcon" />
+            </span>
+          </button>
+        </template>
+        <template #dropdown>
+          <button
+            v-for="shape in shapeOptions"
+            :key="shape.tool"
+            class="sketch-dropdown-item"
+            :class="{ 'sketch-dropdown-item--active': lastShapeTool === shape.tool }"
+            @click="onSelectShape(shape.tool)"
+          >
+            <span class="sketch-dropdown-item__icon">
+              <IconParkIcon :name="shape.icon" />
+            </span>
+            <span class="sketch-dropdown-item__label">{{ t(shape.labelKey) }}</span>
+          </button>
+        </template>
+      </ToolDropdown>
 
       <!-- 文本 -->
       <button
@@ -238,6 +256,22 @@ const showHighlighterDropdown = ref(false);
 
 const penSubtypes: PenSubtype[] = ["ballpoint", "pencil", "fountain", "brush"];
 const highlighterSubtypes: HighlighterSubtype[] = ["round", "square", "watercolor"];
+
+// ── 图形下拉 ──
+const shapeOptions = [
+  { tool: "line" as ShapeEditorTool, labelKey: "line", icon: "Minus" },
+  { tool: "arrow" as ShapeEditorTool, labelKey: "arrow", icon: "ArrowRight" },
+  { tool: "rectangle" as ShapeEditorTool, labelKey: "rectangle", icon: "Rectangle" },
+  { tool: "ellipse" as ShapeEditorTool, labelKey: "ellipse", icon: "Round" },
+  { tool: "triangle" as ShapeEditorTool, labelKey: "triangle", icon: "Triangle" },
+];
+
+const showShapeDropdown = ref(false);
+
+function onSelectShape(tool: ShapeEditorTool) {
+  emit("selectTool", tool);
+  showShapeDropdown.value = false;
+}
 
 function onSelectPenSubtype(subtype: PenSubtype) {
   emit("selectPenSubtype", subtype);
