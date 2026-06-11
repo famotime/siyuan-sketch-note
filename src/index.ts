@@ -1,6 +1,5 @@
 import {
   Plugin,
-  Menu,
   Setting,
   fetchSyncPost,
   getFrontend,
@@ -30,7 +29,7 @@ import {
   sketchAssetFileName,
 } from "./utils/sketchReference";
 
-const ICON_SVG = `<svg xmlns="http://www.w3.org/2000/svg" width="52" height="52" viewBox="0 0 52 52"><path d="M5.414 38.35a3.033 3.033 0 0 1-.62.506c-.626.38-1.31.435-1.937.29-.094-.021-.142-.036-.13-.031-1.399-.551-2.88.585-2.714 2.08 1.268 11.415 19.239 11.88 23.796.524a2 2 0 0 0-.45-2.167l-9.068-8.956a1.995 1.995 0 0 0-1.402-.575c-4.567 0-6.186 1.992-6.835 6.043l-.03.196c-.216 1.352-.361 1.828-.61 2.09zM20 41.37c-3.355 5.69-12.19 5.987-15 1.705a6.642 6.642 0 0 0 2.103-.822 7.125 7.125 0 0 0 1.463-1.168c1.036-1.072 1.341-2.051 1.693-4.23l.03-.192c.33-2.025.59-2.557 2.134-2.663L20 41.37zm3.37-4.634a4.314 4.314 0 0 0 6.128.003l.234-.23.701-.7c.753-.755 1.592-1.608 2.494-2.543 2.58-2.67 5.16-5.46 7.57-8.234a142.055 142.055 0 0 0 3.486-4.158C51.226 11.87 54.143 5.994 50.301 3c-3.41-2.658-8.99.134-17.087 6.63a130.127 130.127 0 0 0-4.51 3.802 200.127 200.127 0 0 0-8.099 7.564 205.356 205.356 0 0 0-3.173 3.193l-.245.254c-1.644 1.68-1.626 4.42.045 6.104l6.138 6.19zm2.877-2.831l-6.143-6.193a.375.375 0 0 1-.008-.508l.243-.253a201.487 201.487 0 0 1 3.107-3.125 196.32 196.32 0 0 1 7.94-7.413 126.252 126.252 0 0 1 4.374-3.687c3.214-2.578 6.024-4.507 8.28-5.636 2.135-1.067 3.479-1.264 3.867-.961.216.168.115 1.27-.939 3.39-1.163 2.34-3.239 5.346-6.04 8.828-1.046 1.3-2.18 2.65-3.39 4.042a212.273 212.273 0 0 1-7.434 8.083 219.059 219.059 0 0 1-3.372 3.412c-.15.151-.356.15-.485.021z" fill="none" stroke="currentColor" stroke-width="3" stroke-linejoin="round" fill-rule="nonzero"/></svg>`;
+const ICON_SVG = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 48 48" style="fill:none"><path d="M24 24V19L39 4L44 9L29 24H24Z" stroke="currentColor" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/><path d="M16 24H9C6.23858 24 4 26.2386 4 29C4 31.7614 6.23858 34 9 34H39C41.7614 34 44 36.2386 44 39C44 41.7614 41.7614 44 39 44H18" stroke="currentColor" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
 
 export default class SketchNotePlugin extends Plugin {
   public isMobile = false;
@@ -74,16 +73,7 @@ export default class SketchNotePlugin extends Plugin {
     this.addTopBar({
       icon: ICON_SVG,
       title: this.i18n?.insertSketch ?? "Insert Sketch Block",
-      callback: (event: MouseEvent) => {
-        const menu = new Menu("sketch-note-topbar");
-        menu.addItem({
-          icon: ICON_SVG,
-          label: this.i18n?.insertSketch ?? "Insert Sketch Block",
-          click: () => this.insertSketchBlock(),
-        });
-
-        menu.open({ x: event.clientX, y: event.clientY, isLeft: true });
-      },
+      callback: () => this.insertSketchBlock(),
     });
 
     // Register command
