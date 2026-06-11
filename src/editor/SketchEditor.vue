@@ -30,7 +30,7 @@
         :templates="templates"
         :liveMode="liveMode"
         :liveAvailable="!!sketchId"
-        :liveStartLabel="t('liveStartViewer')"
+        :liveStartLabel="liveStartLabel"
         @addPage="canvasRef?.addPage()"
         @back="goBack"
         @backgroundFitChange="onBackgroundFitChange"
@@ -247,7 +247,7 @@
 import { ref, computed, onMounted, onUnmounted, watch, watchEffect, nextTick } from "vue";
 import type { HighlighterSubtype, PenSubtype, SketchData, ToolPreset } from "@/types/sketch";
 import { getAllTemplates, getTemplate } from "@/template";
-import { fetchSyncPost, showMessage } from "siyuan";
+import { fetchSyncPost, showMessage, getFrontend } from "siyuan";
 import { normalizeToolPresets, updateToolPreset, applyPenSubtypeDefaults, applyHighlighterSubtypeDefaults } from "@/tools/presets";
 import { importSketchJson } from "@/export/json";
 import { importSketchFromFile } from "@/export/embedding";
@@ -497,26 +497,43 @@ const liveSession = useLiveSession({
 const {
   role: liveMode,
   connectionState: liveConnectionState,
+  startWriter,
   startViewer,
   sendEvent: sendLiveEvent,
   disconnect: disconnectLive,
 } = liveSession;
 
+// 根据设备类型决定 live 角色
+const frontend = getFrontend();
+const isMobileFrontend = frontend === "mobile" || frontend === "browser-mobile";
+const liveStartLabel = computed(() =>
+  isMobileFrontend ? t("liveConnectWriter") : t("liveStartViewer"),
+);
+
 // Viewer 模式：接收快照和事件
-liveSession.onSnapshot((data) => {
+const unsubSnapshot = liveSession.onSnapshot((data) => {
   if (canvasRef.value) {
     canvasRef.value.restoreData(data);
   }
 });
 
-liveSession.onLiveEvent((event) => {
+const unsubLiveEvent = liveSession.onLiveEvent((event) => {
   if (canvasRef.value) {
     canvasRef.value.applyLiveEvent(event);
   }
 });
 
+onUnmounted(() => {
+  unsubSnapshot();
+  unsubLiveEvent();
+});
+
 function onLiveStart(): void {
-  startViewer();
+  if (isMobileFrontend) {
+    startWriter();
+  } else {
+    startViewer();
+  }
 }
 
 const liveStatusText = computed(() => {
