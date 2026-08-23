@@ -7,6 +7,8 @@ export interface SketchInputSettings {
   stabilizerMode?: StabilizerMode;
   stabilizerOptions?: StabilizerOptions;
   predictiveTracking?: boolean;
+  enableHoldToShape?: boolean;
+  holdToShapeDelayMs?: number;
 }
 
 export function createDefaultInputSettings(): SketchInputSettings {
@@ -16,6 +18,8 @@ export function createDefaultInputSettings(): SketchInputSettings {
     stabilizerMode: "smooth",
     stabilizerOptions: DEFAULT_STABILIZER_OPTIONS.smooth,
     predictiveTracking: true,
+    enableHoldToShape: false,
+    holdToShapeDelayMs: 750,
   };
 }
 
@@ -27,6 +31,8 @@ export function normalizeInputSettings(input?: Partial<SketchInputSettings> | nu
     stabilizerMode: mode,
     stabilizerOptions: input?.stabilizerOptions ?? DEFAULT_STABILIZER_OPTIONS[mode] ?? DEFAULT_STABILIZER_OPTIONS.smooth,
     predictiveTracking: input?.predictiveTracking ?? true,
+    enableHoldToShape: input?.enableHoldToShape ?? false,
+    holdToShapeDelayMs: input?.holdToShapeDelayMs ?? 750,
   };
 }
 

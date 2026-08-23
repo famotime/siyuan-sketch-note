@@ -228,18 +228,39 @@ export function recognizeDrawnShape(points: StrokePoint[]): RecognizedShape | nu
     }
   }
 
-  // 3. 箭头判定
-  const simplified = douglasPeucker(points, diag * 0.05);
-  if (simplified.length >= 4 && !isClosed) {
-    const mainStart = points[0];
-    const mainEnd = points[Math.floor(points.length * 0.75)];
-    if (distance(mainStart, mainEnd) > diag * 0.5) {
-      const arrowPoints = generateArrowPoints(mainStart, points[points.length - 1]);
-      return {
-        type: "arrow",
-        confidence: 0.75,
-        points: arrowPoints,
-      };
+  // 3. 严格单向箭头判定：必须满足主干近似直线且末端存在明显回折翼翅
+  if (!isClosed && points.length >= 8) {
+    const mainLength = Math.floor(points.length * 0.8);
+    const mainPoints = points.slice(0, mainLength);
+    const mainStart = mainPoints[0];
+    const mainEnd = mainPoints[mainPoints.length - 1];
+    const mainTotalLen = mainPoints.reduce((acc, pt, i) => i === 0 ? 0 : acc + distance(mainPoints[i - 1], pt), 0);
+    const mainChordLen = distance(mainStart, mainEnd);
+
+    // 主干自身必须高度接近直线 (弦长比 > 0.88)
+    if (mainChordLen / Math.max(1, mainTotalLen) > 0.88 && mainChordLen > 24) {
+      const tipPoint = points[points.length - 1];
+      const wingDist = distance(mainEnd, tipPoint);
+
+      // 翅膀长度应为适中比例 (主干长度的 10% ~ 35%)
+      if (wingDist > 8 && wingDist < mainChordLen * 0.4) {
+        // 主干向量与翅膀折回向量夹角必须形成锐角折角
+        const mainDx = mainEnd.x - mainStart.x;
+        const mainDy = mainEnd.y - mainStart.y;
+        const wingDx = tipPoint.x - mainEnd.x;
+        const wingDy = tipPoint.y - mainEnd.y;
+        const dot = (mainDx * wingDx + mainDy * wingDy) / (Math.hypot(mainDx, mainDy) * Math.hypot(wingDx, wingDy));
+
+        // 夹角余弦为负 (说明朝向反方向折回，形成类似矢状结构)
+        if (dot < -0.3) {
+          const arrowPoints = generateArrowPoints(mainStart, mainEnd);
+          return {
+            type: "arrow",
+            confidence: 0.88,
+            points: arrowPoints,
+          };
+        }
+      }
     }
   }
 

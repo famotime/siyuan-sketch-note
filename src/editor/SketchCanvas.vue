@@ -419,21 +419,26 @@ function onPointerDown(e: PointerEvent) {
     const stabOpts = props.inputSettings.stabilizerOptions ?? DEFAULT_STABILIZER_OPTIONS[stabMode] ?? DEFAULT_STABILIZER_OPTIONS.smooth;
     stabilizer = stabMode !== "none" ? new SpringMassStabilizer(firstPt, stabOpts, firstPt.timeStamp) : null;
 
-    stationaryDetector = new StationaryDetector(DEFAULT_STATIONARY_OPTIONS, () => {
-      if (state.currentStroke && state.currentStroke.points.length >= 5 && isDirectDrawingTool(props.tool) && props.tool !== "eraser") {
-        const recognized = recognizeDrawnShape(state.currentStroke.points);
-        if (recognized) {
-          if (typeof navigator !== "undefined" && navigator.vibrate) {
-            navigator.vibrate(10);
+    if (props.inputSettings.enableHoldToShape) {
+      const holdTimeMs = props.inputSettings.holdToShapeDelayMs || DEFAULT_STATIONARY_OPTIONS.holdTimeMs;
+      stationaryDetector = new StationaryDetector({ ...DEFAULT_STATIONARY_OPTIONS, holdTimeMs }, () => {
+        if (state.currentStroke && state.currentStroke.points.length >= 5 && isDirectDrawingTool(props.tool) && props.tool !== "eraser") {
+          const recognized = recognizeDrawnShape(state.currentStroke.points);
+          if (recognized) {
+            if (typeof navigator !== "undefined" && navigator.vibrate) {
+              navigator.vibrate(10);
+            }
+            state.currentStroke.points = recognized.points;
+            state.currentStroke.isShape = true;
+            const activeCanvas = wetCanvasRef.value || getCanvas();
+            clearWetCanvas(activeCanvas);
+            renderStroke(activeCanvas.getContext("2d")!, state.currentStroke);
           }
-          state.currentStroke.points = recognized.points;
-          state.currentStroke.isShape = true;
-          const activeCanvas = wetCanvasRef.value || getCanvas();
-          clearWetCanvas(activeCanvas);
-          renderStroke(activeCanvas.getContext("2d")!, state.currentStroke);
         }
-      }
-    });
+      });
+    } else {
+      stationaryDetector = null;
+    }
 
     enginePointerDown(state, { ...firstPt, canvasX: firstPt.x, canvasY: firstPt.y }, getCanvas());
     return;

@@ -41,6 +41,8 @@ describe("editor input mode", () => {
         minSimilarityToFinalize: 0.0,
       },
       predictiveTracking: true,
+      enableHoldToShape: false,
+      holdToShapeDelayMs: 750,
     });
   });
 });

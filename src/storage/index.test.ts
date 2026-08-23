@@ -117,6 +117,8 @@ describe("sketch storage", () => {
           minSimilarityToFinalize: 0.0,
         },
         predictiveTracking: true,
+        enableHoldToShape: false,
+        holdToShapeDelayMs: 750,
       },
       customBackgrounds: [],
     });
@@ -150,6 +152,8 @@ describe("sketch storage", () => {
             minSimilarityToFinalize: 0.0,
           },
           predictiveTracking: true,
+          enableHoldToShape: false,
+          holdToShapeDelayMs: 750,
         },
         customBackgrounds: [],
       },

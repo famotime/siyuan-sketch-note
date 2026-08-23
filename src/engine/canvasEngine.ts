@@ -343,12 +343,6 @@ export function handlePointerMoveBatch(
     }
   }
 
-  // 渲染预测前瞻笔触
-  if (shouldRenderLiveSegment && predictedPoints && predictedPoints.length > 0 && state.currentStroke.points.length > 0) {
-    const lastPt = state.currentStroke.points[state.currentStroke.points.length - 1];
-    renderPredictedStroke(ctx, state.currentStroke, lastPt, predictedPoints);
-  }
-
   return heightChanged;
 }
 

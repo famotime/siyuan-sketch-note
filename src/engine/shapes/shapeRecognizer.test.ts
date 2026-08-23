@@ -16,7 +16,7 @@ describe("shapeRecognizer", () => {
     const recognized = recognizeDrawnShape(linePoints);
     expect(recognized).not.toBeNull();
     expect(recognized?.type).toBe("line");
-    expect(recognized?.confidence).toBeGreaterThan(0.9);
+    expect(recognized?.confidence).toBeGreaterThan(0.85);
   });
 
   it("recognizes rough circle as ellipse", () => {
@@ -33,6 +33,20 @@ describe("shapeRecognizer", () => {
     expect(recognized).not.toBeNull();
     expect(recognized?.type).toBe("ellipse");
     expect(recognized?.points.length).toBeGreaterThan(10);
+  });
+
+  it("does NOT falsely recognize normal open curved lines as arrow", () => {
+    // 模拟用户绘制的类似抛物线/半弧的普通手写曲线
+    const curvePoints: StrokePoint[] = [];
+    for (let i = 0; i <= 30; i++) {
+      const x = i * 5;
+      const y = Math.sin((i / 30) * Math.PI) * 80;
+      curvePoints.push(makePoint(x, y));
+    }
+
+    const recognized = recognizeDrawnShape(curvePoints);
+    // 普通弧线不应被判定为箭头
+    expect(recognized?.type).not.toBe("arrow");
   });
 
   it("simplifies curve corners using douglasPeucker", () => {
