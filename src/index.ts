@@ -8,7 +8,7 @@ import {
 } from "siyuan";
 import "@/index.scss";
 import { init, destroy } from "./main";
-import { openSketchEditor, setI18n, setReplayPlaybackEnabled, setReplayRecordConfig, setReplayRecordingEnabled, setHideReplayControls, setOpenInNewTab, setHiddenTopbarKeys } from "./App.vue";
+import { openSketchEditor, setI18n, setReplayPlaybackEnabled, setReplayRecordConfig, setReplayRecordingEnabled, setHideReplayControls, setOpenInNewTab, setHiddenTopbarKeys, setHiddenMoreMenuKeys } from "./App.vue";
 import { storageKey, createEmptySketchData, loadEditorPreferences, loadSketchData } from "./storage";
 import { normalizeSketchDataForSave } from "./storage/sketchIdentity";
 import { loadSketchIndex, saveSketchIndex, upsertSketchIndexItem } from "./storage/sketchIndex";
@@ -16,7 +16,7 @@ import { extractInsertedBlockId } from "./storage/insertedBlockId";
 import { loadPluginSettings, savePluginSettings } from "./storage/pluginSettings";
 import type { ReplayEventType, ReplayRecorderConfig } from "./recorder/types";
 import { setDebugLogEnabled } from "./utils/logger";
-import { isSettingHidden, getHiddenTopbarKeySet } from "./feature-flags/alpha-feature-config";
+import { isSettingHidden, getHiddenTopbarKeySet, getHiddenMoreMenuKeySet } from "./feature-flags/alpha-feature-config";
 import {
   createPlaceholderPng,
   uploadPngToAssets,
@@ -55,6 +55,7 @@ export default class SketchNotePlugin extends Plugin {
     setHideReplayControls(pluginSettings.hideReplayControls);
     setOpenInNewTab(pluginSettings.openInNewTab);
     setHiddenTopbarKeys(getHiddenTopbarKeySet());
+    setHiddenMoreMenuKeys(getHiddenMoreMenuKeySet());
 
     // Initialize Vue app
     init(this);
@@ -166,7 +167,6 @@ export default class SketchNotePlugin extends Plugin {
         imageDelete: enabled,
       });
       const replayChildSwitches: HTMLInputElement[] = [];
-      let hideReplayControlsSwitch: HTMLInputElement | undefined;
       const syncReplayChildrenDisabled = (enabled: boolean) => {
         for (const childSwitch of replayChildSwitches) {
           childSwitch.disabled = !enabled;
@@ -221,7 +221,7 @@ export default class SketchNotePlugin extends Plugin {
         });
       }
 
-      hideReplayControlsSwitch = createSwitch(settings.hideReplayControls, async (checked) => {
+      const hideReplayControlsSwitch = createSwitch(settings.hideReplayControls, async (checked) => {
         settings.hideReplayControls = checked;
         setHideReplayControls(checked);
         await savePluginSettings((key, data) => this.saveData(key, data), settings);

@@ -1,6 +1,6 @@
 import { createApp } from "vue";
 import { openTab } from "siyuan";
-import App, { setSaveDataFn, setLoadDataFn, setRemoveDataFn, pluginI18n, setOpenSketchInNewTabFn, refreshSketchImage } from "./App.vue";
+import App, { setSaveDataFn, setLoadDataFn, setRemoveDataFn, pluginI18n, setOpenSketchInNewTabFn, refreshSketchImage, hiddenTopbarKeys, hiddenMoreMenuKeys } from "./App.vue";
 import SketchEditor from "./editor/SketchEditor.vue";
 import { loadSketchData } from "./storage";
 import type { Plugin, Custom } from "siyuan";
@@ -44,6 +44,8 @@ async function mountSketchEditor(container: HTMLElement, sketchId: string, plugi
     sourceBlockId,
     themeMode: "light",
     embedMode: true,
+    hiddenTopbarKeys: hiddenTopbarKeys.value,
+    hiddenMoreMenuKeys: hiddenMoreMenuKeys.value,
   });
   tabApp.mount(container);
   currentTabApp = tabApp;

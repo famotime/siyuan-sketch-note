@@ -2,7 +2,7 @@
   "name": "siyuan-sketch-note",
   "author": "Quincy Zou",
   "url": "https://github.com/famotime/siyuan-sketch-note",
-  "version": "0.8.4",
+  "version": "0.9.0",
   "minAppVersion": "2.10.14",
   "disabledInPublish": true,
   "backends": ["all"],
@@ -13,7 +13,7 @@
   },
   "description": {
     "default": "Handwriting plugin for SiYuan Note with vector strokes and multiple edits",
-    "zh_CN": "思源笔记手写插件，支持矢量笔迹和多次编辑"
+    "zh_CN": "思源笔记手写插件，支持矢量笔迹和多次编辑。"
   },
   "readme": {
     "default": "README.md"

@@ -16,6 +16,7 @@
         :exportIncludeBackground="exportIncludeBackground"
         :exportIncludeSketchData="exportIncludeSketchData"
         :hiddenTopbarKeys="hiddenTopbarKeys"
+        :hiddenMoreMenuKeys="hiddenMoreMenuKeys"
         :ocrState="ocrState"
         :pageOverview="pageOverview"
         :pageState="pageState"
@@ -301,6 +302,7 @@ const props = defineProps<{
   ocrProvider?: OcrProvider;
   themeMode: 'light' | 'dark';
   hiddenTopbarKeys?: Set<string>;
+  hiddenMoreMenuKeys?: Set<string>;
   replayPlaybackEnabled?: boolean;
   replayRecordingEnabled?: boolean;
   replayRecordConfig?: Partial<ReplayRecorderConfig>;
@@ -338,7 +340,7 @@ const colorPalettes = ref(normalizeToolColorPalettes({
 }));
 const favoriteColors = ref(normalizeToolFavoriteColors({
   pen: props.initialData?.favoriteColors,
-  highlighter: props.initialData?.highlighterFavoriteColors,
+  highlighter: props.highlighterFavoriteColors ?? props.initialData?.highlighterFavoriteColors,
 }));
 const canUndo = ref(false);
 const canRedo = ref(false);
@@ -371,6 +373,7 @@ let preReplayTool: EditorTool = "pen";
 const replayPlaybackEnabled = computed(() => props.replayPlaybackEnabled !== false);
 const replayRecordingEnabled = computed(() => props.replayRecordingEnabled === true);
 const hiddenTopbarKeys = computed(() => props.hiddenTopbarKeys ?? new Set<string>());
+const hiddenMoreMenuKeys = computed(() => props.hiddenMoreMenuKeys ?? new Set<string>());
 
 // ─── Derived state ───
 const activePreset = computed(() => {
@@ -477,6 +480,10 @@ const { exportIncludeBackground, exportIncludeSketchData, exportPng, exportPdf, 
   customBackgrounds,
   blockId: computed(() => props.blockId),
 });
+
+if (hiddenMoreMenuKeys.value.has("exportSketchData")) {
+  exportIncludeSketchData.value = false;
+}
 
 const { toggleStylusOnly, togglePressure, onTemplateChange, persistEditorPreferences } = useEditorPreferences({
   inputSettings,

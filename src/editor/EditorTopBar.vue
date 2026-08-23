@@ -62,7 +62,7 @@
       <IconParkIcon :name="zenToggleState.icon" />
     </button>
     <div
-      v-if="!hiddenTopbarKeys.has('moreMenu')"
+      v-if="isMoreMenuVisible"
       ref="moreWrapRef"
       class="sketch-more-wrap"
     >
@@ -79,6 +79,7 @@
         class="sketch-more-popover"
       >
         <div
+          v-if="!hiddenMoreKeys.has('clear')"
           class="sketch-more-row sketch-more-row--action"
           @click="$emit('clear'); moreOpen = false"
         >
@@ -86,6 +87,7 @@
           <IconParkIcon name="Clear" />
         </div>
         <div
+          v-if="!hiddenMoreKeys.has('export')"
           class="sketch-more-row sketch-more-row--action"
           @click="openExportDialog"
         >
@@ -93,6 +95,7 @@
           <IconParkIcon name="ArrowRight" />
         </div>
         <div
+          v-if="!hiddenMoreKeys.has('importSketch')"
           class="sketch-more-row sketch-more-row--action"
           @click="$emit('importSketch'); moreOpen = false"
         >
@@ -100,30 +103,39 @@
           <IconParkIcon name="Download" />
         </div>
         <div
+          v-if="!hiddenMoreKeys.has('cleanupInvalidSketches')"
           class="sketch-more-row sketch-more-row--action"
           @click="onCleanupInvalidSketchesClick"
         >
           <span class="sketch-more-label">{{ t("cleanupInvalidSketches") }}</span>
           <IconParkIcon name="Delete" />
         </div>
+        <template v-if="!hiddenMoreKeys.has('live')">
+          <div
+            v-if="liveMode !== 'off'"
+            class="sketch-more-row sketch-more-row--action"
+            @click="$emit('liveDisconnect'); moreOpen = false"
+          >
+            <span class="sketch-more-label">{{ t("liveDisconnect") }}</span>
+            <IconParkIcon name="SmartOptimization" />
+          </div>
+          <div
+            v-else-if="liveAvailable"
+            class="sketch-more-row sketch-more-row--action"
+            @click="$emit('liveStart'); moreOpen = false"
+          >
+            <span class="sketch-more-label">{{ liveStartLabel ?? t("liveStartViewer") }}</span>
+            <IconParkIcon name="SmartOptimization" />
+          </div>
+        </template>
         <div
-          v-if="liveMode !== 'off'"
-          class="sketch-more-row sketch-more-row--action"
-          @click="$emit('liveDisconnect'); moreOpen = false"
+          v-if="hasTopActions && hasBottomSettings"
+          class="sketch-more-divider"
+        />
+        <label
+          v-if="!hiddenMoreKeys.has('template')"
+          class="sketch-more-row sketch-more-row--select"
         >
-          <span class="sketch-more-label">{{ t("liveDisconnect") }}</span>
-          <IconParkIcon name="SmartOptimization" />
-        </div>
-        <div
-          v-else-if="liveAvailable"
-          class="sketch-more-row sketch-more-row--action"
-          @click="$emit('liveStart'); moreOpen = false"
-        >
-          <span class="sketch-more-label">{{ liveStartLabel ?? t("liveStartViewer") }}</span>
-          <IconParkIcon name="SmartOptimization" />
-        </div>
-        <div class="sketch-more-divider" />
-        <label class="sketch-more-row sketch-more-row--select">
           <span class="sketch-more-label">{{ t("noteBackground") }}</span>
           <select
             class="sketch-select sketch-select--menu"
@@ -140,7 +152,7 @@
           </select>
         </label>
         <label
-          v-if="backgroundFit"
+          v-if="backgroundFit && !hiddenMoreKeys.has('backgroundFit')"
           class="sketch-more-row sketch-more-row--select"
         >
           <span class="sketch-more-label">{{ t("backgroundFit") }}</span>
@@ -154,7 +166,10 @@
             <option value="stretch">{{ t("backgroundFitStretch") }}</option>
           </select>
         </label>
-        <label class="sketch-more-row">
+        <label
+          v-if="!hiddenMoreKeys.has('stylusOnly')"
+          class="sketch-more-row"
+        >
           <span class="sketch-more-label">{{ t("stylusOnly") }}</span>
           <span
             class="sketch-toggle"
@@ -164,7 +179,10 @@
             <span class="sketch-toggle__knob" />
           </span>
         </label>
-        <label class="sketch-more-row">
+        <label
+          v-if="!hiddenMoreKeys.has('enablePressure')"
+          class="sketch-more-row"
+        >
           <span class="sketch-more-label">{{ t("enablePressure") }}</span>
           <span
             class="sketch-toggle"
@@ -207,7 +225,7 @@
               <label
                 class="sketch-export-format__option"
                 :class="{ 'sketch-export-format__option--active': exportFormat === 'png' }"
-                >
+              >
                 <IconParkIcon name="AddPic" />
                 <input
                   v-model="exportFormat"
@@ -219,7 +237,7 @@
               <label
                 class="sketch-export-format__option"
                 :class="{ 'sketch-export-format__option--active': exportFormat === 'pdf' }"
-                >
+              >
                 <IconParkIcon name="BookOpen" />
                 <input
                   v-model="exportFormat"
@@ -240,7 +258,10 @@
               <span class="sketch-toggle__knob" />
             </span>
           </label>
-          <label class="sketch-export-dialog__row">
+          <label
+            v-if="!hiddenMoreKeys.has('exportSketchData')"
+            class="sketch-export-dialog__row"
+          >
             <span class="sketch-export-dialog__label">{{ t("exportSketchData") }}</span>
             <span
               class="sketch-toggle"
@@ -280,13 +301,14 @@ import { createLogger } from "@/utils/logger";
 import IconParkIcon from "./IconParkIcon.vue";
 import { createZenToggleState } from "./zenMode";
 
-defineProps<{
+const props = defineProps<{
   backgroundFit?: string;
   canRedo: boolean;
   canUndo: boolean;
   exportIncludeBackground: boolean;
   exportIncludeSketchData: boolean;
   hiddenTopbarKeys: Set<string>;
+  hiddenMoreMenuKeys?: Set<string>;
   ocrState: "idle" | "recognizing" | "completed" | "error";
   pageOverview: PageOverviewItem[];
   pageState: { current: number; total: number };
@@ -327,6 +349,32 @@ const emit = defineEmits<{
 
 const zenToggleState = computed(() => createZenToggleState(false));
 
+const hiddenMoreKeys = computed(() => props.hiddenMoreMenuKeys ?? new Set<string>());
+
+const hasTopActions = computed(() => {
+  const keys = hiddenMoreKeys.value;
+  const isLiveVisible = !keys.has('live') && (props.liveMode !== 'off' || Boolean(props.liveAvailable));
+  return !keys.has('clear')
+    || !keys.has('export')
+    || !keys.has('importSketch')
+    || !keys.has('cleanupInvalidSketches')
+    || isLiveVisible;
+});
+
+const hasBottomSettings = computed(() => {
+  const keys = hiddenMoreKeys.value;
+  const isBackgroundFitVisible = Boolean(props.backgroundFit) && !keys.has('backgroundFit');
+  return !keys.has('template')
+    || isBackgroundFitVisible
+    || !keys.has('stylusOnly')
+    || !keys.has('enablePressure');
+});
+
+const isMoreMenuVisible = computed(() => {
+  if (props.hiddenTopbarKeys.has('moreMenu')) return false;
+  return hasTopActions.value || hasBottomSettings.value;
+});
+
 const moreOpen = ref(false);
 const exportDialogOpen = ref(false);
 const exportFormat = ref<"png" | "pdf">("png");
@@ -349,6 +397,7 @@ function confirmExport() {
 
 function onCleanupInvalidSketchesClick() {
   logger.info("cleanup menu item clicked");
+  // eslint-disable-next-line vue/custom-event-name-casing
   emit("cleanup-invalid-sketches");
   moreOpen.value = false;
 }

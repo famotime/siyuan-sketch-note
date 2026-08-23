@@ -14,6 +14,7 @@
     :replayRecordConfig="replayRecordConfig"
     :hideReplayControls="hideReplayControls"
     :hiddenTopbarKeys="hiddenTopbarKeys"
+    :hiddenMoreMenuKeys="hiddenMoreMenuKeys"
     @close="closeEditor"
   />
 </template>
@@ -44,7 +45,8 @@ const replayRecordingEnabled = ref(false);
 const replayRecordConfig = ref<ReplayRecorderConfig>({ ...DEFAULT_RECORDER_CONFIG });
 const hideReplayControls = ref(false);
 const openInNewTab = ref(false);
-const hiddenTopbarKeys = ref<Set<string>>(new Set());
+export const hiddenTopbarKeys = ref<Set<string>>(new Set());
+export const hiddenMoreMenuKeys = ref<Set<string>>(new Set());
 let themeObserver: MutationObserver | null = null;
 let themeSyncTimer: number | null = null;
 let lastThemeDiagnosticKey = "";
@@ -223,6 +225,10 @@ export function setHiddenTopbarKeys(keys: Set<string>) {
   hiddenTopbarKeys.value = keys;
 }
 
+export function setHiddenMoreMenuKeys(keys: Set<string>) {
+  hiddenMoreMenuKeys.value = keys;
+}
+
 export async function openSketchEditor(sketchId: string, sourceBlockId?: string | null) {
   console.log("[Sketch Note] openSketchEditor called, openInNewTab =", openInNewTab.value, "openSketchInNewTabFn =", !!openSketchInNewTabFn);
   if (openInNewTab.value) {
@@ -308,6 +314,7 @@ export default {
       hideReplayControls,
       openInNewTab,
       hiddenTopbarKeys,
+      hiddenMoreMenuKeys,
       closeEditor,
     };
   },
