@@ -290,6 +290,7 @@ import { useExportManager } from "@/composables/useExportManager";
 import { useEditorPreferences } from "@/composables/useEditorPreferences";
 import { useZenMode } from "@/composables/useZenMode";
 import { useLiveSession } from "@/live/useLiveSession";
+import { usePenHoverTooltip } from "@/composables/usePenHoverTooltip";
 
 const props = defineProps<{
   blockId: string;
@@ -494,6 +495,7 @@ const { toggleStylusOnly, togglePressure, onTemplateChange, persistEditorPrefere
 });
 
 const { isZenMode, zenTogglePos, zenToggleState, enterZenMode, onZenToggleClick, onZenToggleDragStart } = useZenMode();
+usePenHoverTooltip(editorRootRef);
 
 // ─── Live Sync ───
 const sketchId = computed(() => props.initialData?.id?.sketchId ?? "");

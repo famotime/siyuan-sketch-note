@@ -23,13 +23,13 @@ export function createZenToggleState(isZenMode: boolean): ZenToggleState {
   return isZenMode
     ? {
         ariaLabelKey: 'exitZenMode',
-        icon: 'Unlock',
+        icon: 'OffScreen',
         isPressed: true,
         titleKey: 'exitZenMode',
       }
     : {
         ariaLabelKey: 'enterZenMode',
-        icon: 'Lock',
+        icon: 'FullScreen',
         isPressed: false,
         titleKey: 'enterZenMode',
       };
