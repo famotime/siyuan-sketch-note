@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { SpringMassStabilizer, DEFAULT_STABILIZER_OPTIONS } from "./springMassStabilizer";
 
-describe("SpringMassStabilizer", () => {
+describe("spring mass stabilizer", () => {
   it("should initialize at starting point correctly", () => {
     const stabilizer = new SpringMassStabilizer({ x: 100, y: 100, pressure: 0.5 });
     const current = stabilizer.getCurrentStrokePoint();
@@ -61,5 +61,22 @@ describe("SpringMassStabilizer", () => {
     expect(finalPt.x).toBe(12);
     expect(finalPt.y).toBe(12);
     expect(finalPt.pressure).toBe(0.9);
+  });
+
+  it("should adaptively accelerate to track fast pointer movements and reduce lag", () => {
+    const stabilizer = new SpringMassStabilizer(
+      { x: 0, y: 0, pressure: 0.5 },
+      DEFAULT_STABILIZER_OPTIONS.smooth,
+      1000,
+    );
+
+    // Fast drag of 300px in 16ms
+    stabilizer.setTarget({ x: 300, y: 0, pressure: 0.5 });
+    const points = stabilizer.step(1016);
+
+    expect(points.length).toBeGreaterThan(0);
+    const last = points[points.length - 1];
+    // Under speed adaptive scaling, should cover a significant portion of the distance rapidly
+    expect(last.x).toBeGreaterThan(60);
   });
 });

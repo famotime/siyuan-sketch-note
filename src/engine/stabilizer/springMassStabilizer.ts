@@ -1,11 +1,11 @@
 import type { StrokePoint } from "@/types/sketch";
 
 export interface StabilizerOptions {
-  mass: number;                // 质点质量 (0.1 ~ 2.0)
-  springConstant: number;      // 弹性系数 (10 ~ 500)
+  mass: number; // 质点质量 (0.1 ~ 2.0)
+  springConstant: number; // 弹性系数 (10 ~ 500)
   frictionCoefficient: number; // 摩擦阻尼系数 (0.0 ~ 2.0)
-  maxPointDist: number;        // 最大细分步长 (1 ~ 50px)
-  inertiaFraction: number;     // 惯性比例 (0.0 ~ 1.0)
+  maxPointDist: number; // 最大细分步长 (1 ~ 50px)
+  inertiaFraction: number; // 惯性比例 (0.0 ~ 1.0)
   velocityDecayFactor: number; // 速度衰减 (0.0 ~ 1.0)
   minSimilarityToFinalize: number; // 收笔对齐阈值
 }
@@ -23,30 +23,30 @@ export const DEFAULT_STABILIZER_OPTIONS: Record<StabilizerMode, StabilizerOption
     minSimilarityToFinalize: 0.0,
   },
   smooth: {
-    mass: 0.35,
-    springConstant: 130.0,
-    frictionCoefficient: 0.28,
+    mass: 0.28,
+    springConstant: 160.0,
+    frictionCoefficient: 0.22,
     maxPointDist: 8.0,
-    inertiaFraction: 0.72,
-    velocityDecayFactor: 0.1,
+    inertiaFraction: 0.65,
+    velocityDecayFactor: 0.08,
     minSimilarityToFinalize: 0.0,
   },
   calligraphy: {
-    mass: 0.65,
-    springConstant: 95.0,
-    frictionCoefficient: 0.35,
+    mass: 0.48,
+    springConstant: 120.0,
+    frictionCoefficient: 0.28,
     maxPointDist: 6.0,
-    inertiaFraction: 0.85,
-    velocityDecayFactor: 0.12,
+    inertiaFraction: 0.76,
+    velocityDecayFactor: 0.10,
     minSimilarityToFinalize: -0.2,
   },
   custom: {
-    mass: 0.4,
-    springConstant: 120.0,
-    frictionCoefficient: 0.3,
+    mass: 0.32,
+    springConstant: 150.0,
+    frictionCoefficient: 0.24,
     maxPointDist: 8.0,
-    inertiaFraction: 0.75,
-    velocityDecayFactor: 0.1,
+    inertiaFraction: 0.68,
+    velocityDecayFactor: 0.08,
     minSimilarityToFinalize: 0.0,
   },
 };
@@ -136,23 +136,36 @@ export class SpringMassStabilizer {
       const curDy = this.targetPoint.y - this.strokePoint.y;
       const curDist = Math.hypot(curDx, curDy);
 
+      // 速度/距离自适应响应因子 (0 < adaptiveRatio <= 1.0)
+      // 当距离较小 (微移慢写，curDist < 3px) 时保持 100% 平滑抗抖惯性；
+      // 当快速划动 (curDist 增大到 10px 以上) 时，平滑降低惯性与有效质量，大幅增强弹簧响应拉力以贴合笔尖
+      const adaptiveRatio = curDist <= 3
+        ? 1.0
+        : Math.max(0.08, 1 / (1 + ((curDist - 3) / 10.0) ** 1.6));
+
+      const effectiveSpringK = this.options.springConstant * (1.0 + (1.0 - adaptiveRatio) * 2.5);
+      const effectiveMass = Math.max(0.01, this.options.mass * (0.25 + 0.75 * adaptiveRatio));
+      const effectiveFriction = this.options.frictionCoefficient * (0.3 + 0.7 * adaptiveRatio);
+      const effectiveInertia = Math.max(0, Math.min(1, this.options.inertiaFraction * adaptiveRatio));
+      const effectiveDecay = this.options.velocityDecayFactor * adaptiveRatio;
+
       // 弹簧拉力
-      const fSpringX = curDx * this.options.springConstant;
-      const fSpringY = curDy * this.options.springConstant;
+      const fSpringX = curDx * effectiveSpringK;
+      const fSpringY = curDy * effectiveSpringK;
 
       // 动摩擦力
       const vLen = Math.hypot(this.velocity.x, this.velocity.y);
-      const normalForce = this.options.mass * 9.8;
-      const fFrictionX = vLen > 0.0001 ? -(this.velocity.x / vLen) * this.options.frictionCoefficient * normalForce : 0;
-      const fFrictionY = vLen > 0.0001 ? -(this.velocity.y / vLen) * this.options.frictionCoefficient * normalForce : 0;
+      const normalForce = effectiveMass * 9.8;
+      const fFrictionX = vLen > 0.0001 ? -(this.velocity.x / vLen) * effectiveFriction * normalForce : 0;
+      const fFrictionY = vLen > 0.0001 ? -(this.velocity.y / vLen) * effectiveFriction * normalForce : 0;
 
       // 牛顿第二定律加速度
-      const ax = (fSpringX + fFrictionX) / Math.max(0.01, this.options.mass);
-      const ay = (fSpringY + fFrictionY) / Math.max(0.01, this.options.mass);
+      const ax = (fSpringX + fFrictionX) / effectiveMass;
+      const ay = (fSpringY + fFrictionY) / effectiveMass;
 
       // 弹簧速度
-      const springVx = this.velocity.x * (1 - this.options.velocityDecayFactor) + ax * subDt;
-      const springVy = this.velocity.y * (1 - this.options.velocityDecayFactor) + ay * subDt;
+      const springVx = this.velocity.x * (1 - effectiveDecay) + ax * subDt;
+      const springVy = this.velocity.y * (1 - effectiveDecay) + ay * subDt;
       const springSpeed = Math.hypot(springVx, springVy);
 
       // 目标方向速度
@@ -160,9 +173,8 @@ export class SpringMassStabilizer {
       const targetDirY = curDist > 0.0001 ? (curDy / curDist) * springSpeed : 0;
 
       // 惯性混合速度
-      const inertia = Math.max(0, Math.min(1, this.options.inertiaFraction));
-      this.velocity.x = targetDirX * (1 - inertia) + springVx * inertia;
-      this.velocity.y = targetDirY * (1 - inertia) + springVy * inertia;
+      this.velocity.x = targetDirX * (1 - effectiveInertia) + springVx * effectiveInertia;
+      this.velocity.y = targetDirY * (1 - effectiveInertia) + springVy * effectiveInertia;
 
       // 质点位移
       this.strokePoint.x += this.velocity.x * subDt;

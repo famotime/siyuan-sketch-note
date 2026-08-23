@@ -209,7 +209,7 @@ export function setupDryCanvas(
   canvas.height = state.canvasHeight * dpr;
   canvas.style.width = `${state.canvasWidth}px`;
   canvas.style.height = `${state.canvasHeight}px`;
-  const ctx = canvas.getContext("2d")!;
+  const ctx = (canvas.getContext("2d", { desynchronized: true, alpha: true }) || canvas.getContext("2d"))!;
   ctx.scale(dpr, dpr);
   const layers = splitElementsForRender(state.elements);
   renderNonStrokeElements(ctx, layers.background, options);
@@ -234,7 +234,7 @@ export function setupWetCanvas(
   canvas.height = state.canvasHeight * dpr;
   canvas.style.width = `${state.canvasWidth}px`;
   canvas.style.height = `${state.canvasHeight}px`;
-  const ctx = canvas.getContext("2d")!;
+  const ctx = (canvas.getContext("2d", { desynchronized: true, alpha: true }) || canvas.getContext("2d"))!;
   ctx.scale(dpr, dpr);
 }
 
@@ -309,20 +309,28 @@ export function handlePointerMove(
 }
 
 /**
- * 批量点流处理：支持经物理稳定器/合并事件产生的点序列批量推入并增量渲染
+ * 批量点流处理：支持经物理稳定器/合并事件产生的点序列批量推入并增量/前瞻渲染
+ *
+ * @param state 引擎状态
+ * @param points 本次批次新增的真实/稳定点序列
+ * @param targetCanvas 绘制目标 Canvas（湿墨图层或干墨图层）
+ * @param predictedPoints 硬件/OS 预测的前瞻轨迹点（用于消除视觉延迟）
+ * @param isWetLayer 是否为湿墨活动图层（默认 true，允许清空活动笔画并绘制平滑预测轨迹）
  */
 export function handlePointerMoveBatch(
   state: EngineState,
   points: StrokePoint[],
   targetCanvas: HTMLCanvasElement,
   predictedPoints?: StrokePoint[],
+  isWetLayer = true,
 ): boolean {
   if (!state.currentStroke || points.length === 0) return false;
 
   let heightChanged = false;
   const ctx = targetCanvas.getContext("2d")!;
-  const shouldRenderLiveSegment = !(state.currentStroke.tool === "eraser" && state.toolPresets.eraser.mode === "stroke");
+  const shouldRenderLive = !(state.currentStroke.tool === "eraser" && state.toolPresets.eraser.mode === "stroke");
 
+  let addedCount = 0;
   for (const pt of points) {
     const pts = state.currentStroke.points;
     const lastPoint = pts[pts.length - 1];
@@ -330,14 +338,25 @@ export function handlePointerMoveBatch(
       continue;
     }
     pts.push(pt);
+    addedCount++;
 
     if (pt.y > state.canvasHeight - 100) {
       state.canvasHeight += CANVAS_HEIGHT_INCREMENT;
       heightChanged = true;
     }
+  }
 
-    if (shouldRenderLiveSegment && pts.length >= 2) {
-      const prev = pts[pts.length - 2];
+  if (shouldRenderLive && state.currentStroke.points.length >= 2) {
+    if (isWetLayer) {
+      clearWetCanvas(targetCanvas);
+      renderStroke(ctx, state.currentStroke);
+      if (predictedPoints && predictedPoints.length > 0) {
+        const lastRealPoint = state.currentStroke.points[state.currentStroke.points.length - 1];
+        renderPredictedStroke(ctx, state.currentStroke, lastRealPoint, predictedPoints);
+      }
+    } else if (addedCount > 0) {
+      const pts = state.currentStroke.points;
+      const prev = pts[pts.length - 1 - addedCount] || pts[pts.length - 2];
       const curr = pts[pts.length - 1];
       renderStrokeSegment(ctx, state.currentStroke, prev, curr);
     }

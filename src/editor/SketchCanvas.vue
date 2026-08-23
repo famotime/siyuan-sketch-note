@@ -912,7 +912,8 @@ function onPointerMove(e: PointerEvent) {
     }
 
     const activeCanvas = wetCanvasRef.value || getCanvas();
-    const heightChanged = handlePointerMoveBatch(state, generatedPoints, activeCanvas, predictedPoints);
+    const isWet = Boolean(wetCanvasRef.value && activeCanvas === wetCanvasRef.value);
+    const heightChanged = handlePointerMoveBatch(state, generatedPoints, activeCanvas, predictedPoints, isWet);
     if (heightChanged) {
       resizeCanvases(bgCanvasRef.value!, strokeCanvasRef.value!, state, wetCanvasRef.value);
       emit("heightChanged", state.canvasHeight);
@@ -1086,7 +1087,8 @@ function onPointerUp(e: PointerEvent) {
     const finalPoints = stabilizer.finish(e.timeStamp);
     if (finalPoints.length > 0) {
       const activeCanvas = wetCanvasRef.value || getCanvas();
-      handlePointerMoveBatch(state, finalPoints, activeCanvas);
+      const isWet = Boolean(wetCanvasRef.value && activeCanvas === wetCanvasRef.value);
+      handlePointerMoveBatch(state, finalPoints, activeCanvas, undefined, isWet);
     }
     stabilizer = null;
   }

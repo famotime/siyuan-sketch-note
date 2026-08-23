@@ -7,6 +7,7 @@ import {
   fullRedrawStrokeCanvas,
   handlePointerDown,
   handlePointerMove,
+  handlePointerMoveBatch,
   handlePointerUp,
   cancelCurrentStroke,
   pushHistorySnapshot,
@@ -329,5 +330,63 @@ describe("canvas engine current stroke cancellation", () => {
     expect(state.strokes).toEqual([]);
     expect(state.undoStack).toEqual([]);
     expect(state.isDirty).toBe(false);
+  });
+});
+
+describe("canvas engine batch stroke and predictive rendering", () => {
+  it("renders live smoothed stroke and predictive points on wet layer", () => {
+    const state = createEngineState("blank");
+    const operations: string[] = [];
+    const canvas = {
+      width: 800,
+      height: 1200,
+      getBoundingClientRect: () => ({ left: 0, top: 0 }),
+      getContext: () => ({
+        save() { operations.push("save"); },
+        restore() { operations.push("restore"); },
+        setTransform() {},
+        clearRect() { operations.push("clearRect"); },
+        beginPath() { operations.push("beginPath"); },
+        moveTo() { operations.push("moveTo"); },
+        lineTo() { operations.push("lineTo"); },
+        quadraticCurveTo() { operations.push("quadraticCurveTo"); },
+        stroke() { operations.push("stroke"); },
+        get lineWidth() { return 1; },
+        set lineWidth(_value: number) {},
+        get lineJoin() { return ""; },
+        set lineJoin(_value: string) {},
+        get lineCap() { return ""; },
+        set lineCap(_value: string) {},
+        get globalAlpha() { return 1; },
+        set globalAlpha(_value: number) {},
+        get globalCompositeOperation() { return ""; },
+        set globalCompositeOperation(_value: string) {},
+        get strokeStyle() { return ""; },
+        set strokeStyle(_value: string) {},
+      }),
+    } as unknown as HTMLCanvasElement;
+
+    handlePointerDown(state, {
+      clientX: 10,
+      clientY: 10,
+      pressure: 0.5,
+      timeStamp: 1,
+    } as PointerEvent, canvas);
+
+    const realBatch = [
+      { x: 20, y: 20, pressure: 0.5, timestamp: 2 },
+      { x: 30, y: 30, pressure: 0.5, timestamp: 3 },
+    ];
+    const predicted = [
+      { x: 40, y: 40, pressure: 0.5, timestamp: 4 },
+      { x: 50, y: 50, pressure: 0.5, timestamp: 5 },
+    ];
+
+    handlePointerMoveBatch(state, realBatch, canvas, predicted, true);
+
+    expect(state.currentStroke?.points).toHaveLength(3);
+    // Should clear wet canvas, render real stroke, and render predictive stroke
+    expect(operations).toContain("clearRect");
+    expect(operations).toContain("stroke");
   });
 });
