@@ -106,6 +106,17 @@ describe("sketch storage", () => {
       inputSettings: {
         stylusOnly: true,
         enablePressure: false,
+        stabilizerMode: "smooth",
+        stabilizerOptions: {
+          mass: 0.35,
+          springConstant: 130.0,
+          frictionCoefficient: 0.28,
+          maxPointDist: 8.0,
+          inertiaFraction: 0.72,
+          velocityDecayFactor: 0.1,
+          minSimilarityToFinalize: 0.0,
+        },
+        predictiveTracking: true,
       },
       customBackgrounds: [],
     });
@@ -128,6 +139,17 @@ describe("sketch storage", () => {
         inputSettings: {
           stylusOnly: true,
           enablePressure: true,
+          stabilizerMode: "smooth",
+          stabilizerOptions: {
+            mass: 0.35,
+            springConstant: 130.0,
+            frictionCoefficient: 0.28,
+            maxPointDist: 8.0,
+            inertiaFraction: 0.72,
+            velocityDecayFactor: 0.1,
+            minSimilarityToFinalize: 0.0,
+          },
+          predictiveTracking: true,
         },
         customBackgrounds: [],
       },

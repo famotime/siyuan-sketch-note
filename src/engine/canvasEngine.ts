@@ -14,7 +14,7 @@ import { getSketchPages } from "@/pages/model";
 import { getCustomBackgroundDrawRect, getCustomBackgroundTemplate } from "@/template/customBackground";
 import type { CustomBackgroundTemplate } from "@/template/customBackground";
 import { filterStrokePointsByDistance } from "./strokeSmoothing";
-import { renderStroke, renderStrokeSegment } from "./strokeRenderer";
+import { renderStroke, renderStrokeSegment, renderPredictedStroke } from "./strokeRenderer";
 
 let idCounter = 0;
 const MIN_POINT_DISTANCE = 1.5;
@@ -149,6 +149,9 @@ function restoreSnapshot(state: EngineState, snapshot: EngineSnapshot): void {
   state.elements = snapshot.elements.map((element) => ({ ...element, bounds: { ...element.bounds } }));
 }
 
+/**
+ * 初始化 Layer 1: 背景 Canvas (Background Layer)
+ */
 export function setupBackgroundCanvas(
   canvas: HTMLCanvasElement,
   state: EngineState,
@@ -193,7 +196,10 @@ export function setupBackgroundCanvas(
   }
 }
 
-export function setupStrokeCanvas(
+/**
+ * 初始化 Layer 2: 干墨 Canvas (Dry Layer - 固化的笔画与对象)
+ */
+export function setupDryCanvas(
   canvas: HTMLCanvasElement,
   state: EngineState,
   options: RenderOptions = {},
@@ -213,12 +219,43 @@ export function setupStrokeCanvas(
   renderNonStrokeElements(ctx, layers.foreground, options);
 }
 
+/** 兼容原有 setupStrokeCanvas 命名 */
+export const setupStrokeCanvas = setupDryCanvas;
+
+/**
+ * 初始化 Layer 3: 湿墨活动 Canvas (Wet Layer - 活动笔画、预测点、套索选框)
+ */
+export function setupWetCanvas(
+  canvas: HTMLCanvasElement,
+  state: EngineState,
+): void {
+  const dpr = window.devicePixelRatio || 1;
+  canvas.width = state.canvasWidth * dpr;
+  canvas.height = state.canvasHeight * dpr;
+  canvas.style.width = `${state.canvasWidth}px`;
+  canvas.style.height = `${state.canvasHeight}px`;
+  const ctx = canvas.getContext("2d")!;
+  ctx.scale(dpr, dpr);
+}
+
+/**
+ * 清空湿墨 Canvas
+ */
+export function clearWetCanvas(canvas: HTMLCanvasElement): void {
+  const ctx = canvas.getContext("2d");
+  if (!ctx) return;
+  ctx.save();
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  ctx.restore();
+}
+
 export function handlePointerDown(
   state: EngineState,
   e: Pick<PointerEvent, "pressure" | "timeStamp"> & { canvasX?: number; canvasY?: number; clientX?: number; clientY?: number },
-  canvas: HTMLCanvasElement,
+  canvas?: HTMLCanvasElement,
 ): void {
-  const rect = canvas.getBoundingClientRect();
+  const rect = canvas ? canvas.getBoundingClientRect() : { left: 0, top: 0 };
   const x = e.canvasX ?? ((e.clientX ?? 0) - rect.left);
   const y = e.canvasY ?? ((e.clientY ?? 0) - rect.top);
   const preset = state.toolPresets[state.tool];
@@ -268,6 +305,50 @@ export function handlePointerMove(
     const curr = pts[pts.length - 1];
     renderStrokeSegment(ctx, state.currentStroke, prev, curr);
   }
+  return heightChanged;
+}
+
+/**
+ * 批量点流处理：支持经物理稳定器/合并事件产生的点序列批量推入并增量渲染
+ */
+export function handlePointerMoveBatch(
+  state: EngineState,
+  points: StrokePoint[],
+  targetCanvas: HTMLCanvasElement,
+  predictedPoints?: StrokePoint[],
+): boolean {
+  if (!state.currentStroke || points.length === 0) return false;
+
+  let heightChanged = false;
+  const ctx = targetCanvas.getContext("2d")!;
+  const shouldRenderLiveSegment = !(state.currentStroke.tool === "eraser" && state.toolPresets.eraser.mode === "stroke");
+
+  for (const pt of points) {
+    const pts = state.currentStroke.points;
+    const lastPoint = pts[pts.length - 1];
+    if (Math.hypot(lastPoint.x - pt.x, lastPoint.y - pt.y) < MIN_POINT_DISTANCE) {
+      continue;
+    }
+    pts.push(pt);
+
+    if (pt.y > state.canvasHeight - 100) {
+      state.canvasHeight += CANVAS_HEIGHT_INCREMENT;
+      heightChanged = true;
+    }
+
+    if (shouldRenderLiveSegment && pts.length >= 2) {
+      const prev = pts[pts.length - 2];
+      const curr = pts[pts.length - 1];
+      renderStrokeSegment(ctx, state.currentStroke, prev, curr);
+    }
+  }
+
+  // 渲染预测前瞻笔触
+  if (shouldRenderLiveSegment && predictedPoints && predictedPoints.length > 0 && state.currentStroke.points.length > 0) {
+    const lastPt = state.currentStroke.points[state.currentStroke.points.length - 1];
+    renderPredictedStroke(ctx, state.currentStroke, lastPt, predictedPoints);
+  }
+
   return heightChanged;
 }
 
@@ -342,9 +423,13 @@ export function resizeCanvases(
   bgCanvas: HTMLCanvasElement,
   strokeCanvas: HTMLCanvasElement,
   state: EngineState,
+  wetCanvas?: HTMLCanvasElement,
 ): void {
   setupBackgroundCanvas(bgCanvas, state);
-  setupStrokeCanvas(strokeCanvas, state);
+  setupDryCanvas(strokeCanvas, state);
+  if (wetCanvas) {
+    setupWetCanvas(wetCanvas, state);
+  }
 }
 
 export function serializeState(state: EngineState): SketchData {
@@ -421,8 +506,6 @@ function renderImageElement(ctx: CanvasRenderingContext2D, element: Extract<Sket
   ctx.strokeRect(-element.bounds.width / 2, -element.bounds.height / 2, element.bounds.width, element.bounds.height);
   ctx.restore();
 }
-
-
 
 function findStrokeEraseHits(strokes: Stroke[], eraserStroke: Stroke): Set<string> {
   const hitIds = new Set<string>();

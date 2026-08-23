@@ -10,6 +10,8 @@ import { showMessage } from "siyuan";
 import { sketchAssetFileName, uploadDataUrlToAssets } from "@/utils/uploadPng";
 import { SaveQueue } from "@/storage/saveQueue";
 import type { SaveStatus } from "@/storage/saveStatus";
+import { bumpSyncMarker } from "@/storage/syncMarker";
+import { refreshSketchImages } from "@/storage/imageBuster";
 
 export function useSaveManager(ctx: {
   canvasRef: Ref<{ getData: () => SketchData; getState: () => { isDirty: boolean } } | undefined>;
@@ -100,6 +102,9 @@ export function useSaveManager(ctx: {
           assetName: fileName,
         }));
       }
+      await bumpSyncMarker(storageAccess.saveData);
+      void refreshSketchImages(ctx.blockId.value);
+
       saveStatus.value = "saved";
       lastSavedAt.value = Date.now();
       ctx.canvasRef.value.getState().isDirty = false;

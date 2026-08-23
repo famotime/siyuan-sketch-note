@@ -107,3 +107,36 @@ export function renderStrokeSegment(
   ctx.stroke();
   ctx.restore();
 }
+
+/**
+ * 在湿墨图层渲染预测点前瞻笔触，消除笔尖与墨水线条之间的视觉延迟
+ */
+export function renderPredictedStroke(
+  ctx: CanvasRenderingContext2D,
+  stroke: Stroke,
+  lastRealPoint: StrokePoint,
+  predictedPoints: StrokePoint[],
+): void {
+  if (!predictedPoints || predictedPoints.length === 0) return;
+  const profile = resolveBrushProfile(stroke.brushProfileId, stroke.tool, {
+    tool: stroke.tool,
+    penSubtype: stroke.penSubtype,
+    highlighterSubtype: stroke.highlighterSubtype,
+  });
+
+  ctx.save();
+  ctx.globalAlpha = (stroke.opacity ?? 1) * 0.45;
+  ctx.globalCompositeOperation = profile.blendMode;
+  ctx.strokeStyle = stroke.color;
+  ctx.lineWidth = getBrushPressureWidth(stroke.width, lastRealPoint.pressure, profile);
+  ctx.lineJoin = profile.lineJoin;
+  ctx.lineCap = profile.lineCap;
+
+  ctx.beginPath();
+  ctx.moveTo(lastRealPoint.x, lastRealPoint.y);
+  for (const pt of predictedPoints) {
+    ctx.lineTo(pt.x, pt.y);
+  }
+  ctx.stroke();
+  ctx.restore();
+}

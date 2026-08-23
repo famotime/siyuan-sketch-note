@@ -28,6 +28,8 @@ import {
   isSketchImageSource,
   sketchAssetFileName,
 } from "./utils/sketchReference";
+import { refreshSketchImages } from "./storage/imageBuster";
+import { updateImageColorInversionStyle } from "./theme/inversion";
 
 const ICON_SVG = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 48 48" style="fill:none"><path d="M24 24V19L39 4L44 9L29 24H24Z" stroke="currentColor" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/><path d="M16 24H9C6.23858 24 4 26.2386 4 29C4 31.7614 6.23858 34 9 34H39C41.7614 34 44 36.2386 44 39C44 41.7614 41.7614 44 39 44H18" stroke="currentColor" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
 
@@ -69,6 +71,19 @@ export default class SketchNotePlugin extends Plugin {
       this.handleOpenMenuImage(detail);
     };
     this.eventBus.on("open-menu-image", this.onOpenMenuImage);
+
+    // Multi-device sync reload: listen for ws-main data change
+    this.eventBus.on("ws-main", (e: any) => {
+      if (e.detail?.cmd === "reloadPlugin") {
+        const dataChangePlugins: string[] = e.detail?.data?.dataChangePlugins ?? [];
+        if (dataChangePlugins.includes("siyuan-sketch-note")) {
+          void refreshSketchImages();
+        }
+      }
+    });
+
+    // Dark mode smart image color inversion
+    updateImageColorInversionStyle("on-dark");
 
     // Add top bar button
     this.addTopBar({

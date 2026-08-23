@@ -1,57 +1,49 @@
 # Repository Guidelines
 
+## Project Overview
+
+siyuan-sketch-note (闲笔) is a vector handwriting editor plugin for SiYuan Note, built with Vue 3, HTML5 Canvas, and TypeScript using the SiYuan Plugin SDK.
+
 ## Project Structure & Module Organization
 
-This repository is a SiYuan Note plugin (闲笔) built with Vite, Vue 3, and TypeScript. It provides a vector handwriting editor using HTML5 Canvas.
+Core code is located in `src/`: `index.ts` (plugin lifecycle, settings, context menus, DOM injection), `main.ts` (Vue app bridge), `App.vue` (visibility, theme detection, tab management). Key modules:
 
-Core plugin code lives in `src/`: `index.ts` exports the `SketchNotePlugin` class (SiYuan Plugin SDK lifecycle), `main.ts` handles Vue app mount/unmount and API bridge, `App.vue` manages editor visibility and theme detection. Key modules:
-
-- `composables/` — Vue 3 composables extracted from editor components: `useThemeDetection` (shared theme resolution), `useSaveManager`, `useColorPalettes`, `useOcrSearch`, `useExportManager`, `useEditorPreferences`, `useZenMode`, `useViewport`, `useTextEditing`
-- `editor/` — Vue editor components: `SketchEditor.vue` (orchestrator, ~1000 lines), `SketchCanvas.vue` (canvas surface, ~1040 lines), `EditorTopBar.vue`, `ToolBar.vue`, `FloatingToolbar.vue`, `ToolOptionsPopover.vue`, plus `shortcuts.ts`, `clipboard.ts`, `inputMode.ts`
-- `elements/` — Element model system: `SketchElement` discriminated union (StrokeElement | ShapeElement | TextElement | ImageElement), `model.ts` exports `defaultTransform()`, lasso hit-testing and edit operations, transform, render ordering
-- `engine/` — Canvas rendering engine: `canvasEngine.ts` (state machine, pointer events, undo/redo, `clearImageCache()`), `strokeSmoothing.ts` (point filtering, Bézier curves)
-- `storage/` — Data persistence via SiYuan plugin storage API, migration/recovery, thumbnail generation, save queue
+- `composables/` — Vue 3 composables: `useThemeDetection`, `useSaveManager` (debounce + queue), `useColorPalettes`, `usePenHoverTooltip`, `useOcrSearch`, `useExportManager`, `useEditorPreferences`, `useZenMode`, `useViewport`, `useTextEditing`
+- `editor/` — Editor UI & logic: `SketchEditor.vue` (orchestrator), `SketchCanvas.vue` (canvas), `EditorTopBar.vue`, `ToolBar.vue`, `ToolDropdown.vue`, `FloatingToolbar.vue`, `ReplayControls.vue`, `ColorPickerPopup.vue`, `shortcuts.ts`, `clipboard.ts`, `inputMode.ts`, `tools.ts`
+- `live/` — Real-time screen projection / sync (mobile stylus writer -> PC viewer via SiYuan Broadcast API & SSE): `useLiveSession.ts`, `transport.ts`, `session.ts`, `viewerApply.ts`, `types.ts`
+- `elements/` — Element models: `SketchElement` (strokes, shapes, text, images), `model.ts`, `lasso.ts` / `lassoEdit.ts`, `transform.ts`, `renderOrder.ts`
+- `engine/` — Canvas rendering engine: `canvasEngine.ts` (state machine, undo/redo, image caching), `strokeSmoothing.ts`, `penSubtypePressure.ts`
+- `storage/` — Data persistence: `saveQueue.ts`, `migrations.ts`, `thumbnail.ts` (cropping + eraser compositing), `cleanup.ts` (invalid sketch cleanup), `sketchIndex.ts`, `pluginSettings.ts`
+- `recorder/` — Stroke operation recorder (`recorder.ts`), player (`player.ts`), and state reconstruction (`reconstruct.ts`)
 - `template/` — 9 built-in page templates + custom background support
-- `export/` — PNG/PDF/JSON export (uses shared `pad()` from `utils/date.ts`)
+- `export/` — PNG, PDF, and JSON export/import
 - `pages/` — Multi-page model
-- `search/` — OCR provider interface (pluggable) and text indexing
-- `tools/` — Tool presets and recent colors palette
-- `utils/` — Shared utilities: `date.ts` (date formatting `pad()`), `uploadPng.ts` (SiYuan asset upload)
-- `types/` — Shared TypeScript types (`SketchData`, `Stroke`, `SketchTool`, etc.)
-- `i18n/` — Locale JSON files (en_US, zh_CN)
-
-Root files: `plugin.json` (metadata), `icon.png`, `preview.png` (marketplace assets), `release.js` (version bump + tag script). `developer_docs/` stores SiYuan API references, `plugin-sample-vite-vue/` is an upstream sample. Do not edit generated `dist/` or `package.zip` by hand.
+- `search/` — Pluggable OCR interface (`ocrProvider.ts`) and text indexing
+- `tools/` — Presets, palette management, and brush profiles
+- `feature-flags/` — Alpha feature toggles
+- `utils/` — Date formatting, image upload, sketch identity/references, logger, confirm dialogs, workspace resolution
+- `types/` — Shared TypeScript definitions (`SketchData`, `Stroke`, `SketchTool`, `LiveMessage`, etc.)
+- `i18n/` — Locale JSON files (`en_US.json`, `zh_CN.json`)
 
 ## Build, Test, and Development Commands
 
-Use `pnpm install` to install dependencies from `pnpm-lock.yaml`.
+- `pnpm install`: Install dependencies
+- `pnpm dev`: Development mode (`vite build --watch`) outputting to SiYuan workspace
+- `pnpm build`: Production build into `dist/` + `package.zip`
+- `pnpm test`: Run full Vitest test suite
+- `npx vitest run src/path/to/file.test.ts`: Run a single test file
+- `npx eslint src/`: Check code style and linting
+- `pnpm release:patch|minor|major`: Bump version, update files, tag, and push
 
-- `pnpm dev`: runs `vite build --watch` for plugin development (outputs to SiYuan workspace via `.env` config)
-- `pnpm build`: creates a production build in `dist/` + `package.zip`
-- `pnpm test`: runs Vitest unit tests
-- `npx vitest run src/path/to/file.test.ts`: run a single test file
-- `npx eslint src/`: check code conventions
-- `pnpm release`: interactive version bump, git tag, and push
-- `pnpm release:patch|minor|major`: auto-bump the corresponding version
+## Coding Style & Conventions
 
-Before submitting changes, run `pnpm test` and `pnpm build`.
-
-## Coding Style & Naming Conventions
-
-Follow `.editorconfig`: UTF-8, spaces, 2-space indentation, final newline, and trimmed trailing whitespace except Markdown and declaration files. TypeScript and Vue style is governed by `eslint.config.mjs`, based on `@antfu/eslint-config`. Prefer single quotes, multiline object properties, trailing commas in multiline structures, and Vue SFC block order of `template`, `script`, then `style`. Each Vue attribute on its own line (`vue/max-attributes-per-line: 1`). Name Vue components in PascalCase, modules in camelCase, and keep locale keys aligned across `src/i18n/en_US.json` and `src/i18n/zh_CN.json`.
-
-## Testing Guidelines
-
-Vitest is the test framework. Test files are colocated with source using the `.test.ts` suffix (not `.spec.ts`). Run `pnpm test` for the full suite or `npx vitest run src/path/to/file.test.ts` for a single file.
-
-For UI/editor changes that cannot be unit-tested, verify manually in SiYuan: insert a sketch block, draw, erase, undo/redo, save, reopen, and confirm thumbnail rendering. Include manual verification notes in the PR.
-
-## Commit & Pull Request Guidelines
-
-Recent history uses Conventional Commit prefixes such as `feat:`, `fix:`, `revert:`, `docs:`, and `refactor:` with concise Chinese descriptions, for example: `fix: 修复橡皮擦导出边界计算`.
-
-Pull requests should include a short summary, affected user workflows, verification commands, and screenshots or screen recordings for UI/editor changes. Link related issues when available and call out any changes to `plugin.json`, release packaging, or SiYuan API assumptions.
+- **Tooling & Formatting**: Follow `.editorconfig` (2 spaces, UTF-8). ESLint via `@antfu/eslint-config` (single quotes, semicolons required, multiline trailing commas).
+- **Vue SFC**: Order must be `<template>` → `<script setup lang="ts">` → `<style>`. Attributes on separate lines (`vue/max-attributes-per-line: 1`).
+- **Naming**: PascalCase for components, camelCase for modules/functions.
+- **i18n**: Keep keys synchronized across `src/i18n/en_US.json` and `src/i18n/zh_CN.json`.
+- **Testing**: Colocate test files alongside source with `.test.ts` suffix. Run `pnpm test` before committing.
+- **Commits**: Conventional Commits in concise Simplified Chinese (e.g., `feat: 支持实时投屏同步`, `fix: 修复缩略图裁剪边界`).
 
 ## Agent-Specific Instructions
 
-Unless explicitly requested otherwise, reply to users in Simplified Chinese. When committing code, use concise Chinese commit messages with a conventional prefix.
+Unless explicitly requested otherwise, reply to users in Simplified Chinese. Maintain concise, structured responses.

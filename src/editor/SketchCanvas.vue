@@ -11,6 +11,10 @@
     <canvas
       ref="strokeCanvasRef"
       class="sketch-canvas sketch-canvas--stroke"
+    />
+    <canvas
+      ref="wetCanvasRef"
+      class="sketch-canvas sketch-canvas--wet"
       @contextmenu.prevent
       @dblclick="onCanvasDoubleClick"
       @pointerdown="onPointerDown"
@@ -67,8 +71,11 @@ import {
   restoreEngineState,
   setupBackgroundCanvas,
   setupStrokeCanvas,
+  setupWetCanvas,
+  clearWetCanvas,
   handlePointerDown as enginePointerDown,
   handlePointerMove as enginePointerMove,
+  handlePointerMoveBatch,
   handlePointerUp as enginePointerUp,
   cancelCurrentStroke,
   undo as engineUndo,
@@ -83,6 +90,11 @@ import {
 } from "@/engine/canvasEngine";
 import type { EngineState } from "@/engine/canvasEngine";
 import { renderStroke } from "@/engine/strokeRenderer";
+import { extractPointerPoints } from "./inputEvents";
+import { PressureFilter } from "@/engine/stabilizer/pressureFilter";
+import { SpringMassStabilizer, DEFAULT_STABILIZER_OPTIONS } from "@/engine/stabilizer/springMassStabilizer";
+import { StationaryDetector, DEFAULT_STATIONARY_OPTIONS } from "@/engine/shapes/stationaryDetector";
+import { recognizeDrawnShape } from "@/engine/shapes/shapeRecognizer";
 import {
   createArrowStroke,
   createEllipseStroke,
@@ -164,6 +176,12 @@ const emit = defineEmits<{
 const containerRef = ref<HTMLDivElement>();
 const bgCanvasRef = ref<HTMLCanvasElement>();
 const strokeCanvasRef = ref<HTMLCanvasElement>();
+const wetCanvasRef = ref<HTMLCanvasElement>();
+
+// ── 手写输入高采样、压感滤波与物理稳定器 ──
+const pressureFilter = new PressureFilter();
+let stabilizer: SpringMassStabilizer | null = null;
+let stationaryDetector: StationaryDetector | null = null;
 
 // ── Composables ──
 const viewport = useViewport({ containerRef });
@@ -266,6 +284,9 @@ onMounted(async () => {
   await preloadElementImages(state.elements);
   setupBackgroundCanvas(bgCanvasRef.value, state);
   setupStrokeCanvas(strokeCanvasRef.value, state);
+  if (wetCanvasRef.value) {
+    setupWetCanvas(wetCanvasRef.value, state);
+  }
   updateUndoRedoState();
   emitPageState();
 });
@@ -279,7 +300,7 @@ watch(
 );
 
 function updateCanvasCursor(tool: string, eraserWidth: number) {
-  const canvas = strokeCanvasRef.value;
+  const canvas = wetCanvasRef.value || strokeCanvasRef.value;
   if (!canvas) return;
   if (tool === "eraser") {
     const w = Math.max(16, eraserWidth);
@@ -384,8 +405,37 @@ function onPointerDown(e: PointerEvent) {
   (e.target as HTMLElement).setPointerCapture(e.pointerId);
 
   if (isDirectDrawingTool(props.tool)) {
-    const point = eventPoint(e);
-    enginePointerDown(state, { ...point, canvasX: point.x, canvasY: point.y }, getCanvas());
+    const extracted = extractPointerPoints(
+      e,
+      (cx, cy) => canvasPoint({ clientX: cx, clientY: cy } as any),
+      props.inputSettings.enablePressure,
+    );
+    const firstPt = extracted.realPoints[0] || eventPoint(e);
+    pressureFilter.reset();
+    const smoothPressure = pressureFilter.filter(firstPt.pressure);
+    firstPt.pressure = smoothPressure;
+
+    const stabMode = props.inputSettings.stabilizerMode ?? "smooth";
+    const stabOpts = props.inputSettings.stabilizerOptions ?? DEFAULT_STABILIZER_OPTIONS[stabMode] ?? DEFAULT_STABILIZER_OPTIONS.smooth;
+    stabilizer = stabMode !== "none" ? new SpringMassStabilizer(firstPt, stabOpts, firstPt.timeStamp) : null;
+
+    stationaryDetector = new StationaryDetector(DEFAULT_STATIONARY_OPTIONS, () => {
+      if (state.currentStroke && state.currentStroke.points.length >= 5 && isDirectDrawingTool(props.tool) && props.tool !== "eraser") {
+        const recognized = recognizeDrawnShape(state.currentStroke.points);
+        if (recognized) {
+          if (typeof navigator !== "undefined" && navigator.vibrate) {
+            navigator.vibrate(10);
+          }
+          state.currentStroke.points = recognized.points;
+          state.currentStroke.isShape = true;
+          const activeCanvas = wetCanvasRef.value || getCanvas();
+          clearWetCanvas(activeCanvas);
+          renderStroke(activeCanvas.getContext("2d")!, state.currentStroke);
+        }
+      }
+    });
+
+    enginePointerDown(state, { ...firstPt, canvasX: firstPt.x, canvasY: firstPt.y }, getCanvas());
     return;
   }
 
@@ -819,10 +869,57 @@ function onPointerMove(e: PointerEvent) {
 
   if (interaction.shapeStart) return;
 
+  if (isDirectDrawingTool(props.tool) && state.currentStroke) {
+    const extracted = extractPointerPoints(
+      e,
+      (cx, cy) => canvasPoint({ clientX: cx, clientY: cy } as any),
+      props.inputSettings.enablePressure,
+    );
+
+    const generatedPoints: StrokePoint[] = [];
+
+    for (const rawPt of extracted.realPoints) {
+      const smoothedPressure = pressureFilter.filter(rawPt.pressure);
+      rawPt.pressure = smoothedPressure;
+
+      if (stabilizer) {
+        stabilizer.setTarget(rawPt);
+        const subSteps = stabilizer.step(rawPt.timeStamp);
+        for (const subPt of subSteps) {
+          generatedPoints.push(subPt);
+          stationaryDetector?.update(subPt);
+        }
+      } else {
+        const pt: StrokePoint = { x: rawPt.x, y: rawPt.y, pressure: smoothedPressure, timestamp: rawPt.timeStamp };
+        generatedPoints.push(pt);
+        stationaryDetector?.update(pt);
+      }
+    }
+
+    let predictedPoints: StrokePoint[] | undefined;
+    if (props.inputSettings.predictiveTracking && extracted.predictedPoints.length > 0) {
+      predictedPoints = extracted.predictedPoints.map((pt) => ({
+        x: pt.x,
+        y: pt.y,
+        pressure: pressureFilter.getCurrent(),
+        timestamp: pt.timeStamp,
+      }));
+    }
+
+    const activeCanvas = wetCanvasRef.value || getCanvas();
+    const heightChanged = handlePointerMoveBatch(state, generatedPoints, activeCanvas, predictedPoints);
+    if (heightChanged) {
+      resizeCanvases(bgCanvasRef.value!, strokeCanvasRef.value!, state, wetCanvasRef.value);
+      emit("heightChanged", state.canvasHeight);
+      emitPageState();
+    }
+    return;
+  }
+
   const point = eventPoint(e);
   const heightChanged = enginePointerMove(state, { ...point, canvasX: point.x, canvasY: point.y }, getCanvas());
   if (heightChanged) {
-    resizeCanvases(bgCanvasRef.value!, strokeCanvasRef.value!, state);
+    resizeCanvases(bgCanvasRef.value!, strokeCanvasRef.value!, state, wetCanvasRef.value);
     emit("heightChanged", state.canvasHeight);
     emitPageState();
   }
@@ -976,15 +1073,37 @@ function onPointerUp(e: PointerEvent) {
     return;
   }
 
+  // 结束稳定器与停顿检测器
+  stationaryDetector?.cancelTimer();
+  stationaryDetector = null;
+
+  if (stabilizer && state.currentStroke) {
+    const finalPoints = stabilizer.finish(e.timeStamp);
+    if (finalPoints.length > 0) {
+      const activeCanvas = wetCanvasRef.value || getCanvas();
+      handlePointerMoveBatch(state, finalPoints, activeCanvas);
+    }
+    stabilizer = null;
+  }
+  pressureFilter.reset();
+
   // Before enginePointerUp, capture pre-state for eraser detection
   const preStrokeIds = props.recorder && props.tool === "eraser"
     ? new Set(state.strokes.map((s) => s.id))
     : null;
 
+  const preCurrentStroke = state.currentStroke;
   const completed = enginePointerUp(state);
   if (completed) {
+    if (wetCanvasRef.value) {
+      clearWetCanvas(wetCanvasRef.value);
+    }
+
     if (props.tool === "eraser" && props.toolPresets.eraser.mode === "stroke") {
       fullRedrawStrokeCanvas(getCanvas(), state);
+    } else if (preCurrentStroke) {
+      // 在干墨层渲染固化笔画
+      renderStroke(getCanvas().getContext("2d")!, preCurrentStroke);
     }
     updateUndoRedoState();
     emit("stroke");
@@ -1013,7 +1132,6 @@ function onPointerUp(e: PointerEvent) {
               stroke: lastStroke,
             };
             props.recorder.record(event);
-            // 不广播 eraser 笔迹——viewer 不应看到橡皮的拖拽轨迹
           }
         }
       } else if (props.tool !== "eraser") {
@@ -1689,7 +1807,8 @@ defineExpose({
 }
 .sketch-canvas { display: block; }
 .sketch-canvas--bg { position: relative; }
-.sketch-canvas--stroke { position: absolute; top: 0; left: 0; cursor: crosshair; }
+.sketch-canvas--stroke { position: absolute; top: 0; left: 0; pointer-events: none; }
+.sketch-canvas--wet { position: absolute; top: 0; left: 0; cursor: crosshair; pointer-events: auto; }
 
 /* 原位文本编辑器 */
 .sketch-text-editor-overlay {
