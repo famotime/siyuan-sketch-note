@@ -195,28 +195,47 @@ export class SpringMassStabilizer {
   }
 
   /**
-   * 抬笔完成笔画：判断收尾相似度并对齐终点
+   * 抬笔完成笔画：自适应平滑逼近真实落点，防止高速挥笔收尾丢点与回缩
    */
   finish(nowTime: number = performance.now()): StrokePoint[] {
     const toTargetX = this.targetPoint.x - this.strokePoint.x;
     const toTargetY = this.targetPoint.y - this.strokePoint.y;
     const dist = Math.hypot(toTargetX, toTargetY);
 
-    const extra: StrokePoint[] = [];
+    if (dist < 0.001) {
+      return [];
+    }
 
-    // 若接近终点或速度朝向终点，则对齐至真实落点
-    const dot = this.velocity.x * toTargetX + this.velocity.y * toTargetY;
-    if (dist < 12 || dot > this.options.minSimilarityToFinalize) {
-      this.strokePoint.x = this.targetPoint.x;
-      this.strokePoint.y = this.targetPoint.y;
-      this.currentPressure = this.targetPressure;
+    const extra: StrokePoint[] = [];
+    const startX = this.strokePoint.x;
+    const startY = this.strokePoint.y;
+    const startPressure = this.currentPressure;
+
+    // 根据滞后距离自适应计算收敛微步步数，杜绝硬折线与大跨度跳跃
+    const stepDist = Math.max(3, Math.min(8, this.options.maxPointDist));
+    const steps = Math.min(6, Math.max(1, Math.ceil(dist / stepDist)));
+
+    for (let i = 1; i <= steps; i++) {
+      const t = i / steps;
+      // 使用二次缓出 (Ease-Out) 曲线使质点自然减速滑行至真实终点
+      const ease = 1 - (1 - t) * (1 - t);
+      const curX = startX + toTargetX * ease;
+      const curY = startY + toTargetY * ease;
+      // 压感向真实终点平滑过渡
+      const curPressure = startPressure + (this.targetPressure - startPressure) * ease;
+
       extra.push({
-        x: this.strokePoint.x,
-        y: this.strokePoint.y,
-        pressure: this.currentPressure,
+        x: curX,
+        y: curY,
+        pressure: curPressure,
         timestamp: nowTime,
       });
     }
+
+    this.strokePoint.x = this.targetPoint.x;
+    this.strokePoint.y = this.targetPoint.y;
+    this.currentPressure = this.targetPressure;
+    this.velocity = { x: 0, y: 0 };
 
     return extra;
   }

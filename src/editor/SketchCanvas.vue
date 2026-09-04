@@ -1083,7 +1083,45 @@ function onPointerUp(e: PointerEvent) {
   stationaryDetector?.cancelTimer();
   stationaryDetector = null;
 
-  if (stabilizer && state.currentStroke) {
+  if (isDirectDrawingTool(props.tool) && state.currentStroke) {
+    const extracted = extractPointerPoints(
+      e,
+      (cx, cy) => canvasPoint({ clientX: cx, clientY: cy } as any),
+      props.inputSettings.enablePressure,
+    );
+
+    const generatedPoints: StrokePoint[] = [];
+
+    for (const rawPt of extracted.realPoints) {
+      const smoothedPressure = pressureFilter.filter(rawPt.pressure);
+      rawPt.pressure = smoothedPressure;
+
+      if (stabilizer) {
+        stabilizer.setTarget(rawPt);
+        const subSteps = stabilizer.step(rawPt.timeStamp);
+        for (const subPt of subSteps) {
+          generatedPoints.push(subPt);
+        }
+      } else {
+        const pt: StrokePoint = { x: rawPt.x, y: rawPt.y, pressure: smoothedPressure, timestamp: rawPt.timeStamp };
+        generatedPoints.push(pt);
+      }
+    }
+
+    if (stabilizer) {
+      const finalPoints = stabilizer.finish(e.timeStamp);
+      for (const finalPt of finalPoints) {
+        generatedPoints.push(finalPt);
+      }
+      stabilizer = null;
+    }
+
+    if (generatedPoints.length > 0) {
+      const activeCanvas = wetCanvasRef.value || getCanvas();
+      const isWet = Boolean(wetCanvasRef.value && activeCanvas === wetCanvasRef.value);
+      handlePointerMoveBatch(state, generatedPoints, activeCanvas, undefined, isWet);
+    }
+  } else if (stabilizer && state.currentStroke) {
     const finalPoints = stabilizer.finish(e.timeStamp);
     if (finalPoints.length > 0) {
       const activeCanvas = wetCanvasRef.value || getCanvas();
@@ -1102,16 +1140,18 @@ function onPointerUp(e: PointerEvent) {
   const preCurrentStroke = state.currentStroke;
   const completed = enginePointerUp(state);
   if (completed) {
+    if (props.tool === "eraser" && props.toolPresets.eraser.mode === "stroke") {
+      fullRedrawStrokeCanvas(getCanvas(), state);
+    } else if (preCurrentStroke) {
+      // 关键优化：先在干墨层渲染固化笔画
+      renderStroke(getCanvas().getContext("2d")!, preCurrentStroke);
+    }
+
+    // 关键优化：干墨层绘制完成后再清空湿墨层，消除空白过渡帧导致的整条笔画闪烁
     if (wetCanvasRef.value) {
       clearWetCanvas(wetCanvasRef.value);
     }
 
-    if (props.tool === "eraser" && props.toolPresets.eraser.mode === "stroke") {
-      fullRedrawStrokeCanvas(getCanvas(), state);
-    } else if (preCurrentStroke) {
-      // 在干墨层渲染固化笔画
-      renderStroke(getCanvas().getContext("2d")!, preCurrentStroke);
-    }
     updateUndoRedoState();
     emit("stroke");
 

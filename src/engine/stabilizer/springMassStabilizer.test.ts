@@ -79,4 +79,28 @@ describe("spring mass stabilizer", () => {
     // Under speed adaptive scaling, should cover a significant portion of the distance rapidly
     expect(last.x).toBeGreaterThan(60);
   });
+
+  it("should smoothly converge to target endpoint without dropping tail on high-speed release", () => {
+    const stabilizer = new SpringMassStabilizer(
+      { x: 0, y: 0, pressure: 0.6 },
+      DEFAULT_STABILIZER_OPTIONS.smooth,
+      1000,
+    );
+
+    // 笔尖高速划到 (100, 0)
+    stabilizer.setTarget({ x: 100, y: 0, pressure: 0.2 });
+    // 假设抬笔前虚拟质点滞后在某个位置，直接调用 finish
+    const finalPoints = stabilizer.finish(1020);
+
+    expect(finalPoints.length).toBeGreaterThanOrEqual(1);
+    const last = finalPoints[finalPoints.length - 1];
+    expect(last.x).toBe(100);
+    expect(last.y).toBe(0);
+    expect(last.pressure).toBe(0.2);
+
+    // 质点位置应已完全同步至 targetPoint
+    const current = stabilizer.getCurrentStrokePoint();
+    expect(current.x).toBe(100);
+    expect(current.y).toBe(0);
+  });
 });
