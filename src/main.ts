@@ -1,6 +1,6 @@
-import { createApp } from "vue";
+import { createApp, reactive } from "vue";
 import { openTab } from "siyuan";
-import App, { setSaveDataFn, setLoadDataFn, setRemoveDataFn, pluginI18n, setOpenSketchInNewTabFn, refreshSketchImage, hiddenTopbarKeys, hiddenMoreMenuKeys } from "./App.vue";
+import App, { setSaveDataFn, setLoadDataFn, setRemoveDataFn, pluginI18n, setOpenSketchInNewTabFn, refreshSketchImage, hiddenTopbarKeys, hiddenMoreMenuKeys, penCursorStyle } from "./App.vue";
 import SketchEditor from "./editor/SketchEditor.vue";
 import { loadSketchData } from "./storage";
 import type { Plugin, Custom } from "siyuan";
@@ -34,7 +34,7 @@ async function mountSketchEditor(container: HTMLElement, sketchId: string, plugi
   const data = await loadSketchData((key) => plugin.loadData(key), sketchId);
   console.log("[Sketch Note] mountSketchEditor: data loaded", data ? "OK" : "NULL");
 
-  const tabApp = createApp(SketchEditor, {
+  const tabProps = reactive({
     blockId: sketchId,
     initialData: data,
     i18n: pluginI18n.value,
@@ -42,11 +42,14 @@ async function mountSketchEditor(container: HTMLElement, sketchId: string, plugi
     loadData: (key: string) => plugin.loadData(key),
     removeData: (key: string) => plugin.removeData(key),
     sourceBlockId,
-    themeMode: "light",
+    themeMode: "light" as const,
     embedMode: true,
+    penCursorStyle,
     hiddenTopbarKeys: hiddenTopbarKeys.value,
     hiddenMoreMenuKeys: hiddenMoreMenuKeys.value,
   });
+
+  const tabApp = createApp(SketchEditor, tabProps);
   tabApp.mount(container);
   currentTabApp = tabApp;
   currentTabSketchId = sketchId;

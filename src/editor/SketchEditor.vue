@@ -128,6 +128,7 @@
           :inputSettings="inputSettings"
           :templateId="currentTemplate"
           :lassoMode="lassoMode"
+          :penCursorStyle="props.penCursorStyle"
           :recorder="replayRecordingEnabled ? replayRecorder : undefined"
           :onLiveEvent="liveMode === 'writer' ? sendLiveEvent : undefined"
           @update:canUndo="canUndo = $event"
@@ -262,6 +263,7 @@ import { resolveEditorShortcut } from "./shortcuts";
 import { getDrawingToolForEditorTool, isShapeEditorTool } from "./tools";
 import type { EditorTool, ShapeEditorTool } from "./tools";
 import type { OcrProvider } from "@/search/ocrProvider";
+import type { PenCursorStyle } from "@/storage/pluginSettings";
 import EditorTopBar from "./EditorTopBar.vue";
 import SketchCanvas from "./SketchCanvas.vue";
 import ToolBar from "./ToolBar.vue";
@@ -309,6 +311,7 @@ const props = defineProps<{
   replayRecordConfig?: Partial<ReplayRecorderConfig>;
   hideReplayControls?: boolean;
   embedMode?: boolean;
+  penCursorStyle?: PenCursorStyle;
 }>();
 
 const emit = defineEmits<{ (e: "close"): void }>();

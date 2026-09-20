@@ -8,12 +8,13 @@ import {
 } from "siyuan";
 import "@/index.scss";
 import { init, destroy } from "./main";
-import { openSketchEditor, setI18n, setReplayPlaybackEnabled, setReplayRecordConfig, setReplayRecordingEnabled, setHideReplayControls, setOpenInNewTab, setHiddenTopbarKeys, setHiddenMoreMenuKeys } from "./App.vue";
+import { openSketchEditor, setI18n, setReplayPlaybackEnabled, setReplayRecordConfig, setReplayRecordingEnabled, setHideReplayControls, setOpenInNewTab, setHiddenTopbarKeys, setHiddenMoreMenuKeys, setPenCursorStyle } from "./App.vue";
 import { storageKey, createEmptySketchData, loadEditorPreferences, loadSketchData } from "./storage";
 import { normalizeSketchDataForSave } from "./storage/sketchIdentity";
 import { loadSketchIndex, saveSketchIndex, upsertSketchIndexItem } from "./storage/sketchIndex";
 import { extractInsertedBlockId } from "./storage/insertedBlockId";
 import { loadPluginSettings, savePluginSettings } from "./storage/pluginSettings";
+import type { PenCursorStyle } from "./storage/pluginSettings";
 import type { ReplayEventType, ReplayRecorderConfig } from "./recorder/types";
 import { setDebugLogEnabled } from "./utils/logger";
 import { isSettingHidden, getHiddenTopbarKeySet, getHiddenMoreMenuKeySet } from "./feature-flags/alpha-feature-config";
@@ -56,6 +57,7 @@ export default class SketchNotePlugin extends Plugin {
     setReplayRecordConfig(pluginSettings.replayRecordConfig);
     setHideReplayControls(pluginSettings.hideReplayControls);
     setOpenInNewTab(pluginSettings.openInNewTab);
+    setPenCursorStyle(pluginSettings.penCursorStyle);
     setHiddenTopbarKeys(getHiddenTopbarKeySet());
     setHiddenMoreMenuKeys(getHiddenMoreMenuKeySet());
 
@@ -158,6 +160,40 @@ export default class SketchNotePlugin extends Plugin {
           await savePluginSettings((key, data) => this.saveData(key, data), settings);
         });
         return checkbox;
+      },
+    });
+
+    setting.addItem({
+      title: this.i18n?.penCursorStyle ?? "Pen Cursor Style",
+      description: this.i18n?.penCursorStyleDesc ?? "Set cursor style for pen and highlighter on the canvas.",
+      createActionElement: () => {
+        const select = document.createElement("select");
+        select.className = "b3-select fn__flex-center";
+
+        const options: Array<{ value: PenCursorStyle; text: string }> = [
+          { value: "crosshair", text: this.i18n?.penCursorCrosshair ?? "Crosshair" },
+          { value: "colorDot", text: this.i18n?.penCursorColorDot ?? "Current Color Dot" },
+          { value: "brushSize", text: this.i18n?.penCursorBrushSize ?? "Brush Size Circle" },
+        ];
+
+        for (const opt of options) {
+          const optionEl = document.createElement("option");
+          optionEl.value = opt.value;
+          optionEl.textContent = opt.text;
+          if (settings.penCursorStyle === opt.value) {
+            optionEl.selected = true;
+          }
+          select.appendChild(optionEl);
+        }
+
+        select.addEventListener("change", async () => {
+          const newStyle = select.value as PenCursorStyle;
+          settings.penCursorStyle = newStyle;
+          setPenCursorStyle(newStyle);
+          await savePluginSettings((key, data) => this.saveData(key, data), settings);
+        });
+
+        return select;
       },
     });
 

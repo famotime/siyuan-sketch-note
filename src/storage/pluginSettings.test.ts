@@ -13,6 +13,7 @@ describe("plugin settings", () => {
       enableDebugLog: false,
       hideReplayControls: false,
       openInNewTab: false,
+      penCursorStyle: "crosshair",
       replayPlaybackEnabled: true,
       replayRecordingEnabled: false,
       replayRecordConfig: { ...DEFAULT_RECORDER_CONFIG },
@@ -26,13 +27,14 @@ describe("plugin settings", () => {
       async (key, data) => {
         store.set(key, data);
       },
-      { enableDebugLog: true },
+      { enableDebugLog: true, penCursorStyle: "brushSize" },
     );
 
     expect(store.get(pluginSettingsKey())).toEqual({
       enableDebugLog: true,
       hideReplayControls: false,
       openInNewTab: false,
+      penCursorStyle: "brushSize",
       replayPlaybackEnabled: true,
       replayRecordingEnabled: false,
       replayRecordConfig: { ...DEFAULT_RECORDER_CONFIG },
@@ -41,6 +43,13 @@ describe("plugin settings", () => {
     const loaded = await loadPluginSettings(async (key) => store.get(key));
 
     expect(loaded.enableDebugLog).toBe(true);
+    expect(loaded.penCursorStyle).toBe("brushSize");
+  });
+
+  it("normalizes penCursorStyle to crosshair for unknown values", () => {
+    expect(normalizePluginSettings({ penCursorStyle: "unknown" as any }).penCursorStyle).toBe("crosshair");
+    expect(normalizePluginSettings({ penCursorStyle: "colorDot" }).penCursorStyle).toBe("colorDot");
+    expect(normalizePluginSettings({ penCursorStyle: "brushSize" }).penCursorStyle).toBe("brushSize");
   });
 
   it("normalizes replay recording and grouped image replay settings", () => {

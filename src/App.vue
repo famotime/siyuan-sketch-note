@@ -9,6 +9,7 @@
     :loadData="pluginLoadData"
     :removeData="pluginRemoveData"
     :themeMode="themeMode"
+    :penCursorStyle="penCursorStyle"
     :replayPlaybackEnabled="replayPlaybackEnabled"
     :replayRecordingEnabled="replayRecordingEnabled"
     :replayRecordConfig="replayRecordConfig"
@@ -30,6 +31,7 @@ import { parseCssColor, getColorLuminance as getLuminance, resolveThemeModeFromC
 import { createLogger } from "@/utils/logger";
 import type { ReplayRecorderConfig } from "@/recorder/types";
 import { DEFAULT_RECORDER_CONFIG } from "@/recorder/types";
+import { penCursorStyle, setPenCursorStyle } from "@/composables/usePenCursorStyle";
 
 const editorVisible = ref(false);
 const editorBlockId = ref("");
@@ -221,6 +223,8 @@ export function setOpenInNewTab(value: boolean) {
   openInNewTab.value = value;
 }
 
+export { penCursorStyle, setPenCursorStyle };
+
 export function setHiddenTopbarKeys(keys: Set<string>) {
   hiddenTopbarKeys.value = keys;
 }
@@ -308,6 +312,7 @@ export default {
       pluginI18n,
       pluginSaveData,
       themeMode,
+      penCursorStyle,
       replayPlaybackEnabled,
       replayRecordingEnabled,
       replayRecordConfig,

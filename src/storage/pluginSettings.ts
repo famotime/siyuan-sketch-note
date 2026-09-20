@@ -3,10 +3,13 @@ import { DEFAULT_RECORDER_CONFIG } from "@/recorder/types";
 
 const PLUGIN_SETTINGS_KEY = "plugin-settings.json";
 
+export type PenCursorStyle = "crosshair" | "colorDot" | "brushSize";
+
 export interface SketchPluginSettings {
   enableDebugLog: boolean;
   hideReplayControls: boolean;
   openInNewTab: boolean;
+  penCursorStyle: PenCursorStyle;
   replayPlaybackEnabled: boolean;
   replayRecordingEnabled: boolean;
   replayRecordConfig: ReplayRecorderConfig;
@@ -22,10 +25,15 @@ export function normalizePluginSettings(input?: Partial<SketchPluginSettings> | 
     replayRecordConfig.imageTransform = false;
     replayRecordConfig.imageDelete = false;
   }
+  const penCursorStyle: PenCursorStyle =
+    input?.penCursorStyle === "colorDot" || input?.penCursorStyle === "brushSize"
+      ? input.penCursorStyle
+      : "crosshair";
   return {
     enableDebugLog: input?.enableDebugLog === true,
     hideReplayControls: input?.hideReplayControls === true,
     openInNewTab: input?.openInNewTab === true,
+    penCursorStyle,
     replayPlaybackEnabled: input?.replayPlaybackEnabled !== false,
     replayRecordingEnabled: input?.replayRecordingEnabled === true,
     replayRecordConfig,

@@ -153,6 +153,9 @@ import { useViewport } from "@/composables/useViewport";
 import { useTextEditing } from "@/composables/useTextEditing";
 import type { ReplayRecorder } from "@/recorder/recorder";
 import type { ElementTransformReplayEvent, ImageTransformSample, ReplayEvent, ReplayToolSource } from "@/recorder/types";
+import type { PenCursorStyle } from "@/storage/pluginSettings";
+import { penCursorStyle as globalPenCursorStyle } from "@/composables/usePenCursorStyle";
+import { resolveCanvasCursor } from "./cursor";
 
 const props = defineProps<{
   initialData: SketchData | null;
@@ -161,6 +164,7 @@ const props = defineProps<{
   inputSettings: SketchInputSettings;
   templateId: string;
   lassoMode: "freehand" | "box";
+  penCursorStyle?: PenCursorStyle;
   recorder?: ReplayRecorder;
   onLiveEvent?: (event: ReplayEvent) => void;
 }>();
@@ -287,36 +291,45 @@ onMounted(async () => {
   if (wetCanvasRef.value) {
     setupWetCanvas(wetCanvasRef.value, state);
   }
+  updateCanvasCursor();
   updateUndoRedoState();
   emitPageState();
 });
 
+function updateCanvasCursor() {
+  const elements = [wetCanvasRef.value, strokeCanvasRef.value, containerRef.value];
+  const effectiveCursorStyle = props.penCursorStyle ?? globalPenCursorStyle.value;
+  const cursor = resolveCanvasCursor({
+    tool: props.tool,
+    penCursorStyle: effectiveCursorStyle,
+    toolPresets: props.toolPresets,
+    viewportScale: viewportScale.value,
+  });
+
+  for (const el of elements) {
+    if (el) {
+      el.style.cursor = cursor;
+    }
+  }
+}
+
 watch(
-  [() => props.tool, () => props.toolPresets.eraser.width],
-  ([newTool, newWidth]) => {
-    updateCanvasCursor(newTool, newWidth);
+  [
+    () => props.tool,
+    () => props.penCursorStyle,
+    () => globalPenCursorStyle.value,
+    () => props.toolPresets?.eraser?.width,
+    () => props.toolPresets?.pen?.color,
+    () => props.toolPresets?.pen?.width,
+    () => props.toolPresets?.highlighter?.color,
+    () => props.toolPresets?.highlighter?.width,
+    () => viewportScale.value,
+  ],
+  () => {
+    updateCanvasCursor();
   },
   { immediate: true },
 );
-
-function updateCanvasCursor(tool: string, eraserWidth: number) {
-  const canvas = wetCanvasRef.value || strokeCanvasRef.value;
-  if (!canvas) return;
-  if (tool === "eraser") {
-    const w = Math.max(16, eraserWidth);
-    const r = eraserWidth / 2;
-    const center = w / 2;
-    const svg = `
-      <svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${w}" viewBox="0 0 ${w} ${w}">
-        <circle cx="${center}" cy="${center}" r="${r - 1}" stroke="rgba(255, 255, 255, 0.8)" stroke-width="1.5" fill="none"/>
-        <circle cx="${center}" cy="${center}" r="${r}" stroke="rgba(223, 76, 60, 0.9)" stroke-width="1" fill="rgba(223, 76, 60, 0.15)"/>
-      </svg>
-    `.trim().replace(/\s+/g, " ");
-    canvas.style.cursor = `url("data:image/svg+xml;utf8,${encodeURIComponent(svg)}") ${center} ${center}, auto`;
-  } else {
-    canvas.style.cursor = "crosshair";
-  }
-}
 
 function getEngineTool(tool: EditorTool): SketchTool {
   if (tool === "eraser") return "eraser";
